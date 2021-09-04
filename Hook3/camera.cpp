@@ -168,9 +168,9 @@ void cameraHookUpdate(PPCInterpreter_t* hCPU) {
 	glm::fvec3 rotatedHmdPos = glm::toMat3(combinedQuat) * hmdPos;
 
 
-	inputData.newPosX = inputData.oldPosX + (hmdPos.x * 10);
-	inputData.newPosY = inputData.oldPosY + (hmdPos.y * 10) + inputData.heightPositionOffsetSetting;
-	inputData.newPosZ = inputData.oldPosZ + (hmdPos.z * 10);
+	inputData.newPosX = inputData.oldPosX + (hmdPos.x * 1);
+	inputData.newPosY = inputData.oldPosY + (hmdPos.y * 1) + inputData.heightPositionOffsetSetting;
+	inputData.newPosZ = inputData.oldPosZ + (hmdPos.z * 1);
 
 	inputData.newTargetX = inputData.newPosX + ((combinedMatrix[2][0] * -1.0f) * originalCameraDistance);
 	inputData.newTargetY = inputData.newPosY + ((combinedMatrix[2][1] * -1.0f) * originalCameraDistance);
