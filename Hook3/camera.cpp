@@ -165,15 +165,19 @@ void cameraHookUpdate(PPCInterpreter_t* hCPU) {
 	glm::fquat combinedQuat = lookAtQuat * hmdQuat;
 	glm::fmat3 combinedMatrix = glm::toMat3(hmdQuat);
 
-	glm::fvec3 rotatedHmdPos = combinedQuat * hmdPos;
+	glm::fvec3 rotatedHmdPos = glm::toMat3(combinedQuat) * hmdPos;
 
-	inputData.newTargetX = inputData.oldPosX + ((combinedMatrix[2][0] * -1.0f) * originalCameraDistance) + rotatedHmdPos.x;
-	inputData.newTargetY = inputData.oldPosY + ((combinedMatrix[2][1] * -1.0f) * originalCameraDistance) + rotatedHmdPos.y + inputData.heightPositionOffsetSetting;
-	inputData.newTargetZ = inputData.oldPosZ + ((combinedMatrix[2][2] * -1.0f) * originalCameraDistance) + rotatedHmdPos.z;
 
-	inputData.newPosX = inputData.oldPosX + rotatedHmdPos.x;
-	inputData.newPosY = inputData.oldPosY + rotatedHmdPos.y + inputData.heightPositionOffsetSetting;
-	inputData.newPosZ = inputData.oldPosZ + rotatedHmdPos.z;
+	inputData.newPosX = inputData.oldPosX + (hmdPos.x * 10);
+	inputData.newPosY = inputData.oldPosY + (hmdPos.y * 10) + inputData.heightPositionOffsetSetting;
+	inputData.newPosZ = inputData.oldPosZ + (hmdPos.z * 10);
+
+	inputData.newTargetX = inputData.newPosX + ((combinedMatrix[2][0] * -1.0f) * originalCameraDistance);
+	inputData.newTargetY = inputData.newPosY + ((combinedMatrix[2][1] * -1.0f) * originalCameraDistance);
+	inputData.newTargetZ = inputData.newPosZ + ((combinedMatrix[2][2] * -1.0f) * originalCameraDistance);
+
+
+
 
 	inputData.newRotX = combinedMatrix[1][0];
 	inputData.newRotY = combinedMatrix[1][1];
