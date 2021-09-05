@@ -179,9 +179,9 @@ void cameraHookUpdate(PPCInterpreter_t* hCPU) {
 	swapEndianness(inputData.newPosY);
 	swapEndianness(inputData.newPosZ);
 
-	inputData.newPosX += (hmdPos.x * inputData.headPositionSensitivitySetting) + (hmdPos.x - eyePos.x);
-	inputData.newPosY += (hmdPos.y * inputData.headPositionSensitivitySetting) + (hmdPos.y - eyePos.y);
-	inputData.newPosZ += (hmdPos.z * inputData.headPositionSensitivitySetting) + (hmdPos.z - eyePos.z);
+	inputData.newPosX += (hmdPos.x * inputData.headPositionSensitivitySetting) - (hmdPos.x - eyePos.x);
+	inputData.newPosY += (hmdPos.y * inputData.headPositionSensitivitySetting) - (hmdPos.y - eyePos.y);
+	inputData.newPosZ += (hmdPos.z * inputData.headPositionSensitivitySetting) - (hmdPos.z - eyePos.z);
 
 	logPrint(std::to_string(inputData.newPosX) + " | " + std::to_string(inputData.newPosY) + " | " + std::to_string(inputData.newPosZ));
 
