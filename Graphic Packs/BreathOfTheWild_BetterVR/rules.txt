@@ -200,7 +200,7 @@ $headPositionSensitivity = 0.5
 name = Normal (Default)
 category = Player Size
 condition = $mode == 0
-$headPositionSensitivity = 1.4
+$headPositionSensitivity = 1.0
 
 [Preset]
 name = Big
