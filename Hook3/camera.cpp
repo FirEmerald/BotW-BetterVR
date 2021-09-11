@@ -238,9 +238,9 @@ void cameraHookUpdate(PPCInterpreter_t* hCPU) {
 	float verticalFOV = (leftView.fov.angleUp - leftView.fov.angleDown);
 	float aspectRatio = horizontalFOV / verticalFOV;
 
-	logPrint(std::string("Horizontal FOV in degrees is ") + std::to_string(glm::degrees(horizontalFOV)) + std::string(" and in radians (as used by OpenXR) ") + std::to_string(horizontalFOV));
-	logPrint(std::string("Vertical FOV in degrees is ") + std::to_string(glm::degrees(verticalFOV)) + std::string(" and in radians (as used by OpenXR) ") + std::to_string(verticalFOV));
-	logPrint(std::string("Calculated aspect ratio is ") + std::to_string(aspectRatio));
+	//logPrint(std::string("Horizontal FOV in degrees is ") + std::to_string(glm::degrees(horizontalFOV)) + std::string(" and in radians (as used by OpenXR) ") + std::to_string(horizontalFOV));
+	//logPrint(std::string("Vertical FOV in degrees is ") + std::to_string(glm::degrees(verticalFOV)) + std::string(" and in radians (as used by OpenXR) ") + std::to_string(verticalFOV));
+	//logPrint(std::string("Calculated aspect ratio is ") + std::to_string(aspectRatio));
 
 	inputData.newFOV = verticalFOV;
 	inputData.newAspectRatio = aspectRatio;
