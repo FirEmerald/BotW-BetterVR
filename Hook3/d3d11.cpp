@@ -205,10 +205,6 @@ void dx11Initialize() {
 	XrViewConfigurationProperties viewConfigurationProperties = { XR_TYPE_VIEW_CONFIGURATION_PROPERTIES };
 	checkXRResult(xrGetViewConfigurationProperties(xrInstanceHandle, xrSystemId, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, &viewConfigurationProperties), "The current headset doesn't support stereo rendering!");
 
-	if (!viewConfigurationProperties.fovMutable) {
-		MessageBoxA(NULL, "The OpenXR runtime that you're using doesn't allow the FOV to be changed! Click OK to continue regardless.", "Error: Missing Feature", NULL);
-	}
-
 	xrSwapchainSize.extent.width = viewConfigurations[0].recommendedImageRectWidth;
 	xrSwapchainSize.extent.height = viewConfigurations[0].recommendedImageRectHeight;
 
