@@ -229,12 +229,12 @@ void OpenXR::ProcessEvents() {
                 break;
             case XR_SESSION_STATE_STOPPING:
                 Log::print("OpenXR has indicated that the session should be ended!");
-                this->m_renderer.reset();
+                //this->m_renderer.reset();
                 break;
             case XR_SESSION_STATE_EXITING:
                 Log::print("OpenXR has indicated that the session should be destroyed!");
                 // an exception is thrown here instead of using exit() to allow Cemu to ideally gracefully shutdown
-                throw std::runtime_error("BetterVR mod has been requested to exit by OpenXR!");
+                //throw std::runtime_error("BetterVR mod has been requested to exit by OpenXR!");
                 break;
             case XR_SESSION_STATE_LOSS_PENDING:
                 Log::print("OpenXR has indicated that the session is going to be lost!");

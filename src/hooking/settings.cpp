@@ -1,6 +1,8 @@
 #include "cemu_hooks.h"
 
-std::atomic<data_VRSettingsIn> g_settings = {};
+std::mutex g_settingsMutex;
+data_VRSettingsIn g_settings = {};
+
 uint64_t CemuHooks::s_memoryBaseAddress = 0;
 std::atomic_uint32_t CemuHooks::s_framesSinceLastCameraUpdate = 0;
 
@@ -16,12 +18,14 @@ void CemuHooks::hook_UpdateSettings(PPCInterpreter_t* hCPU) {
     swapEndianness(settings.guiFollowSetting);
     swapEndianness(settings.alternatingEyeRenderingSetting);
 
-    g_settings.store(settings);
+    std::lock_guard<std::mutex> lock(g_settingsMutex);
+    g_settings = settings;
     s_framesSinceLastCameraUpdate++;
 }
 
 data_VRSettingsIn CemuHooks::GetSettings() {
-    return g_settings.load();
+    std::lock_guard<std::mutex> lock(g_settingsMutex);
+    return g_settings;
 }
 
 // currently unused

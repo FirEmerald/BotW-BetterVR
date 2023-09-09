@@ -446,6 +446,7 @@ XrCompositionLayerQuad RND_Renderer::Layer2D::FinishRendering() {
     const float width = aspectRatio > 1.0f ? aspectRatio : 1.0f;
     const float height = aspectRatio <= 1.0f ? 1.0f / aspectRatio : 1.0f;
 
+    // todo: change space to head space if we want to follow the head
     constexpr float MENU_SIZE = 1.0f;
     // clang-format off
     return {
