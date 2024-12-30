@@ -287,8 +287,8 @@ const std::array<XrCompositionLayerProjectionView, 2>& RND_Renderer::Layer3D::Fi
         },
         .minDepth = -1.0f,
         .maxDepth = 1.0f,
-        .nearZ = 0.1f,
-        .farZ = 1000.0f,
+        .nearZ = 1.0f,
+        .farZ = 10000.0f,
     };
     m_projectionViews[OpenXR::EyeSide::RIGHT] = {
         .type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW,
@@ -320,8 +320,8 @@ const std::array<XrCompositionLayerProjectionView, 2>& RND_Renderer::Layer3D::Fi
         },
         .minDepth = -1.0f,
         .maxDepth = 1.0f,
-        .nearZ = 0.1f,
-        .farZ = 1000.0f,
+        .nearZ = 1.0f,
+        .farZ = 10000.0f,
     };
     // clang-format on
     return m_projectionViews;
