@@ -271,6 +271,22 @@ struct data_VRSettingsIn {
     BEType<int32_t> alternatingEyeRenderingSetting;
     BEType<int32_t> cropFlatTo16x9Setting;
     BEType<float> playerHeightSetting;
+
+    bool IsFirstPersonMode() const {
+        return cameraModeSetting == 0;
+    }
+
+    bool UIFollowsLookingDirection() const {
+        return guiFollowSetting == 1;
+    }
+
+    bool IsAlternatingEyeRenderingEnabled() const {
+        return alternatingEyeRenderingSetting == 1;
+    }
+
+    bool ShouldFlatPreviewBeCroppedTo16x9() const {
+        return cropFlatTo16x9Setting == 1;
+    }
 };
 
 struct data_VRCameraIn {

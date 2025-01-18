@@ -22,11 +22,9 @@ data_VRProjectionMatrixOut calculateProjectionMatrix(XrFovf viewFOV) {
 
 OpenXR::EyeSide s_currentEye = OpenXR::EyeSide::RIGHT;
 std::pair<data_VRCameraRotationOut, OpenXR::EyeSide> s_currentCameraRotation = {};
-data_VRProjectionMatrixOut s_currentProjectionMatrix = {};
 
 glm::fvec3 g_lookAtPos;
 glm::fquat g_lookAtQuat;
-glm::fquat g_VRtoGame;
 
 // todo: for non-EAR versions it should use the same camera inputs for both eyes
 void CemuHooks::hook_UpdateCameraPositionAndTarget(PPCInterpreter_t* hCPU) {

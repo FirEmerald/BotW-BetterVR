@@ -45,10 +45,10 @@ public:
         void Render(OpenXR::EyeSide side);
         const std::array<XrCompositionLayerProjectionView, 2>& FinishRendering();
 
-        [[nodiscard]] Status3D GetStatus() const { return m_status; }
-        [[nodiscard]] XrFovf GetFOV(OpenXR::EyeSide side) const { return m_currViews[side].fov; }
-        [[nodiscard]] XrPosef GetPose(OpenXR::EyeSide side) const { return m_currViews[side].pose; }
-        [[nodiscard]] float GetAspectRatio(OpenXR::EyeSide side) const { return m_swapchains[side]->GetWidth() / (float)m_swapchains[side]->GetHeight(); }
+        Status3D GetStatus() const { return m_status; }
+        XrFovf GetFOV(OpenXR::EyeSide side) const { return m_currViews[side].fov; }
+        XrPosef GetPose(OpenXR::EyeSide side) const { return m_currViews[side].pose; }
+        float GetAspectRatio(OpenXR::EyeSide side) const { return m_swapchains[side]->GetWidth() / (float)m_swapchains[side]->GetHeight(); }
 
     private:
         std::array<std::unique_ptr<Swapchain<DXGI_FORMAT_R8G8B8A8_UNORM_SRGB>>, 2> m_swapchains;
@@ -104,7 +104,16 @@ public:
     Layer3D m_layer3D;
     Layer2D m_layer2D;
 
+    bool IsRendering3D() {
+        return m_presented3DLastFrame;
+    }
+    bool IsRendering2D() {
+        return m_presented2DLastFrame;
+    }
+
 protected:
     XrSession m_session;
     XrFrameState m_frameState = { XR_TYPE_FRAME_STATE };
+    std::atomic_bool m_presented3DLastFrame = false;
+    std::atomic_bool m_presented2DLastFrame = false;
 };

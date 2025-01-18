@@ -68,7 +68,8 @@ void RND_Renderer::EndFrame() {
 
     // todo: currently ignores m_frameState.shouldRender, but that's probably fine
     XrCompositionLayerQuad layer2D = { XR_TYPE_COMPOSITION_LAYER_QUAD };
-    if (m_layer2D.GetStatus() == Layer2D::Status2D::RENDERING) {
+    m_presented2DLastFrame = m_layer2D.GetStatus() == Layer2D::Status2D::RENDERING;
+    if (m_presented2DLastFrame) {
         // The HUD/menus aren't eye-specific, so just present the most recent one for both eyes at once
         m_layer2D.Render();
         layer2D = m_layer2D.FinishRendering();
@@ -77,6 +78,7 @@ void RND_Renderer::EndFrame() {
 
     XrCompositionLayerProjection layer3D = { XR_TYPE_COMPOSITION_LAYER_PROJECTION };
     std::array<XrCompositionLayerProjectionView, 2> layer3DViews = {};
+    m_presented3DLastFrame = false;
     if (m_layer3D.GetStatus() == Layer3D::Status3D::RENDERING) {
         m_layer3D.Render(OpenXR::EyeSide::LEFT);
         m_layer3D.Render(OpenXR::EyeSide::RIGHT);
@@ -86,6 +88,7 @@ void RND_Renderer::EndFrame() {
         layer3D.viewCount = (uint32_t)layer3DViews.size();
         layer3D.views = layer3DViews.data();
         if (CemuHooks::GetFramesSinceLastCameraUpdate() < 2) {
+            m_presented3DLastFrame = true;
             compositionLayers.emplace_back(reinterpret_cast<XrCompositionLayerBaseHeader*>(&layer3D));
         }
     }
@@ -421,7 +424,7 @@ XrCompositionLayerQuad RND_Renderer::Layer2D::FinishRendering() {
     glm::quat headOrientation = glm::quat(spaceLocation.pose.orientation.w, spaceLocation.pose.orientation.x, spaceLocation.pose.orientation.y, spaceLocation.pose.orientation.z);
     glm::vec3 headPosition = glm::vec3(spaceLocation.pose.position.x, spaceLocation.pose.position.y, spaceLocation.pose.position.z);
 
-    if (CemuHooks::GetSettings().guiFollowSetting == 1) {
+    if (CemuHooks::GetSettings().UIFollowsLookingDirection()) {
         m_currentOrientation = glm::slerp(m_currentOrientation, headOrientation, LERP_SPEED);
         glm::vec3 forwardDirection = headOrientation * glm::vec3(0.0f, 0.0f, -1.0f);
 

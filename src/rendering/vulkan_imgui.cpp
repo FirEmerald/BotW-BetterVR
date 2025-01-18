@@ -221,7 +221,7 @@ void RND_Vulkan::ImGuiOverlay::BeginFrame() {
         m_hudFramebufferDescriptorSet = ImGui_ImplVulkan_AddTexture(m_sampler, m_hudFramebuffer->GetImageView(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     }
 
-    const bool shouldCrop3DTo16_9 = VRManager::instance().Hooks->GetSettings().cropFlatTo16x9Setting == 1;
+    const bool shouldCrop3DTo16_9 = CemuHooks::GetSettings().cropFlatTo16x9Setting == 1;
 
     // calculate width minus the retina scaling
     ImVec2 windowSize = ImGui::GetIO().DisplaySize;
@@ -272,10 +272,12 @@ void RND_Vulkan::ImGuiOverlay::BeginFrame() {
 void RND_Vulkan::ImGuiOverlay::Draw3DLayerAsBackground(VkCommandBuffer cb, VkImage srcImage, float aspectRatio) {
     m_mainFramebuffer->vkPipelineBarrier(cb);
     m_mainFramebuffer->vkTransitionLayout(cb, VK_IMAGE_LAYOUT_GENERAL);
-    m_mainFramebuffer->vkClear(cb, { 0.0f, 0.0f, 0.0f, 0.0f });
-    m_mainFramebuffer->vkPipelineBarrier(cb);
-    m_mainFramebuffer->vkTransitionLayout(cb, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    m_mainFramebuffer->vkCopyFromImage(cb, srcImage);
+    m_mainFramebuffer->vkClear(cb, { 0.0f, 0.0f, 0.0f, 1.0f });
+    if (VRManager::instance().XR->GetRenderer()->IsRendering3D()) {
+        m_mainFramebuffer->vkPipelineBarrier(cb);
+        m_mainFramebuffer->vkTransitionLayout(cb, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        m_mainFramebuffer->vkCopyFromImage(cb, srcImage);
+    }
     m_mainFramebuffer->vkPipelineBarrier(cb);
     m_mainFramebuffer->vkTransitionLayout(cb, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
@@ -347,7 +349,7 @@ void RND_Vulkan::ImGuiOverlay::DrawOverlayToImage(VkCommandBuffer cb, VkImage de
     m_framebuffers[m_framebufferIdx]->vkPipelineBarrier(cb);
 
     // start render pass
-    VkClearValue clearValue = { .color = { 0.0f, 0.0f, 0.0f, 1.0f } };
+    VkClearValue clearValue = { .color = { 1.0f, 1.0f, 1.0f, 1.0f } };
     VkRenderPassBeginInfo renderPassInfo = {
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
         .renderPass = m_renderPass,
