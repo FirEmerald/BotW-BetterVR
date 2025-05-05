@@ -192,11 +192,11 @@ void RND_Renderer::Layer3D::Render(OpenXR::EyeSide side) {
     ID3D12CommandQueue* queue = VRManager::instance().D3D12->GetCommandQueue();
     ID3D12CommandAllocator* allocator = VRManager::instance().D3D12->GetFrameAllocator();
 
-    RND_D3D12::CommandContext<true> renderSharedTexture(device, queue, allocator, [this, side](RND_D3D12::CommandContext<true>* context) {
+    RND_D3D12::CommandContext<false> renderSharedTexture(device, queue, allocator, [this, side](RND_D3D12::CommandContext<false>* context) {
         context->GetRecordList()->SetName(L"RenderSharedTexture");
         Log::print("[D3D12] Waiting for 3D layer's {} side to be 1", side == OpenXR::EyeSide::LEFT ? "left" : "right");
-        context->WaitFor(m_textures[side].get(), 0);
-        context->WaitFor(m_depthTextures[side].get(), 0);
+        context->WaitFor(m_textures[side].get(), SEMAPHORE_TO_D3D12);
+        context->WaitFor(m_depthTextures[side].get(), SEMAPHORE_TO_D3D12);
         m_textures[side]->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         m_depthTextures[side]->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
@@ -208,8 +208,8 @@ void RND_Renderer::Layer3D::Render(OpenXR::EyeSide side) {
 
         m_textures[side]->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_COPY_DEST);
         m_depthTextures[side]->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_COPY_DEST);
-        context->Signal(m_textures[side].get(), 0);
-        context->Signal(m_depthTextures[side].get(), 0);
+        context->Signal(m_textures[side].get(), SEMAPHORE_TO_VULKAN);
+        context->Signal(m_depthTextures[side].get(), SEMAPHORE_TO_VULKAN);
         Log::print("[D3D12 - 3D Layer] Signalling for 3D layer's {} side to be 0", side == OpenXR::EyeSide::LEFT ? "left" : "right");
     });
     Log::print("[D3D12 - 3D Layer] Rendering finished");
@@ -346,13 +346,13 @@ void RND_Renderer::Layer2D::Render() {
     ID3D12CommandQueue* queue = VRManager::instance().D3D12->GetCommandQueue();
     ID3D12CommandAllocator* allocator = VRManager::instance().D3D12->GetFrameAllocator();
 
-    RND_D3D12::CommandContext<true> renderSharedTexture(device, queue, allocator, [this](RND_D3D12::CommandContext<true>* context) {
+    RND_D3D12::CommandContext<false> renderSharedTexture(device, queue, allocator, [this](RND_D3D12::CommandContext<false>* context) {
         context->GetRecordList()->SetName(L"RenderSharedTexture");
 
         // wait for both since we only have one 2D swap buffer to render to
         // fixme: Why do we signal to the global command list instead of the local one?!
         Log::print("[D3D12] Waiting for 2D layer's texture to be 1");
-        context->WaitFor(m_texture.get(), 0);
+        context->WaitFor(m_texture.get(), SEMAPHORE_TO_D3D12);
         m_texture->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
         m_presentPipeline->BindAttachment(0, m_texture->d3d12GetTexture());

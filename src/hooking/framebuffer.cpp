@@ -273,6 +273,8 @@ VkResult VkDeviceOverrides::QueueSubmit(const vkroots::VkDeviceDispatch* pDispat
         return pDispatch->QueueSubmit(queue, submitCount, pSubmits, fence);
     }
     else {
+        Log::print("[VULKAN] QueueSubmit called with {} active copy operations", s_activeCopyOperations.size());
+
         // insert (possible) pipeline barriers for any active copy operations
         struct ModifiedSubmitInfo_t {
             std::vector<VkSemaphore> waitSemaphores;
@@ -320,13 +322,16 @@ VkResult VkDeviceOverrides::QueueSubmit(const vkroots::VkDeviceDispatch* pDispat
             }
 
             // insert timeline semaphores for active copy operations
+            bool foundCommandBufferForActiveCopyOperations = false;
             for (uint32_t j = 0; j < submitInfo.commandBufferCount; j++) {
                 for (auto it = s_activeCopyOperations.begin(); it != s_activeCopyOperations.end();) {
                     if (submitInfo.pCommandBuffers[j] == it->first) {
                         // wait for D3D12/XR to finish with the previous shared texture render
                         modifiedSubmitInfo.waitSemaphores.emplace_back(it->second->GetSemaphore());
                         modifiedSubmitInfo.waitDstStageMasks.emplace_back(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
-                        modifiedSubmitInfo.timelineWaitValues.emplace_back(0);
+                        modifiedSubmitInfo.timelineWaitValues.emplace_back(SEMAPHORE_TO_VULKAN);
+
+#if defined(_DEBUG)
                         wchar_t name[128] = {};
                         UINT size = sizeof(name);
                         it->second->d3d12GetTexture()->GetPrivateData(WKPDID_D3DDebugObjectNameW, &size, name);
@@ -336,16 +341,35 @@ VkResult VkDeviceOverrides::QueueSubmit(const vkroots::VkDeviceDispatch* pDispat
 
 
                         Log::print("[VULKAN] Waiting for {} to be 0 inside the cmd buffer {}", nameStr, (void*)submitInfo.pCommandBuffers[j]);
+                        Log::print("[VULKAN] Signalling to {} to be 1 inside the cmd buffer {}", nameStr, (void*)submitInfo.pCommandBuffers[j]);
 
+#endif
                         // signal to D3D12/XR rendering that the shared texture can be rendered to VR headset
                         modifiedSubmitInfo.signalSemaphores.emplace_back(it->second->GetSemaphore());
-                        modifiedSubmitInfo.timelineSignalValues.emplace_back(0);
-                        Log::print("[VULKAN] Signalling to {} to be 1 inside the cmd buffer {}", nameStr, (void*)submitInfo.pCommandBuffers[j]);
+                        modifiedSubmitInfo.timelineSignalValues.emplace_back(SEMAPHORE_TO_D3D12);
                         it = s_activeCopyOperations.erase(it);
+                        foundCommandBufferForActiveCopyOperations = true;
                     }
                     else {
                         ++it;
                     }
+                }
+            }
+
+            if (!foundCommandBufferForActiveCopyOperations) {
+                Log::print("[VULKAN] No command buffer found for active copy operations!");
+                Log::print("[VULKAN] Active copy operations:");
+                for (const auto& op : s_activeCopyOperations) {
+                    wchar_t name[128] = {};
+                    UINT size = sizeof(name);
+                    op.second->d3d12GetTexture()->GetPrivateData(WKPDID_D3DDebugObjectNameW, &size, name);
+                    std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+                    std::string nameStr = converter.to_bytes(name);
+                    Log::print("[VULKAN]   - Command buffer: {}, Texture: {}", (void*)op.first, nameStr);
+                }
+                Log::print("[VULKAN] Submitted command buffers:");
+                for (uint32_t j = 0; j < submitInfo.commandBufferCount; j++) {
+                    Log::print("[VULKAN]   - Command buffer: {}", (void*)submitInfo.pCommandBuffers[j]);
                 }
             }
 
