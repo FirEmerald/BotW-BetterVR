@@ -2,7 +2,9 @@
 #include "cemu_hooks.h"
 #include "hands.h"
 
+
 std::array<WeaponMotionAnalyser, 2> CemuHooks::m_motionAnalyzers = {};
+std::array<uint32_t, 2> CemuHooks::m_heldWeapons = { 0, 0 };
 
 static void ModifyWeaponMtxToVRPose(OpenXR::EyeSide side, BEMatrix34& toBeAdjustedMtx, glm::fquat cameraRotation, glm::fvec3 cameraPosition) {
     OpenXR::InputState inputs = VRManager::instance().XR->m_input.load();
@@ -75,24 +77,19 @@ void CemuHooks::hook_ChangeWeaponMtx(PPCInterpreter_t* hCPU) {
     hCPU->gpr[9] = 0; // this is used to indicate whether the weapon was modified
     hCPU->gpr[11] = 0; // this is used to drop the weapon if the grip button is pressed
 
-    if (CemuHooks::GetSettings().IsThirdPersonMode()) {
+    if (GetSettings().IsThirdPersonMode()) {
         return;
     }
 
-    uint32_t actorPtr = hCPU->gpr[3];
+    uint32_t actorPtr = hCPU->gpr[3]; // holder of weapon
     uint32_t boneNamePtr = hCPU->gpr[4];
     uint32_t weaponMtxPtr = hCPU->gpr[5];
     uint32_t playerMtxPtr = hCPU->gpr[6];
     uint32_t modelBindInfoMtxPtr = hCPU->gpr[7];
-    uint32_t targetActorPtr = hCPU->gpr[8];
+    uint32_t targetActorPtr = hCPU->gpr[8]; // weapon that's being held
     uint32_t cameraPtr = hCPU->gpr[10];
 
-    uint32_t actorLinkPtr = actorPtr + offsetof(ActorWiiU, name) + offsetof(sead::FixedSafeString40, c_str);
-    uint32_t actorNamePtr = 0;
-    readMemoryBE(actorLinkPtr, &actorNamePtr);
-    if (actorNamePtr == 0)
-        return;
-    char* actorName = (char*)s_memoryBaseAddress + actorNamePtr;
+    sead::FixedSafeString40 actorName = getMemory<sead::FixedSafeString40>(actorPtr + offsetof(ActorWiiU, name));
 
     BESeadLookAtCamera camera = {};
     readMemory(cameraPtr, &camera);
@@ -108,23 +105,28 @@ void CemuHooks::hook_ChangeWeaponMtx(PPCInterpreter_t* hCPU) {
     char* boneName = (char*)s_memoryBaseAddress + boneNamePtr;
 
     // real logic
-    bool isHeldByPlayer = strcmp(actorName, "GameROMPlayer") == 0;
+    bool isHeldByPlayer = actorName.getLE() == "GameROMPlayer";
     bool isLeftHandWeapon = strcmp(boneName, "Weapon_L") == 0;
     bool isRightHandWeapon = strcmp(boneName, "Weapon_R") == 0;
-    if (actorName[0] != '\0' && boneName[0] != '\0' && isHeldByPlayer && (isLeftHandWeapon || isRightHandWeapon)) {
+    if (!actorName.getLE().empty() && boneName[0] != '\0' && isHeldByPlayer && (isLeftHandWeapon || isRightHandWeapon)) {
+        OpenXR::EyeSide side = isLeftHandWeapon ? OpenXR::EyeSide::LEFT : OpenXR::EyeSide::RIGHT;
+
+        m_heldWeapons[side] = targetActorPtr;
+
         BEMatrix34 weaponMtx = {};
         readMemory(weaponMtxPtr, &weaponMtx);
 
         BEMatrix34 modelBindInfoMtx = {};
         readMemory(modelBindInfoMtxPtr, &modelBindInfoMtx);
 
-        ModifyWeaponMtxToVRPose(isLeftHandWeapon ? OpenXR::EyeSide::LEFT : OpenXR::EyeSide::RIGHT, weaponMtx, lookAtQuat, lookAtPos);
+        ModifyWeaponMtxToVRPose(side, weaponMtx, lookAtQuat, lookAtPos);
 
         // prevent weapon transparency
         BEType<float> modelOpacity = 1.0f;
         writeMemory(targetActorPtr + offsetof(ActorWiiU, modelOpacity), &modelOpacity);
-        uint8_t opacityOrSomethingEnabled = 1;
-        writeMemory(targetActorPtr + offsetof(ActorWiiU, opacityOrSomethingEnabled), &opacityOrSomethingEnabled);
+        writeMemory(targetActorPtr + offsetof(ActorWiiU, startModelOpacity), &modelOpacity);
+        uint8_t opacityOrDoFlushOpacityToGPU = 1;
+        writeMemory(targetActorPtr + offsetof(ActorWiiU, opacityOrDoFlushOpacityToGPU), &opacityOrDoFlushOpacityToGPU);
 
         writeMemory(weaponMtxPtr, &weaponMtx);
         writeMemory(modelBindInfoMtxPtr, &modelBindInfoMtx);
@@ -150,7 +152,7 @@ void CemuHooks::hook_EnableWeaponAttackSensor(PPCInterpreter_t* hCPU) {
 
     WeaponType weaponType = weapon.type.getLE();
     if (weaponType == WeaponType::Bow || weaponType == WeaponType::Shield) {
-        Log::print("!! Skipping motion analysis for Bow/Shield (type: {})", (int)weaponType);
+        //Log::print("!! Skipping motion analysis for Bow/Shield (type: {})", (int)weaponType);
         return;
     }
 
@@ -175,7 +177,7 @@ void CemuHooks::hook_EnableWeaponAttackSensor(PPCInterpreter_t* hCPU) {
     // Use the analysed motion to determine whether the weapon is swinging or stabbing, and whether the attackSensor should be active this frame
     if (isHeldByPlayer && m_motionAnalyzers[heldIndex].IsAttacking()) {
         m_motionAnalyzers[heldIndex].SetHitboxEnabled(true);
-        Log::print("!! Activate sensor for {}: isHeldByPlayer={}, weaponType={}", heldIndex, isHeldByPlayer, (int)weaponType);
+        //Log::print("!! Activate sensor for {}: isHeldByPlayer={}, weaponType={}", heldIndex, isHeldByPlayer, (int)weaponType);
         weapon.setupAttackSensor.resetAttack = 1;
         weapon.setupAttackSensor.mode = 2;
         weapon.setupAttackSensor.isContactLayerInitialized = 0;
@@ -186,7 +188,7 @@ void CemuHooks::hook_EnableWeaponAttackSensor(PPCInterpreter_t* hCPU) {
     }
     else if (m_motionAnalyzers[heldIndex].IsHitboxEnabled()) {
         m_motionAnalyzers[heldIndex].SetHitboxEnabled(false);
-        Log::print("!! Deactivate sensor for {}: isHeldByPlayer={}, weaponType={}", heldIndex, isHeldByPlayer, (int)weaponType);
+        //Log::print("!! Deactivate sensor for {}: isHeldByPlayer={}, weaponType={}", heldIndex, isHeldByPlayer, (int)weaponType);
 
         weapon.setupAttackSensor.resetAttack = 1;
         weapon.setupAttackSensor.mode = 1; // deactivate attack sensor

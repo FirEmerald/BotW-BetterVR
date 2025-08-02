@@ -17,8 +17,8 @@ hook_UseCustomCameraDistance:
 mflr r0
 stwu r1, -0x10(r1)
 stw r0, 0x14(r1)
-lwz r3, 0x08(r1)
-lwz r4, 0x04(r1)
+stw r3, 0x08(r1)
+stw r4, 0x04(r1)
 
 ; load the user-selected camera distance
 lis r9, customCameraDistance@ha
@@ -89,13 +89,15 @@ blr
 ;; disables more SetWeaponOpacity calls
 ;0x02D55084 = .int ((($cameraMode == 0) * 0x4B751A55) + (($cameraMode == 1) * 0x60000000))
 ;
-;; disables the transition effect when an object goes out of view/near the camera
-;; 0x4182003C = beq 0x02D53130
-;; 0x60000000 = nop
+
+
+; disables the transition effect when an object goes out of view/near the camera
+; 0x4182003C = beq 0x02D53130
+; 0x60000000 = nop
 ;0x02D530F4 = .int ((($cameraMode == 0) * 0x4182003C) + (($cameraMode == 1) * 0x60000000))
-;
-;; disables the opacity fade effect when it gets near any graphics
+
+; disables the opacity fade effect when it gets near any graphics
 ;0x02C05A2C = .int ((($cameraMode == 0) * 0x2C040000) + (($cameraMode == 1) * 0x7C042000))
-;
-;; disables camera collision fading when it collides with objects
+
+; disables camera collision fading when it collides with objects
 ;0x02C07848 = .int ((($cameraMode == 0) * 0x2C030000) + (($cameraMode == 1) * 0x2C010000))

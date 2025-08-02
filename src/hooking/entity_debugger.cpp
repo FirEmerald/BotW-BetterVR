@@ -109,11 +109,11 @@ void EntityDebugger::UpdateEntityMemory() {
             //     writeMemory(actorData.second + offsetof(ActorWiiU, modelOpacity), &modelOpacity);
             // }
             // {
-            //     uint8_t opacityOrSomethingEnabled = 0;
-            //     writeMemory(actorData.second + offsetof(ActorWiiU, opacityOrSomethingEnabled), &opacityOrSomethingEnabled);
-            //     writeMemory(actorData.second + offsetof(ActorWiiU, opacityOrSomethingEnabled)+1, &opacityOrSomethingEnabled);
-            //     writeMemory(actorData.second + offsetof(ActorWiiU, opacityOrSomethingEnabled)-1, &opacityOrSomethingEnabled);
-            //     writeMemory(actorData.second + offsetof(ActorWiiU, opacityOrSomethingEnabled)-2, &opacityOrSomethingEnabled);
+            //     uint8_t opacityOrDoFlushOpacityToGPU = 0;
+            //     writeMemory(actorData.second + offsetof(ActorWiiU, opacityOrDoFlushOpacityToGPU), &opacityOrDoFlushOpacityToGPU);
+            //     writeMemory(actorData.second + offsetof(ActorWiiU, opacityOrDoFlushOpacityToGPU)+1, &opacityOrDoFlushOpacityToGPU);
+            //     writeMemory(actorData.second + offsetof(ActorWiiU, opacityOrDoFlushOpacityToGPU)-1, &opacityOrDoFlushOpacityToGPU);
+            //     writeMemory(actorData.second + offsetof(ActorWiiU, opacityOrDoFlushOpacityToGPU)-2, &opacityOrDoFlushOpacityToGPU);
             // }
         }
         else if (actorData.first == "GameRomCamera") {
@@ -123,8 +123,8 @@ void EntityDebugger::UpdateEntityMemory() {
         else if (actorData.first.starts_with("Weapon_Sword")) {
             // BEType<float> modelOpacity = 1.0f;
             // writeMemory(actorData.second + offsetof(ActorWiiU, modelOpacity), &modelOpacity);
-            // uint8_t opacityOrSomethingEnabled = 1;
-            // writeMemory(actorData.second + offsetof(ActorWiiU, opacityOrSomethingEnabled), &opacityOrSomethingEnabled);
+            // uint8_t opacityOrDoFlushOpacityToGPU = 1;
+            // writeMemory(actorData.second + offsetof(ActorWiiU, opacityOrDoFlushOpacityToGPU), &opacityOrDoFlushOpacityToGPU);
         }
     }
 
@@ -189,7 +189,7 @@ void EntityDebugger::UpdateEntityMemory() {
         // addField.operator()<uint32_t>("gsysModelPtr", offsetof(ActorWiiU, gsysModelPtr));
         // addField.operator()<float>("startModelOpacity", offsetof(ActorWiiU, startModelOpacity));
         // addField.operator()<float>("modelOpacity", offsetof(ActorWiiU, modelOpacity));
-        // addField.operator()<uint8_t>("opacityOrSomethingEnabled", offsetof(ActorWiiU, opacityOrSomethingEnabled));
+        // addField.operator()<uint8_t>("opacityOrDoFlushOpacityToGPU", offsetof(ActorWiiU, opacityOrDoFlushOpacityToGPU));
         addField.operator()<BEVec3>("aabb_min", offsetof(ActorWiiU, aabb.minX));
         addField.operator()<BEVec3>("aabb_max", offsetof(ActorWiiU, aabb.maxX));
         addField.operator()<uint32_t>("flags2", offsetof(ActorWiiU, flags2));
@@ -437,6 +437,9 @@ void EntityDebugger::DrawEntityInspector() {
                             uint32_t size = std::get<MemoryRange>(value.value).end - std::get<MemoryRange>(value.value).start;
                             std::string windowName = std::format("{} at {:08X} with size of {:08X}", value.value_name, value.value_address, size);
                             mem_edit->DrawWindow(windowName.c_str(), (ImU8*)CemuHooks::GetMemoryBaseAddress()+(size_t)data, size, 0x0);
+                            if (mem_edit->Open == false) {
+                                value.expanded = false;
+                            }
                         }
                     }
                     else if constexpr (std::is_same_v<T, std::string>) {

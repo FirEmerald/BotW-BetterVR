@@ -324,6 +324,8 @@ void CemuHooks::hook_EndCameraSide(PPCInterpreter_t* hCPU) {
 
     if (VRManager::instance().XR->GetRenderer()->IsInitialized() && side == OpenXR::EyeSide::RIGHT) {
         VRManager::instance().XR->GetRenderer()->EndFrame();
+        CemuHooks::m_heldWeapons[0] = 0;
+        CemuHooks::m_heldWeapons[1] = 0;
     }
 
     Log::print("{0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0}", side == OpenXR::EyeSide::LEFT ? "LEFT" : "RIGHT");
@@ -347,26 +349,41 @@ constexpr uint32_t playerVTable = 0x101E5FFC;
 void CemuHooks::hook_SetActorOpacity(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
 
-    double toBeSetOpacity = hCPU->fpr[0].fp0;
+    double toBeSetOpacity = hCPU->fpr[1].fp0;
     uint32_t actorPtr = hCPU->gpr[3];
 
-    ActorWiiU actor = {};
+    ActorWiiU actor;
     readMemory(actorPtr, &actor);
 
-    if (actor.vtable.getLE() == playerVTable && GetSettings().IsFirstPersonMode()) {
-        //Log::print("[PPC] Setting player opacity to {} for actor at {:08X}", toBeSetOpacity, actorPtr);
-        toBeSetOpacity = 0.0;
-        uint8_t opacityOrSomethingEnabled = 1;
-        writeMemoryBE(actorPtr + offsetof(ActorWiiU, startModelOpacity), &toBeSetOpacity);
-        writeMemoryBE(actorPtr + offsetof(ActorWiiU, modelOpacity), &toBeSetOpacity);
-        writeMemoryBE(actorPtr + offsetof(ActorWiiU, opacityOrSomethingEnabled), &opacityOrSomethingEnabled);
-        return;
+    if (GetSettings().IsFirstPersonMode()) {
+        uint32_t actorVTable = actor.vtable.getLE();
+        if (actorVTable == playerVTable) {
+            //Log::print("[PPC] Setting player opacity to {} for actor at {:08X}", toBeSetOpacity, actorPtr);
+            toBeSetOpacity = 0.0;
+            uint8_t opacityOrDoFlushOpacityToGPU = 1;
+            //writeMemoryBE(actorPtr + offsetof(ActorWiiU, startModelOpacity), &toBeSetOpacity);
+            writeMemoryBE(actorPtr + offsetof(ActorWiiU, modelOpacity), &toBeSetOpacity);
+            writeMemoryBE(actorPtr + offsetof(ActorWiiU, opacityOrDoFlushOpacityToGPU), &opacityOrDoFlushOpacityToGPU);
+            return;
+        }
+
+        // prevent the game from hiding weapons that clip into the player model or are hidden for some other reason
+        if (m_heldWeapons[0] == actorPtr || m_heldWeapons[1] == actorPtr) {
+            //Log::print("!! PREVENTING setting the weapon opacity for a held weapon {} for actor at {:08X} (LR = {:08X})", toBeSetOpacity, actorPtr, hCPU->sprNew.LR);
+            toBeSetOpacity = 1.0;
+            uint8_t opacityOrDoFlushOpacityToGPU = 0;
+            writeMemoryBE(actorPtr + offsetof(ActorWiiU, startModelOpacity), &toBeSetOpacity);
+            writeMemoryBE(actorPtr + offsetof(ActorWiiU, modelOpacity), &toBeSetOpacity);
+            writeMemoryBE(actorPtr + offsetof(ActorWiiU, opacityOrDoFlushOpacityToGPU), &opacityOrDoFlushOpacityToGPU);
+            return;
+        }
     }
 
     if (actor.modelOpacity.getLE() != toBeSetOpacity) {
-        //Log::print("[PPC] Setting actor opacity to {} for actor at {:08X}", toBeSetOpacity, actorPtr);
-        uint8_t opacityOrSomethingEnabled = 1;
+        //Log::print("!! Currently held weapon ptrs: {:08X} {:08X}", CemuHooks::m_heldWeapons[0], CemuHooks::m_heldWeapons[1]);
+        //Log::print("!! Setting opacity of '{}' (vtable = {:08X}, ptr = {:08X}) to opacity {} (LR = {:08X})", actor.name.getLE(), actor.vtable.getLE(), actorPtr, toBeSetOpacity, hCPU->sprNew.LR);
+        uint8_t opacityOrDoFlushOpacityToGPU = 1;
         writeMemoryBE(actorPtr + offsetof(ActorWiiU, modelOpacity), &toBeSetOpacity);
-        writeMemoryBE(actorPtr + offsetof(ActorWiiU, opacityOrSomethingEnabled), &opacityOrSomethingEnabled);
+        writeMemoryBE(actorPtr + offsetof(ActorWiiU, opacityOrDoFlushOpacityToGPU), &opacityOrDoFlushOpacityToGPU);
     }
 }

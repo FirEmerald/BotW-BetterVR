@@ -84,7 +84,7 @@ $enableDebugOverlay:int = 0
 # 2D Viewer - Crop VR Image To 16:9
 [Preset]
 name = Crop 3D Game World To 16:9 (Recommended)
-category = Keep 2D VR View in Cemu (Might Cause Bugs)
+category = Crop VR Image
 condition = $enable2DView == 1
 default = 1
 $cropFlatTo16_9:int = 1

@@ -52,6 +52,7 @@ public:
 
     std::unique_ptr<class EntityDebugger> m_entityDebugger;
     static std::array<class WeaponMotionAnalyser, 2> m_motionAnalyzers;
+    static std::array<uint32_t, 2> m_heldWeapons;
 
     static void DrawDebugOverlays();
 
@@ -73,6 +74,7 @@ private:
     static void hook_InjectXRInput(PPCInterpreter_t* hCPU);
     static void hook_ModifyHandModelAccessSearch(PPCInterpreter_t* hCPU);
     static void hook_ChangeWeaponMtx(PPCInterpreter_t* hCPU);
+
 
     // todo: remove this in favour of a better tell when the user is inside a menu
     static void hook_updateCameraOLD(PPCInterpreter_t* hCPU);

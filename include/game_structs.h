@@ -2,7 +2,7 @@
 
 #pragma pack(push, 1)
 namespace sead {
-    struct SafeString {
+    struct SafeString : BETypeCompatible {
         BEType<uint32_t> c_str;
         BEType<uint32_t> vtable;
     };
@@ -19,7 +19,7 @@ namespace sead {
             if (c_str.getLE() == 0) {
                 return std::string();
             }
-            return std::string(reinterpret_cast<const char*>(c_str.getBE()), strnlen(reinterpret_cast<const char*>(c_str.getBE()), 0x40));
+            return std::string(data, strnlen(data, sizeof(data)));
         }
     };
     static_assert(sizeof(FixedSafeString40) == 0x4C, "FixedSafeString40 size mismatch");
@@ -58,6 +58,102 @@ struct BaseProc {
 };
 static_assert(sizeof(BaseProc) == 0xEC, "BaseProc size mismatch");
 
+enum ActorFlags : int32_t {
+    ActorFlags_1 = 0x1,
+    ActorFlags_PhysicsPauseDisable = 0x2,
+    ActorFlags_SetPhysicsMtx = 0x4,
+    ActorFlags_DisableUpdateMtxFromPhysics = 0x8,
+    ActorFlags_UndispCut = 0x10,
+    ActorFlags_ModelBind = 0x20,
+    ActorFlags_ParamW = 0x40,
+    ActorFlags_80 = 0x80,
+    ActorFlags_100 = 0x100,
+    ActorFlags_200 = 0x200,
+    ActorFlags_400 = 0x400,
+    ActorFlags_KeepLinkTagOrAreaAliveMaybe = 0x4000,
+    ActorFlags_EnableForbidPushJob = 0x40000,
+    ActorFlags_DisableForbidPushJob = 0x80000,
+    ActorFlags_IsLinkTag_ComplexTag_EventTag_AreaManagement = 0x800000,
+    ActorFlags_OnlyPushJobType4 = 0x1000000,
+    ActorFlags_VillagerRegistered = 0x4000000,
+    ActorFlags_CheckDeleteDistanceEveryFrame = 0x8000000,
+    ActorFlags_ForceCalcInEvent = 0x10000000,
+    ActorFlags_IsCameraOrEditCamera = 0x20000000,
+    ActorFlags_InitializedMaybe = 0x40000000,
+    ActorFlags_PrepareForDeleteMaybe = 0x80000000,
+};
+
+enum ActorFlags2 : int32_t {
+    ActorFlags2_1 = 0x1,
+    ActorFlags2_2 = 0x2,
+    ActorFlags2_4 = 0x4,
+    ActorFlags2_InstEventFlag = 0x8,
+    ActorFlags2_10 = 0x10,
+    ActorFlags2_Invisible = 0x20,
+    ActorFlags2_40 = 0x40,
+    ActorFlags2_NoDistanceCheck = 0x80,
+    ActorFlags2_AlwaysPushJobs = 0x100,
+    ActorFlags2_200_KeepAliveMaybe = 0x200,
+    ActorFlags2_400 = 0x400,
+    ActorFlags2_Armor = 0x800,
+    ActorFlags2_NotXXX = 0x1000,
+    ActorFlags2_ForbidSystemDeleteDistance = 0x2000,
+    ActorFlags2_4000 = 0x4000,
+    ActorFlags2_Delete = 0x8000,
+    ActorFlags2_10000 = 0x10000,
+    ActorFlags2_20000 = 0x20000,
+    ActorFlags2_40000 = 0x40000,
+    ActorFlags2_NoDistanceCheck2 = 0x80000,
+    ActorFlags2_100000 = 0x100000,
+    ActorFlags2_200000 = 0x200000,
+    ActorFlags2_StasisableOrAllRadar = 0x400000,
+    ActorFlags2_800000_NoUnloadForTurnActorBowCharge = 0x800000,
+    ActorFlags2_1000000 = 0x1000000,
+    ActorFlags2_2000000 = 0x2000000,
+    ActorFlags2_4000000 = 0x4000000,
+    ActorFlags2_8000000 = 0x8000000,
+    ActorFlags2_10000000 = 0x10000000,
+    ActorFlags2_20000000 = 0x20000000,
+    ActorFlags2_40000000 = 0x40000000,
+    ActorFlags2_80000000 = 0x80000000,
+};
+
+enum ActorFlags3 : int32_t {
+    ActorFlags3_DisableHideNonDemoMember = 0x1,
+    ActorFlags3_2 = 0x2,
+    ActorFlags3_4 = 0x4,
+    ActorFlags3_8 = 0x8,
+    ActorFlags3_10 = 0x10,
+    ActorFlags3_20 = 0x20,
+    ActorFlags3_40 = 0x40,
+    ActorFlags3_80_KeepAliveMaybe = 0x80,
+    ActorFlags3_100 = 0x100,
+    ActorFlags3_200 = 0x200,
+    ActorFlags3_400 = 0x400,
+    ActorFlags3_Invisible = 0x800,
+    ActorFlags3_1000 = 0x1000,
+    ActorFlags3_DisableForbidJob = 0x2000,
+    ActorFlags3_4000 = 0x4000,
+    ActorFlags3_8000 = 0x8000,
+    ActorFlags3_10000 = 0x10000,
+    ActorFlags3_20000 = 0x20000,
+    ActorFlags3_40000 = 0x40000,
+    ActorFlags3_80000 = 0x80000,
+    ActorFlags3_100000 = 0x100000,
+    ActorFlags3_EmitCreateEffectMaybe = 0x200000,
+    ActorFlags3_EmitDeleteEffectMaybe = 0x400000,
+    ActorFlags3_800000 = 0x800000,
+    ActorFlags3_ND = 0x1000000,
+    ActorFlags3_GuardianOrRemainsOrBackseatKorok = 0x2000000,
+    ActorFlags3_4000000 = 0x4000000,
+    ActorFlags3_8000000 = 0x8000000,
+    ActorFlags3_10000000 = 0x10000000,
+    ActorFlags3_20000000 = 0x20000000,
+    ActorFlags3_40000000 = 0x40000000,
+    ActorFlags3_80000000 = 0x80000000,
+};
+
+
 struct ActorWiiU : BaseProc {
     PADDED_BYTES(0xEC, 0xF0);
     uint32_t physicsMainBodyPtr; // 0xF4
@@ -90,10 +186,10 @@ struct ActorWiiU : BaseProc {
         BEType<float> maxY;
         BEType<float> maxZ;
     } aabb;
-    BEType<uint32_t> flags2;
-    BEType<uint32_t> flags2Copy;
-    BEType<uint32_t> flags;
-    BEType<uint32_t> flags3; // 0x370 or 880. However in IDA there's a 0xF4 offset
+    BEType<ActorFlags2> flags2;
+    BEType<ActorFlags2> flags2Copy;
+    BEType<ActorFlags> flags;
+    BEType<ActorFlags3> flags3; // 0x370 or 880. However in IDA there's a 0xF4 offset
 
     PADDED_BYTES(0x374, 0x39C);
     BEType<uint32_t> actorPhysicsPtr; // 0x3A0
@@ -103,7 +199,7 @@ struct ActorWiiU : BaseProc {
     PADDED_BYTES(0x40C, 0x430);
     uint8_t unk_434;
     uint8_t unk_435;
-    uint8_t opacityOrSomethingEnabled;
+    uint8_t opacityOrDoFlushOpacityToGPU;
     uint8_t unk_437;
     PADDED_BYTES(0x438, 0x440);
     BEType<uint32_t> actorX6A0Ptr;
