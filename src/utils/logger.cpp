@@ -1,7 +1,7 @@
-#include <iostream>
 
-static double timeFrequency;
-static HANDLE consoleHandle;
+HANDLE Log::consoleHandle = NULL;
+double Log::timeFrequency = 0.0f;
+
 
 Log::Log() {
 #ifdef _DEBUG
@@ -9,36 +9,21 @@ Log::Log() {
     SetConsoleTitleA("BetterVR Debugging Console");
     consoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
 #endif
-    Log::print("Successfully started BetterVR!");
+    Log::print<INFO>("Successfully started BetterVR!");
     LARGE_INTEGER timeLI;
     QueryPerformanceFrequency(&timeLI);
     timeFrequency = double(timeLI.QuadPart) / 1000.0;
 }
 
 Log::~Log() {
-    Log::print("Shutting down BetterVR debugging console...");
+    Log::print<INFO>("Shutting down BetterVR debugging console...");
 #ifdef _DEBUG
     FreeConsole();
-#endif
-}
-
-void Log::print(const char* message) {
-#ifdef _DEBUG
-    std::string messageStr(message);
-    if (!messageStr.starts_with("!! ")) {
-        return;
-    }
-    messageStr += "\n";
-    DWORD charsWritten = 0;
-    WriteConsoleA(consoleHandle, messageStr.c_str(), (DWORD)messageStr.size(), &charsWritten, NULL);
-    OutputDebugStringA(messageStr.c_str());
-#else
-    std::cout << message << std::endl;
 #endif
 }
 
 void Log::printTimeElapsed(const char* message_prefix, LARGE_INTEGER time) {
     LARGE_INTEGER timeNow;
     QueryPerformanceCounter(&timeNow);
-    Log::print("{}: {} ms", message_prefix, double(time.QuadPart - timeNow.QuadPart) / timeFrequency);
+    Log::print<INFO>("{}: {} ms", message_prefix, double(time.QuadPart - timeNow.QuadPart) / timeFrequency);
 }

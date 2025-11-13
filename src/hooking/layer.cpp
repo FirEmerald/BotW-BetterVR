@@ -31,7 +31,7 @@ VkResult VRLayer::VkInstanceOverrides::CreateInstance(PFN_vkCreateInstance creat
 
     VkResult result = createInstanceFunc(pCreateInfo, pAllocator, pInstance);
 
-    Log::print("Created Vulkan instance (using Vulkan {}.{}.{}) successfully!", VK_API_VERSION_MAJOR(pCreateInfo->pApplicationInfo->apiVersion), VK_API_VERSION_MINOR(pCreateInfo->pApplicationInfo->apiVersion), VK_API_VERSION_PATCH(pCreateInfo->pApplicationInfo->apiVersion));
+    Log::print<INFO>("Created Vulkan instance (using Vulkan {}.{}.{}) successfully!", VK_API_VERSION_MAJOR(pCreateInfo->pApplicationInfo->apiVersion), VK_API_VERSION_MINOR(pCreateInfo->pApplicationInfo->apiVersion), VK_API_VERSION_PATCH(pCreateInfo->pApplicationInfo->apiVersion));
     checkAssert(VK_VERSION_MINOR(pCreateInfo->pApplicationInfo->apiVersion) != 0 || VK_VERSION_MAJOR(pCreateInfo->pApplicationInfo->apiVersion) > 1, "Vulkan version needs to be v1.1 or higher!");
     return result;
 }
@@ -158,15 +158,15 @@ VkResult VRLayer::VkInstanceOverrides::CreateDevice(const vkroots::VkInstanceDis
 
     VkResult result = pDispatch->CreateDevice(gpu, &modifiedCreateInfo, pAllocator, pDevice);
     if (result != VK_SUCCESS) {
-        Log::print("Failed to create Vulkan device! Error {}", result);
+        Log::print<ERROR>("Failed to create Vulkan device! Error {}", result);
         return result;
     }
 
     // Initialize VRManager late if neither vkEnumeratePhysicalDevices and vkGetPhysicalDeviceProperties were called and used to filter the device
     if (!VRManager::instance().VK) {
-        Log::print("Wasn't able to filter OpenXR-compatible devices for this instance!");
-        Log::print("You might encounter an error if you've selected a GPU that's not connected to the VR headset in Cemu's settings!");
-        Log::print("This issue appears due to OBS's Vulkan layer being installed which skips some calls used to hide GPUs that aren't compatible with your VR headset.");
+        Log::print<WARNING>("Wasn't able to filter OpenXR-compatible devices for this instance!");
+        Log::print<WARNING>("You might encounter an error if you've selected a GPU that's not connected to the VR headset in Cemu's settings. Usually this error is fine as long as this is the case.");
+        Log::print<WARNING>("This issue appears due to OBS's Vulkan layer being installed which skips some calls used to hide GPUs that aren't compatible with your VR headset.");
     }
 
     return result;

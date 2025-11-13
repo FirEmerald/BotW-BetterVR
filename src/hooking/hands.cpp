@@ -154,7 +154,7 @@ void CemuHooks::hook_ChangeWeaponMtx(PPCInterpreter_t* hCPU) {
         auto& grabState = input.inGame.grabState[side];
 
         if (input.inGame.in_game && grabState.lastEvent == GrabButtonState::Event::DoublePress) {
-            Log::print("!! Dropping weapon {} due to double press on grab button", targetActor.name.getLE().c_str());
+            Log::print<CONTROLS>("Dropping weapon {} due to double press on grab button", targetActor.name.getLE().c_str());
             hCPU->gpr[11] = 1;
             hCPU->gpr[9] = 1;
             hCPU->gpr[13] = isLeftHandWeapon ? 1 : 0; // set the hand index to 0 for left hand, 1 for right hand
@@ -162,13 +162,13 @@ void CemuHooks::hook_ChangeWeaponMtx(PPCInterpreter_t* hCPU) {
         }
         // Support for long press (placeholder)
         if (input.inGame.in_game && grabState.lastEvent == GrabButtonState::Event::LongPress) {
-            Log::print("!! Long press detected for {} (side {})", targetActor.name.getLE().c_str(), (int)side);
+            Log::print<CONTROLS>("Long press detected for {} (side {})", targetActor.name.getLE().c_str(), (int)side);
             // TODO: Implement long press action (e.g., temporarily bind item)
             //grabState.longPress = false;
         }
         // Support for short press (placeholder)
         if (input.inGame.in_game && grabState.lastEvent == GrabButtonState::Event::ShortPress) {
-            Log::print("!! Short press detected for {} (side {})", targetActor.name.getLE().c_str(), (int)side);
+            Log::print<CONTROLS>("Short press detected for {} (side {})", targetActor.name.getLE().c_str(), (int)side);
             // TODO: Implement short press action (e.g., cycle weapon)
         }
 
@@ -182,11 +182,11 @@ void CemuHooks::hook_CreateNewScreen(PPCInterpreter_t* hCPU) {
 
     const char* screenName = (const char*)(s_memoryBaseAddress + hCPU->gpr[7]);
     ScreenId screenId = (ScreenId)hCPU->gpr[5];
-    Log::print("!! Switching to new screen \"{}\" with ID {:08X}...", screenName, std::to_underlying(screenId));
+    Log::print<CONTROLS>("Switching to new screen \"{}\" with ID {:08X}...", screenName, std::to_underlying(screenId));
 
     // todo: When a pickup screen is shown, we should track if the user does a short grip press, and if it was the left and right hand.
     if (screenId == ScreenId::PickUp_00) {
-         Log::print("!! PickUp screen detected, waiting for grip button press to bind item to hand...");
+        Log::print<CONTROLS>("PickUp screen detected, waiting for grip button press to bind item to hand...");
     }
 }
 
@@ -216,10 +216,17 @@ void CemuHooks::hook_DropEquipment(PPCInterpreter_t* hCPU) {
     //}
 }
 
+uint32_t frameIndex = 0;
+
 void CemuHooks::hook_EnableWeaponAttackSensor(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
 
     if (GetSettings().IsThirdPersonMode()) {
+        return;
+    }
+
+    frameIndex++;
+    if (frameIndex % 2 == 0) {
         return;
     }
 
@@ -238,15 +245,17 @@ void CemuHooks::hook_EnableWeaponAttackSensor(PPCInterpreter_t* hCPU) {
     }
 
     if (heldIndex >= m_motionAnalyzers.size()) {
-        Log::print("!! Invalid heldIndex: {}. Skipping motion analysis.", heldIndex);
+        Log::print<CONTROLS>("Invalid heldIndex: {}. Skipping motion analysis.", heldIndex);
         return;
     }
 
     heldIndex = heldIndex == 0 ? 1 : 0;
 
+    
+    //Log::print("!! Running weapon analysis for {}", heldIndex);
+
     auto state = VRManager::instance().XR->m_input.load();
     auto headset = VRManager::instance().XR->GetRenderer()->GetMiddlePose();
-
     if (!headset.has_value()) {
         return;
     }
@@ -255,7 +264,8 @@ void CemuHooks::hook_EnableWeaponAttackSensor(PPCInterpreter_t* hCPU) {
     m_motionAnalyzers[heldIndex].Update(state.inGame.poseLocation[heldIndex], state.inGame.poseVelocity[heldIndex], headset.value(), state.inGame.inputTime);
 
     // Use the analysed motion to determine whether the weapon is swinging or stabbing, and whether the attackSensor should be active this frame
-    if (isHeldByPlayer && (m_motionAnalyzers[heldIndex].IsAttacking() || true)) {
+    bool CHEAT_alwaysEnableWeaponCollision = true;
+    if (isHeldByPlayer && (m_motionAnalyzers[heldIndex].IsAttacking() || CHEAT_alwaysEnableWeaponCollision)) {
         m_motionAnalyzers[heldIndex].SetHitboxEnabled(true);
         //Log::print("!! Activate sensor for {}: isHeldByPlayer={}, weaponType={}", heldIndex, isHeldByPlayer, (int)weaponType);
         weapon.setupAttackSensor.resetAttack = 1;
@@ -322,7 +332,7 @@ void CemuHooks::hook_DropWeaponLogging(PPCInterpreter_t* hCPU) {
     uint32_t a6 = hCPU->gpr[8];
     uint32_t a7 = hCPU->gpr[9];
 
-    Log::print("!! {} ({:08X}) is dropping weapon with idx={}, position={}, a4={}, a5={}, a6={}, a7={}", actorName, actorPtr, weaponIdx, position, a4, a5, a6, a7);
+    Log::print<CONTROLS>("{} ({:08X}) is dropping weapon with idx={}, position={}, a4={}, a5={}, a6={}, a7={}", actorName, actorPtr, weaponIdx, position, a4, a5, a6, a7);
 }
 
 void CemuHooks::hook_ModifyHandModelAccessSearch(PPCInterpreter_t* hCPU) {
@@ -337,7 +347,7 @@ void CemuHooks::hook_ModifyHandModelAccessSearch(PPCInterpreter_t* hCPU) {
 
     if (actorName != nullptr) {
         // Weapon_R is presumably his right hand bone name
-        Log::print("! Searching for model handle using {}", actorName);
+        Log::print<CONTROLS>("Searching for model handle using {}", actorName);
     }
 #endif
 }
@@ -615,7 +625,7 @@ void CemuHooks::hook_ModifyModelBoneMatrix(PPCInterpreter_t* hCPU) {
     uint32_t boneIdx = hCPU->gpr[6];
 
     if (modelUnitPtr == 0 || gsysModelPtr == 0 || matrixPtr == 0 || scalePtr == 0) {
-        Log::print("!! Something's invalid");
+        Log::print<CONTROLS>("Something's invalid");
         return;
     }
 

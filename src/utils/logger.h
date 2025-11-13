@@ -197,27 +197,85 @@ struct std::formatter<D3D_FEATURE_LEVEL> : std::formatter<string> {
     }
 };
 
+enum class LogType {
+    // verbose logging types
+    RENDERING,
+    INTEROP,
+    CONTROLS,
+    PPC,
+
+    // generic types
+    INFO,
+    WARNING,
+    ERROR,
+    VERBOSE
+};
+
+using enum LogType;
+
+constexpr LogType operator|(LogType log, LogType rhs) {
+    return static_cast<LogType>(static_cast<int>(log) | static_cast<int>(rhs));
+}
 class Log {
 public:
     Log();
     ~Log();
 
-    static void print(const char* message);
+    template <typename LogType L>
+    static inline bool consteval isLogTypeEnabled() {
+        if constexpr (L == ERROR) {
+            return true;
+        }
+        if constexpr (L == WARNING) {
+            return true;
+        }
+        if constexpr (L == INFO) {
+            return true;
+        }
+#if defined(_DEBUG)
+        if constexpr (L == VERBOSE) {
+            return true;
+        }
+#endif
+        return false;
+    }
 
-    template <class... Args>
-    static void print(const char* format, Args&&... args) {
+    template <typename LogType L>
+    static inline void print(const char* message) {
+        if constexpr (!isLogTypeEnabled<L>()) {
+            return;
+        }
 #ifdef _DEBUG
-        Log::print(std::vformat(format, std::make_format_args(args...)).c_str());
+        std::string messageStr = std::string(message) + "\n";
+        DWORD charsWritten = 0;
+        WriteConsoleA(consoleHandle, messageStr.c_str(), (DWORD)messageStr.size(), &charsWritten, NULL);
+        OutputDebugStringA(messageStr.c_str());
+#else
+        std::cout << message << std::endl;
+#endif
+    }
+
+    template <typename LogType L, class... Args>
+    static inline void print(const char* format, Args&&... args) {
+        if constexpr (!isLogTypeEnabled<L>()) {
+            return;
+        }
+#ifdef _DEBUG
+        Log::print<L>(std::vformat(format, std::make_format_args(args...)).c_str());
 #endif
     }
 
     static void printTimeElapsed(const char* message_prefix, LARGE_INTEGER time);
+
+private:
+    static HANDLE consoleHandle;
+    static double timeFrequency;
 };
 
 static void checkXRResult(const XrResult result, const char* errorMessage) {
     if (XR_FAILED(result)) {
         if (errorMessage == nullptr) {
-            Log::print("[Error] An unknown error (result was {}) has occurred!", result);
+            Log::print<ERROR>("An unknown error (result was {}) has occurred!", result);
 #ifdef _DEBUG
             __debugbreak();
 #endif
@@ -225,7 +283,7 @@ static void checkXRResult(const XrResult result, const char* errorMessage) {
             throw std::runtime_error("Unidentified error occurred!");
         }
         else {
-            Log::print("[Error] Error {}: {}", result, errorMessage);
+            Log::print<ERROR>("Error {}: {}", result, errorMessage);
 #ifdef _DEBUG
             __debugbreak();
 #endif
@@ -238,7 +296,7 @@ static void checkXRResult(const XrResult result, const char* errorMessage) {
 static void checkHResult(const HRESULT result, const char* errorMessage) {
     if (FAILED(result)) {
         if (errorMessage == nullptr) {
-            Log::print("[Error] An unknown error (result was {}) has occurred!", result);
+            Log::print<ERROR>("[Error] An unknown error (result was {}) has occurred!", result);
 #ifdef _DEBUG
             __debugbreak();
 #endif
@@ -246,7 +304,7 @@ static void checkHResult(const HRESULT result, const char* errorMessage) {
             throw std::runtime_error("Unidentified error occurred!");
         }
         else {
-            Log::print("[Error] Error {}: {}", result, errorMessage);
+            Log::print<ERROR>("Error {}: {}", result, errorMessage);
 #ifdef _DEBUG
             __debugbreak();
 #endif
@@ -259,7 +317,7 @@ static void checkHResult(const HRESULT result, const char* errorMessage) {
 static void checkVkResult(const VkResult result, const char* errorMessage) {
     if (result != VK_SUCCESS) {
         if (errorMessage == nullptr) {
-            Log::print("[Error] An unknown error (result was {}) has occurred!", (std::underlying_type_t<VkResult>)result);
+            Log::print<ERROR>("An unknown error (result was {}) has occurred!", (std::underlying_type_t<VkResult>)result);
 #ifdef _DEBUG
             __debugbreak();
 #endif
@@ -267,7 +325,7 @@ static void checkVkResult(const VkResult result, const char* errorMessage) {
             throw std::runtime_error("Unidentified error occurred!");
         }
         else {
-            Log::print("[Error] Error {}: {}", (std::underlying_type_t<VkResult>)result, errorMessage);
+            Log::print<ERROR>("Error {}: {}", (std::underlying_type_t<VkResult>)result, errorMessage);
 #ifdef _DEBUG
             __debugbreak();
 #endif
@@ -280,7 +338,7 @@ static void checkVkResult(const VkResult result, const char* errorMessage) {
 static void checkAssert(const bool assert, const char* errorMessage) {
     if (!assert) {
         if (errorMessage == nullptr) {
-            Log::print("[Error] Something unexpected happened that prevents further execution!");
+            Log::print<ERROR>("Something unexpected happened that prevents further execution!");
 #ifdef _DEBUG
             __debugbreak();
 #endif
@@ -288,7 +346,7 @@ static void checkAssert(const bool assert, const char* errorMessage) {
             throw std::runtime_error("Unexpected assertion occurred!");
         }
         else {
-            Log::print("[Error] {}", errorMessage);
+            Log::print<ERROR>("{}", errorMessage);
 #ifdef _DEBUG
             __debugbreak();
 #endif

@@ -3,8 +3,6 @@
 #include "layer.h"
 #include "utils/vulkan_utils.h"
 
-#include <codecvt>
-
 
 std::mutex lockImageResolutions;
 std::unordered_map<VkImage, std::pair<VkExtent2D, VkFormat>> imageResolutions;
@@ -52,7 +50,7 @@ void VkDeviceOverrides::CmdClearColorImage(const vkroots::VkDeviceDispatch* pDis
         const OpenXR::EyeSide side = pColor->float32[3] < 0.5f ? OpenXR::EyeSide::LEFT : OpenXR::EyeSide::RIGHT;
         checkAssert(captureIdx == 0 || captureIdx == 2, "Invalid capture index!");
 
-        Log::print("[VULKAN] Clearing color image for {} layer for {} side ({})", captureIdx == 0 ? "3D" : "2D", side == OpenXR::EyeSide::LEFT ? "left" : "right", pColor->float32[3]);
+        Log::print<RENDERING>("Clearing color image for {} layer for {} side ({})", captureIdx == 0 ? "3D" : "2D", side == OpenXR::EyeSide::LEFT ? "left" : "right", pColor->float32[3]);
 
         auto* renderer = VRManager::instance().XR->GetRenderer();
         auto& layer3D = renderer->m_layer3D;
@@ -102,14 +100,14 @@ void VkDeviceOverrides::CmdClearColorImage(const vkroots::VkDeviceDispatch* pDis
             }
 
             if (image != s_curr3DColorImage) {
-                Log::print("[VULKAN] Color image is not the same as the current 3D color image! ({} != {})", (void*)image, (void*)s_curr3DColorImage);
+                Log::print<RENDERING>("Color image is not the same as the current 3D color image! ({} != {})", (void*)image, (void*)s_curr3DColorImage);
                 const_cast<VkClearColorValue*>(pColor)[0] = { 0.0f, 0.0f, 0.0f, 0.0f };
                 return pDispatch->CmdClearColorImage(commandBuffer, image, imageLayout, pColor, rangeCount, pRanges);
             }
 
             if (layer3D->HasCopiedColor(side)) {
                 // the color texture has already been copied to the layer
-                Log::print("[VULKAN] A color texture is already bound for the current frame!");
+                Log::print<RENDERING>("A color texture is already bound for the current frame!");
                 const_cast<VkClearColorValue*>(pColor)[0] = { 0.0f, 0.0f, 0.0f, 0.0f };
                 return pDispatch->CmdClearColorImage(commandBuffer, image, imageLayout, pColor, rangeCount, pRanges);
             }
@@ -211,7 +209,7 @@ void VkDeviceOverrides::CmdClearDepthStencilImage(const vkroots::VkDeviceDispatc
             return;
         }
 
-        Log::print("[VULKAN] Clearing depth image for 3D layer for {} side ({})", side == OpenXR::EyeSide::LEFT ? "left" : "right", pDepthStencil->stencil);
+        Log::print<RENDERING>("Clearing depth image for 3D layer for {} side ({})", side == OpenXR::EyeSide::LEFT ? "left" : "right", pDepthStencil->stencil);
 
         if (captureIdx == 1 || captureIdx == 2) {
             // 3D layer - depth texture for 3D rendering
@@ -226,13 +224,13 @@ void VkDeviceOverrides::CmdClearDepthStencilImage(const vkroots::VkDeviceDispatc
             }
 
             if (image != s_curr3DDepthImage) {
-                Log::print("[VULKAN] Depth image is not the same as the current 3D depth image! ({} != {})", (void*)image, (void*)s_curr3DDepthImage);
+                Log::print<RENDERING>("Depth image is not the same as the current 3D depth image! ({} != {})", (void*)image, (void*)s_curr3DDepthImage);
                 return;
             }
 
             if (layer3D->HasCopiedDepth(side)) {
                 // the depth texture has already been copied to the layer
-                Log::print("[VULKAN] A depth texture is already bound for the current frame!");
+                Log::print<RENDERING>("A depth texture is already bound for the current frame!");
                 return;
             }
 
@@ -279,7 +277,7 @@ VkResult VkDeviceOverrides::QueueSubmit(const vkroots::VkDeviceDispatch* pDispat
         return pDispatch->QueueSubmit(queue, submitCount, pSubmits, fence);
     }
     else {
-        Log::print("[VULKAN] QueueSubmit called with {} active copy operations", s_activeCopyOperations.size());
+        Log::print<INTEROP>("QueueSubmit called with {} active copy operations", s_activeCopyOperations.size());
 
         // insert (possible) pipeline barriers for any active copy operations
         struct ModifiedSubmitInfo_t {
@@ -357,18 +355,18 @@ VkResult VkDeviceOverrides::QueueSubmit(const vkroots::VkDeviceDispatch* pDispat
             }
 
             if (!foundCommandBufferForActiveCopyOperations) {
-                Log::print("[VULKAN] No command buffer found for active copy operations!");
-                Log::print("[VULKAN] Active copy operations:");
+                Log::print<RENDERING>("No command buffer found for active copy operations!");
+                Log::print<RENDERING>("Active copy operations:");
                 for (const auto& op : s_activeCopyOperations) {
                     wchar_t name[128] = {};
                     UINT size = sizeof(name);
                     op.second->d3d12GetTexture()->GetPrivateData(WKPDID_D3DDebugObjectNameW, &size, name);
                     std::string nameStr = wcharToUtf8(name);
-                    Log::print("[VULKAN]   - Command buffer: {}, Texture: {}", (void*)op.first, nameStr);
+                    Log::print<RENDERING>(" - Command buffer: {}, Texture: {}", (void*)op.first, nameStr);
                 }
-                Log::print("[VULKAN] Submitted command buffers:");
+                Log::print<RENDERING>("Submitted command buffers:");
                 for (uint32_t j = 0; j < submitInfo.commandBufferCount; j++) {
-                    Log::print("[VULKAN]   - Command buffer: {}", (void*)submitInfo.pCommandBuffers[j]);
+                    Log::print<RENDERING>(" - Command buffer: {}", (void*)submitInfo.pCommandBuffers[j]);
                 }
             }
 

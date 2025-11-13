@@ -84,8 +84,6 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         return state.currentState ? mapping : 0;
     };
 
-    Log::print("[CEMU] Injecting XR input into VPAD in LR {:08X}", hCPU->sprNew.LR);
-
     // read existing vpad as to not overwrite it
     uint32_t vpadStatusOffset = hCPU->gpr[4];
     VPADStatus vpadStatus = {};

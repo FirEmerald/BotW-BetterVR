@@ -194,7 +194,7 @@ public:
         // Remove attack type if too many bad samples
         if (m_badSampleCtr >= BAD_SAMPLES_BUFFER) {
             m_badSampleCtr = 0;
-            //Log::print("!! removed attack due to bad samples");
+            //Log::print<CONTROLS>("removed attack due to bad samples");
             m_lockedAttackType = AttackType::None;
         }
     }
@@ -207,7 +207,7 @@ public:
             switch (m_lockedAttackType) {
                 case AttackType::Stab: {
                     const float travel_dist = glm::length(position - m_lockedPosition);
-                    Log::print("!! travel distance: {}", travel_dist);
+                    Log::print<CONTROLS>("travel distance: {}", travel_dist);
                     if (travel_dist > profile.stab_travelDistance) {
                         m_attackActivity = true;
                     }
@@ -221,7 +221,7 @@ public:
                     const glm::fvec3 z_now = rotation * glm::fvec3(0.0f, 0.0f, 1.0f);
                     const float dot_product = glm::dot(z_now, z_start);
                     const float ang_difference = glm::acos(dot_product); // would be more performant to dot_product as comparison value and change profile.slash_travelAngle to cos(angle) instead of angle
-                    //Log::print("!! angle_dif: {}", ang_difference);
+                    //Log::print<CONTROLS>("angle_dif: {}", ang_difference);
 
                     if (ang_difference > profile.slash_travelAngle) {
                         m_attackActivity = true;

@@ -31,7 +31,7 @@ RND_D3D12::RND_D3D12() {
         if (memcmp(&adapterDesc.AdapterLuid, &VRManager::instance().XR->m_capabilities.adapter, sizeof(LUID)) == 0) {
             char descriptionStr[256 + 1];
             WideCharToMultiByte(CP_UTF8, 0, adapterDesc.Description, -1, descriptionStr, 256, NULL, NULL);
-            Log::print("Using {} as the VR GPU!", descriptionStr);
+            Log::print<INFO>("Using {} as the VR GPU!", descriptionStr);
             break;
         }
     }

@@ -13,8 +13,8 @@ namespace D3D12Utils {
         ID3DBlob* hlslCompilationErrors;
         if (FAILED(D3DCompile(sourceHLSL, strlen(sourceHLSL), nullptr, nullptr, nullptr, entryPoint, version, shaderCompileFlags, 0, &shaderBytes, &hlslCompilationErrors))) {
             std::string errorMessage((const char*)hlslCompilationErrors->GetBufferPointer(), hlslCompilationErrors->GetBufferSize());
-            Log::print("Vertex Shader Compilation Error:");
-            Log::print(errorMessage.c_str());
+            Log::print<ERROR>("Vertex Shader Compilation Error:");
+            Log::print<ERROR>(errorMessage.c_str());
             throw std::runtime_error("Error during the vertex shader compilation!");
         }
         return shaderBytes;
@@ -169,7 +169,7 @@ namespace D3D12Utils {
                 return DxgiToVkFormat[i].first;
             }
         }
-        Log::print("Couldn't find a known DXGI_FORMAT mapping for {}", format);
+        Log::print<ERROR>("Couldn't find a known DXGI_FORMAT mapping for {}", format);
         return DXGI_FORMAT_UNKNOWN;
     }
 
@@ -179,7 +179,7 @@ namespace D3D12Utils {
                 return DxgiToVkFormat[i].second;
             }
         }
-        Log::print("Couldn't find a known VkFormat mapping for {}", format);
+        Log::print<ERROR>("Couldn't find a known VkFormat mapping for {}", format);
         return VK_FORMAT_UNDEFINED;
     }
 

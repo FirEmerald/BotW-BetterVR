@@ -8,9 +8,10 @@ void CemuHooks::hook_BeginCameraSide(PPCInterpreter_t* hCPU) {
 
     OpenXR::EyeSide side = hCPU->gpr[0] == 0 ? OpenXR::EyeSide::LEFT : OpenXR::EyeSide::RIGHT;
 
-    Log::print("");
-    Log::print("===============================================================================");
-    Log::print("{0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0}", side == OpenXR::EyeSide::LEFT ? "LEFT" : "RIGHT");
+
+    Log::print<RENDERING>("");
+    Log::print<RENDERING>("===============================================================================");
+    Log::print<RENDERING>("{0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0}", side == OpenXR::EyeSide::LEFT ? "LEFT" : "RIGHT");
 
     bool layersInitialized = VRManager::instance().XR->GetRenderer()->m_layer3D && VRManager::instance().XR->GetRenderer()->m_layer2D;
     if (layersInitialized && side == OpenXR::EyeSide::LEFT) {
@@ -47,13 +48,13 @@ glm::fquat s_wsCameraRotation = glm::identity<glm::fquat>();
 void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
 
-    // Read the camera matrix from the game's memory
+    // read the camera matrix from the game's memory
     uint32_t ppc_cameraMatrixOffsetIn = hCPU->gpr[31];
     OpenXR::EyeSide ppc_cameraSide = hCPU->gpr[3] == 0 ? OpenXR::EyeSide::LEFT : OpenXR::EyeSide::RIGHT;
     ActCamera actCam = {};
     readMemory(ppc_cameraMatrixOffsetIn, &actCam);
 
-    // Existing in-game camera matrix
+    // extract components from the existing camera matrix
     glm::fvec3 oldCameraPosition = actCam.finalCamMtx.pos.getLE();
     glm::fvec3 oldCameraTarget = actCam.finalCamMtx.target.getLE();
     glm::fvec3 oldCameraForward = glm::normalize(oldCameraTarget - oldCameraPosition);
@@ -62,18 +63,14 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
     float extraValue0 = actCam.finalCamMtx.zNear.getLE();
     float extraValue1 = actCam.finalCamMtx.zFar.getLE();
 
-    //Log::print("!! Existing Camera Address:  {:08X}", ppc_cameraMatrixOffsetIn + (uint32_t)offsetof(ActCamera, finalCamMtx.up));
-    //Log::print("!! Existing Camera Position: {}", oldCameraPosition);
-    //Log::print("!! Existing Camera Target:   {}", oldCameraTarget);
-    //Log::print("!! Existing Camera Up:       {}", oldCameraUp);
-    //Log::print("!! Existing Camera Unknown:  {}", oldCameraUnknown);
-    //Log::print("!! Existing Camera ZNear:    {}, ZFar: {}", extraValue0, extraValue1);
-
+    // remove verticality from the camera position to avoid pitch changes that aren't from the VR headset
     oldCameraPosition.y = oldCameraTarget.y;
 
-
+    // construct glm matrix from the existing camera parameters
     glm::mat4 existingGameMtx = glm::lookAtRH(oldCameraPosition, oldCameraTarget, oldCameraUp);
 
+    // pass real camera position and rotation to be used elsewhere
+    // GetRenderCamera recalculates the left and right eye positions from the base camera position
     s_wsCameraPosition = oldCameraPosition;
     s_wsCameraRotation = glm::quat_cast(glm::inverse(existingGameMtx));
 
@@ -87,17 +84,18 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
         existingGameMtx = playerMtx4;
     }
 
-    // Current VR headset camera matrix
+    // current VR headset camera matrix
     auto viewsOpt = VRManager::instance().XR->GetRenderer()->GetMiddlePose();
     if (!viewsOpt) {
-        Log::print("[ERROR] hook_updateCamera: No views available for the middle pose.");
+        Log::print<ERROR>("hook_UpdateCameraForGameplay: No views available for the middle pose.");
         return;
     }
     auto& views = viewsOpt.value();
 
-    // Corrected code
+    // calculate final camera matrix
     glm::mat4 finalPose = glm::inverse(existingGameMtx) * views;
 
+    // extract camera up, forward and position from the final matrix
     glm::fvec3 camPos = glm::fvec3(finalPose[3]);
     glm::fvec3 forward = -glm::normalize(glm::fvec3(finalPose[2]));
     glm::fvec3 up = glm::normalize(glm::fvec3(finalPose[1]));
@@ -110,7 +108,7 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
     actCam.finalCamMtx.up = up;
     //actCam.finalCamMtx.up = glm::fvec3(0.0f, 1.0f, 0.0f);
 
-    // Write the camera matrix to the game's memory
+    // write back the modified camera matrix to the game's memory
     uint32_t ppc_cameraMatrixOffsetOut = hCPU->gpr[31];
     writeMemory(ppc_cameraMatrixOffsetOut, &actCam);
     s_framesSinceLastCameraUpdate = 0;
@@ -193,7 +191,7 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
     BESeadLookAtCamera camera = {};
     readMemory(cameraIn, &camera);
 
-    Log::print("[PPC] Getting render camera for {} side", cameraSide == OpenXR::EyeSide::LEFT ? "left" : "right");
+    Log::print<RENDERING>("Getting render camera for {} side", cameraSide == OpenXR::EyeSide::LEFT ? "left" : "right");
 
     //s_lastCameraMtx = glm::fmat4x3(glm::inverse(glm::mat4(camera.mtx.getLEMatrix()))); // glm::inverse(glm::lookAtRH(camera.pos.getLE(), camera.at.getLE(), camera.up.getLE()));
 
@@ -209,8 +207,6 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
     auto [swing, baseYaw] = swingTwistY(baseRot);
 
     s_lastCameraMtx = glm::fmat4x3(glm::translate(glm::identity<glm::fmat4>(), basePos) * glm::mat4(baseRot));
-
-
 
     // take link's direction, then rotate the headset position
     BEMatrix34 mtx = {};
@@ -465,9 +461,9 @@ void CemuHooks::hook_EndCameraSide(PPCInterpreter_t* hCPU) {
         }
     }
 
-    Log::print("{0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0}", side == OpenXR::EyeSide::LEFT ? "LEFT" : "RIGHT");
-    Log::print("===============================================================================");
-    Log::print("");
+    Log::print<RENDERING>("{0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0} {0}", side == OpenXR::EyeSide::LEFT ? "LEFT" : "RIGHT");
+    Log::print<RENDERING>("===============================================================================");
+    Log::print<RENDERING>("");
 }
 
 void CemuHooks::hook_UseCameraDistance(PPCInterpreter_t* hCPU) {
@@ -516,7 +512,7 @@ void CemuHooks::hook_GetEventName(PPCInterpreter_t* hCPU) {
     if (isEventActive) {
         uint32_t stringPtr = getMemory<uint32_t>(hCPU->gpr[4]).getLE();
         const char* eventNamePtr = (const char*)(hCPU->gpr[4] + s_memoryBaseAddress);
-        Log::print("!! Event name {} from {:08X}", eventNamePtr, hCPU->gpr[4]);
+        Log::print<RENDERING>("Event name {} from {:08X}", eventNamePtr, hCPU->gpr[4]);
         // shrine going down is Demo008_2
         // camera zoom when opening door is Demo024_0
     }

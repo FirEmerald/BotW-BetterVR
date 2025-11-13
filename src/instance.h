@@ -21,7 +21,7 @@ public:
     void Init(VkInstance instance, VkPhysicalDevice physicalDevice, VkDevice device) {
         D3D12 = std::make_unique<RND_D3D12>();
         VK = std::make_unique<RND_Vulkan>(instance, physicalDevice, device);
-        Log::print("Initialized BotW VR instance...");
+        Log::print<INFO>("Initialized VRManager instance...");
     }
 
     void InitSession() {

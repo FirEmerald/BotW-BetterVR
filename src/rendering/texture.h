@@ -66,15 +66,11 @@ public:
 
 protected:
     void SetLastSignalledValue(uint64_t value) {
-#if defined(_DEBUG)
-        Log::print("Signal fence for texture {} with value {}", (void*)this, value);
-#endif
+        Log::print<INTEROP>("Signal fence for texture {} with value {}", (void*)this, value);
         m_fenceLastSignaledValue = value;
     }
     void SetLastAwaitedValue(uint64_t value) {
-#if defined(_DEBUG)
-        Log::print("Wait for fence for texture {} with value {}", (void*)this, value);
-#endif
+        Log::print<INTEROP>("Wait for fence for texture {} with value {}", (void*)this, value);
         m_fenceLastAwaitedValue = value;
     }
 

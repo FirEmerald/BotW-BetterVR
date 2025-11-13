@@ -44,6 +44,6 @@ void CemuHooks::hook_OSReportToConsole(PPCInterpreter_t* hCPU) {
         return;
     }
     if (str[0] != '\0') {
-        Log::print("{}", str);
+        Log::print<PPC>(str);
     }
 }

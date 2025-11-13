@@ -90,12 +90,12 @@ RND_Vulkan::ImGuiOverlay::ImGuiOverlay(VkCommandBuffer cb, uint32_t width, uint3
         if (addr == nullptr) {
             addr = VRManager::instance().VK->GetInstanceDispatch()->GetInstanceProcAddr(VRManager::instance().VK->GetInstance(), funcName);
 #ifdef _DEBUG
-            Log::print("Loaded function {} at {} using instance", funcName, (void*)addr);
+            Log::print<VERBOSE>("Loaded function {} at {} using instance", funcName, (void*)addr);
 #endif
         }
         else {
 #ifdef _DEBUG
-            Log::print("Loaded function {} at {}", funcName, (void*)addr);
+            Log::print<VERBOSE>("Loaded function {} at {}", funcName, (void*)addr);
 #endif
         }
 
@@ -126,7 +126,7 @@ RND_Vulkan::ImGuiOverlay::ImGuiOverlay(VkCommandBuffer cb, uint32_t width, uint3
         framebuffer = std::make_unique<VulkanFramebuffer>(width, height, format, m_renderPass);
     }
 
-    Log::print("Initializing font textures for ImGui...");
+    Log::print<VERBOSE>("Initializing font textures for ImGui...");
     ImGui_ImplVulkan_CreateFontsTexture(cb);
 
     // find HWND that starts with Cemu in its title
