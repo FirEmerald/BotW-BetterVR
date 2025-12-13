@@ -216,6 +216,171 @@ void CemuHooks::hook_DropEquipment(PPCInterpreter_t* hCPU) {
     //}
 }
 
+
+std::vector<std::string> contactLayerNames = {
+    "EntityObject",
+    "EntitySmallObject",
+    "EntityGroundObject",
+    "EntityPlayer",
+    "EntityNPC",
+    "EntityRagdoll",
+    "EntityWater",
+    "EntityAirWall",
+    "EntityGround",
+    "EntityGroundSmooth",
+    "EntityGroundRough",
+    "EntityRope",
+    "EntityTree",
+    "EntityNPC_NoHitPlayer",
+    "EntityHitOnlyWater",
+    "EntityWallForClimb",
+    "EntityHitOnlyGround",
+    "EntityQueryCustomReceiver",
+    "EntityForbidden18",
+    "EntityNoHit",
+    "EntityMeshVisualizer",
+    "EntityForbidden21",
+    "EntityForbidden22",
+    "EntityForbidden23",
+    "EntityForbidden24",
+    "EntityForbidden25",
+    "EntityForbidden26",
+    "EntityForbidden27",
+    "EntityForbidden28",
+    "EntityForbidden29",
+    "EntityForbidden30",
+    "EntityEnd",
+
+    "SensorObject",
+    "SensorSmallObject",
+    "SensorPlayer",
+    "SensorEnemy",
+    "SensorNPC",
+    "SensorHorse",
+    "SensorRope",
+    "SensorAttackPlayer",
+    "SensorAttackEnemy",
+    "SensorChemical",
+    "SensorTerror",
+    "SensorHitOnlyInDoor",
+    "SensorInDoor",
+    "SensorReserve13",
+    "SensorReserve14",
+    "SensorChemicalElement",
+    "SensorAttackCommon",
+    "SensorQueryOnly",
+    "SensorTree",
+    "SensorCamera",
+    "SensorMeshVisualizer",
+    "SensorNoHit",
+    "SensorReserve20",
+    "SensorCustomReceiver",
+    "SensorEnd"
+};
+
+enum class ContactLayer : uint32_t {
+    EntityObject = 0,
+    EntitySmallObject,
+    EntityGroundObject,
+    EntityPlayer,
+    EntityNPC,
+    EntityRagdoll,
+    EntityWater,
+    EntityAirWall,
+    EntityGround,
+    EntityGroundSmooth,
+    EntityGroundRough,
+    EntityRope,
+    EntityTree,
+    EntityNPC_NoHitPlayer,
+    EntityHitOnlyWater,
+    EntityWallForClimb,
+    EntityHitOnlyGround,
+    EntityQueryCustomReceiver,
+    EntityForbidden18,
+    EntityNoHit,
+    EntityMeshVisualizer,
+    EntityForbidden21,
+    EntityForbidden22,
+    EntityForbidden23,
+    EntityForbidden24,
+    EntityForbidden25,
+    EntityForbidden26,
+    EntityForbidden27,
+    EntityForbidden28,
+    EntityForbidden29,
+    EntityForbidden30,
+    EntityEnd,
+
+    SensorObject,
+    SensorSmallObject,
+    SensorPlayer,
+    SensorEnemy,
+    SensorNPC,
+    SensorHorse,
+    SensorRope,
+    SensorAttackPlayer,
+    SensorAttackEnemy,
+    SensorChemical,
+    SensorTerror,
+    SensorHitOnlyInDoor,
+    SensorInDoor,
+    SensorReserve13,
+    SensorReserve14,
+    SensorChemicalElement,
+    SensorAttackCommon,
+    SensorQueryOnly,
+    SensorTree,
+    SensorCamera,
+    SensorMeshVisualizer,
+    SensorNoHit,
+    SensorReserve20,
+    SensorCustomReceiver,
+    SensorEnd
+};
+
+
+
+void CemuHooks::hook_GetContactLayerOfAttack(PPCInterpreter_t* hCPU) {
+    hCPU->instructionPointer = hCPU->sprNew.LR;
+    if (GetSettings().IsThirdPersonMode()) {
+        return;
+    }
+
+    uint32_t player = hCPU->gpr[25];
+
+    ActorWiiU actor = {};
+    readMemory(player, &actor);
+
+    uint32_t originalContactLayerPtr = hCPU->gpr[5];
+    uint32_t originalContactLayer = getMemory<uint32_t>(originalContactLayerPtr).getLE();
+    const char* originalContactLayerStr = (const char*)(s_memoryBaseAddress + originalContactLayer);
+
+    uint32_t contactLayerValue = hCPU->gpr[3];
+
+    // hardcoded 0!!!
+    if (m_motionAnalyzers[0].IsAttacking()) {
+        contactLayerValue = (uint32_t)ContactLayer::SensorAttackPlayer;
+    }
+    else {
+        //contactLayerValue = (uint32_t)ContactLayer::SensorChemical;
+    }
+
+
+    //for (uint32_t i = 0; i < contactLayerNames.size(); i++) {
+    //    std::string& layerName = contactLayerNames[i];
+    //    if (layerName == "SensorNoHit") {
+    //        //Log::print<INFO>("Layer {} is {}", layerName, i);
+    //        contactLayerValue = i;
+    //    }
+    //}
+
+    hCPU->gpr[3] = contactLayerValue;
+
+    //Log::print<INFO>("GetContactLayerOfAttack called by {} ({:08X}) with contact layer {} which is a value of {}", actor.name.getLE(), player, originalContactLayerStr, contactLayerValue);
+}
+
+
 uint32_t frameIndex = 0;
 
 void CemuHooks::hook_EnableWeaponAttackSensor(PPCInterpreter_t* hCPU) {
@@ -264,16 +429,20 @@ void CemuHooks::hook_EnableWeaponAttackSensor(PPCInterpreter_t* hCPU) {
     m_motionAnalyzers[heldIndex].Update(state.inGame.poseLocation[heldIndex], state.inGame.poseVelocity[heldIndex], headset.value(), state.inGame.inputTime);
 
     // Use the analysed motion to determine whether the weapon is swinging or stabbing, and whether the attackSensor should be active this frame
-    bool CHEAT_alwaysEnableWeaponCollision = true;
+    bool CHEAT_alwaysEnableWeaponCollision = false;
     if (isHeldByPlayer && (m_motionAnalyzers[heldIndex].IsAttacking() || CHEAT_alwaysEnableWeaponCollision)) {
         m_motionAnalyzers[heldIndex].SetHitboxEnabled(true);
         //Log::print("!! Activate sensor for {}: isHeldByPlayer={}, weaponType={}", heldIndex, isHeldByPlayer, (int)weaponType);
         weapon.setupAttackSensor.resetAttack = 1;
         weapon.setupAttackSensor.mode = 2;
         weapon.setupAttackSensor.isContactLayerInitialized = 0;
+        //weapon.setupAttackSensor.overrideImpact = 1;
+        //weapon.setupAttackSensor.impact = 2312;
+        //weapon.setupAttackSensor.multiplier = 20.0f;
         // weapon.setupAttackSensor.overrideImpact = 1;
         // weapon.setupAttackSensor.multiplier = analyzer->GetDamage();
         // weapon.setupAttackSensor.impact = analyzer->GetImpulse();
+
         writeMemory(weaponPtr, &weapon);
     }
     else if (m_motionAnalyzers[heldIndex].IsHitboxEnabled()) {

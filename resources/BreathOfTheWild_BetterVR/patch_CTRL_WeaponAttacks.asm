@@ -3,6 +3,54 @@ moduleMatches = 0x6267BFD0
 
 .origin = codecave
 
+; change weapon sensor to be sort of inactive when not swung in first-person mode
+; this prevents hitting enemies and NPCs when you don't want to, + grass
+
+0x0332EF3C = ksys__phys__contactLayerFromText:
+
+custom_rigidBodyParam_getContactLayer:
+; r26 holds the player's Actor*, not the weapon I think?
+mflr r0
+stwu r1, -0x20(r1)
+stw r0, 0x24(r1)
+stw r3, 0x1C(r1)
+stw r4, 0x18(r1)
+stw r5, 0x14(r1)
+stw r6, 0x10(r1)
+stw r26, 0x0C(r1)
+stw r25, 0x08(r1)
+
+; load function ptr
+lis r4, ksys__phys__contactLayerFromText@ha
+addi r4, r4, ksys__phys__contactLayerFromText@l
+mtctr r4
+lwz r4, 0x18(r1)
+
+lwz r3, 0x1C(r1)
+addi r3, r3, 0x234
+bctrl ; bl ksys__phys__contactLayerFromText
+
+lwz r5, 0x1C(r1)
+addi r5, r5, 0x234 ; original contact layer text
+
+lwz r25, 0x08(r1) ; reload Actor* since it might've been clobbered
+bl import.coreinit.hook_GetContactLayerOfAttack
+
+lwz r25, 0x08(r1)
+lwz r26, 0x0C(r1)
+lwz r6, 0x10(r1)
+lwz r5, 0x14(r1)
+lwz r4, 0x18(r1)
+;lwz r3, 0x1C(r1)
+lwz r0, 0x24(r1)
+addi r1, r1, 0x20
+mtlr r0
+blr
+
+0x02C19E88 = bla custom_rigidBodyParam_getContactLayer
+
+
+; --------------------------------------------
 
 hook_equipWeapon:
 mflr r0

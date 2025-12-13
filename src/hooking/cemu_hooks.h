@@ -50,6 +50,7 @@ public:
         osLib_registerHLEFunction("coreinit", "hook_DropEquipment", &hook_DropEquipment);
         osLib_registerHLEFunction("coreinit", "hook_EnableWeaponAttackSensor", &hook_EnableWeaponAttackSensor);
         osLib_registerHLEFunction("coreinit", "hook_SetPlayerWeaponScale", &hook_SetPlayerWeaponScale);
+        osLib_registerHLEFunction("coreinit", "hook_GetContactLayerOfAttack", &hook_GetContactLayerOfAttack);
 
         // Input Hooks
         osLib_registerHLEFunction("coreinit", "hook_InjectXRInput", &hook_InjectXRInput);
@@ -210,6 +211,7 @@ private:
     static void hook_DropEquipment(PPCInterpreter_t* hCPU);
     static void hook_EnableWeaponAttackSensor(PPCInterpreter_t* hCPU);
     static void hook_SetPlayerWeaponScale(PPCInterpreter_t* hCPU);
+    static void hook_GetContactLayerOfAttack(PPCInterpreter_t* hCPU);
 
     // Input Hooks
     static void hook_InjectXRInput(PPCInterpreter_t* hCPU);
