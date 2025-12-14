@@ -43,14 +43,22 @@ void VkDeviceOverrides::DestroyImage(const vkroots::VkDeviceDispatch* pDispatch,
 }
 
 void VkDeviceOverrides::CmdClearColorImage(const vkroots::VkDeviceDispatch* pDispatch, VkCommandBuffer commandBuffer, VkImage image, VkImageLayout imageLayout, const VkClearColorValue* pColor, uint32_t rangeCount, const VkImageSubresourceRange* pRanges) {
-    // check for magical clear values
+    // check whether the magic values are there, and which order they are in to determine which eye
+    OpenXR::EyeSide side = (OpenXR::EyeSide)-1;
     if (pColor->float32[1] >= 0.12 && pColor->float32[1] <= 0.13 && pColor->float32[2] >= 0.97 && pColor->float32[2] <= 0.99) {
+        side = OpenXR::EyeSide::LEFT;
+    }
+    else if (pColor->float32[2] >= 0.12 && pColor->float32[2] <= 0.13 && pColor->float32[1] >= 0.97 && pColor->float32[1] <= 0.99) {
+        side = OpenXR::EyeSide::RIGHT;
+    }
+
+    if (side != (OpenXR::EyeSide)-1) {
         // r value in magical clear value is the capture idx after rounding down
         const long captureIdx = std::lroundf(pColor->float32[0] * 32.0f);
-        const OpenXR::EyeSide side = pColor->float32[3] < 0.5f ? OpenXR::EyeSide::LEFT : OpenXR::EyeSide::RIGHT;
+        const long frameIdx = pColor->float32[3] < 0.5f ? 0 : 1;
         checkAssert(captureIdx == 0 || captureIdx == 2, "Invalid capture index!");
 
-        Log::print<RENDERING>("Clearing color image for {} layer for {} side ({})", captureIdx == 0 ? "3D" : "2D", side == OpenXR::EyeSide::LEFT ? "left" : "right", pColor->float32[3]);
+        Log::print<RENDERING>("[{}] Clearing color image for {} layer for {} side", frameIdx, captureIdx == 0 ? "3D" : "2D", side == OpenXR::EyeSide::LEFT ? "left" : "right");
 
         auto* renderer = VRManager::instance().XR->GetRenderer();
         auto& layer3D = renderer->m_layer3D;
@@ -110,21 +118,15 @@ void VkDeviceOverrides::CmdClearColorImage(const vkroots::VkDeviceDispatch* pDis
                 return pDispatch->CmdClearColorImage(commandBuffer, image, imageLayout, pColor, rangeCount, pRanges);
             }
 
-            if (layer3D->HasCopiedColor(side)) {
+            if (layer3D->HasCopiedColor(side, frameIdx)) {
                 // the color texture has already been copied to the layer
-                Log::print<RENDERING>("A color texture is already bound for the current frame!");
+                Log::print<RENDERING>("A 3D color texture is already been copied for the current frame!");
                 const_cast<VkClearColorValue*>(pColor)[0] = { 0.0f, 0.0f, 0.0f, 0.0f };
                 return pDispatch->CmdClearColorImage(commandBuffer, image, imageLayout, pColor, rangeCount, pRanges);
             }
 
-            // if (layer3D.GetStatus() == Status3D::LEFT_BINDING_COLOR || layer3D.GetStatus() == Status3D::RIGHT_BINDING_COLOR) {
-            //
-            // }
-
-            layer3D->PrepareRendering(side);
-
             // note: This uses vkCmdCopyImage to copy the image to an OpenXR-specific texture. s_activeCopyOperations queues a semaphore for the D3D12 side to wait on.
-            SharedTexture* texture = layer3D->CopyColorToLayer(side, commandBuffer, image);
+            SharedTexture* texture = layer3D->CopyColorToLayer(side, commandBuffer, image, frameIdx);
             // Log::print("[VULKAN] Waiting for {} side to be 0", side == OpenXR::EyeSide::LEFT ? "left" : "right");
             s_activeCopyOperations.emplace_back(commandBuffer, texture);
             VulkanUtils::DebugPipelineBarrier(commandBuffer);
@@ -151,46 +153,46 @@ void VkDeviceOverrides::CmdClearColorImage(const vkroots::VkDeviceDispatch* pDis
         else if (captureIdx == 2) {
             // 2D layer - color texture for HUD rendering
 
-            // if (layer2D->HasCopied()) {
-            //     const_cast<VkClearColorValue*>(pColor)[0] = { 1.0f, 0.0f, 0.0f, 1.0f };
-            //     return pDispatch->CmdClearColorImage(commandBuffer, image, imageLayout, pColor, rangeCount, pRanges);
-            // }
-
-            bool alreadyCopiedOrAtLeastSignaled = layer2D->HasCopied() || layer2D->HasRecordedCopy();
-
-            // copy the current 2D framebuffer image that's holding the 2D image, before overwriting the contents with the imgui-rendered 2D view (which combines the left eye view and HUD to create the "regular" 2D image)
-            if (!alreadyCopiedOrAtLeastSignaled && !CemuHooks::GetSettings().ShowDebugOverlay()) {
-                // only copy the first attempt at capturing when GX2ClearColor is called with this capture index since the game/Cemu clears the 2D layer twice
-                SharedTexture* texture = layer2D->CopyColorToLayer(commandBuffer, image);
-                s_activeCopyOperations.emplace_back(commandBuffer, texture);
+            if (layer2D->HasRecordedCopy(frameIdx)) {
+                // the 2D texture has already been copied to the layer
+                Log::print<RENDERING>("A 2D texture has already been copied for the current frame!");
+                const_cast<VkClearColorValue*>(pColor)[0] = { 0.0f, 1.0f, 0.0f, 0.0f };
+                return pDispatch->CmdClearColorImage(commandBuffer, image, imageLayout, pColor, rangeCount, pRanges);
             }
 
-            VulkanUtils::DebugPipelineBarrier(commandBuffer);
-            VulkanUtils::TransitionLayout(commandBuffer, image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL);
+            if (side == OpenXR::EyeSide::LEFT) {
+                // provide the HUD texture to the imgui overlay we'll use to recomposite Cemu's original flatscreen rendering
+                if (imguiOverlay && imguiOverlay->m_initialized) {
+                    VRManager::instance().VK->m_imguiOverlay->DrawHUDLayerAsBackground(commandBuffer, image);
+                    VulkanUtils::DebugPipelineBarrier(commandBuffer);
+                    VulkanUtils::TransitionLayout(commandBuffer, image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL);
+                }
 
-            // copy the image to the imgui overlay's texture
-            if (VRManager::instance().VK->m_imguiOverlay && VRManager::instance().VK->m_imguiOverlay->m_initialized) {
-                VRManager::instance().VK->m_imguiOverlay->DrawHUDLayerAsBackground(commandBuffer, image);
-                VulkanUtils::DebugPipelineBarrier(commandBuffer);
-                VulkanUtils::TransitionLayout(commandBuffer, image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL);
+                if (imguiOverlay && imguiOverlay->m_initialized && CemuHooks::GetSettings().ShowDebugOverlay()) {
+                    // render the debug overlay on top of the HUD
+                    imguiOverlay->Render();
+                    imguiOverlay->DrawOverlayToImage(commandBuffer, image);
+
+                    // only copy the first attempt at capturing when GX2ClearColor is called with this capture index since the game/Cemu clears the 2D layer twice
+                    SharedTexture* texture = layer2D->CopyColorToLayer(commandBuffer, image, frameIdx);
+                    s_activeCopyOperations.emplace_back(commandBuffer, texture);
+                }
+                else {
+                    // copy the HUD texture to D3D12 to be presented
+                    SharedTexture* texture = layer2D->CopyColorToLayer(commandBuffer, image, frameIdx);
+                    s_activeCopyOperations.emplace_back(commandBuffer, texture);
+                }
             }
-
-            // render imgui, and then copy the framebuffer to the 2D layer
-            if (VRManager::instance().VK->m_imguiOverlay && VRManager::instance().VK->m_imguiOverlay->m_initialized) {
-                VRManager::instance().VK->m_imguiOverlay->Render();
-                VRManager::instance().VK->m_imguiOverlay->DrawOverlayToImage(commandBuffer, image);
-                VulkanUtils::DebugPipelineBarrier(commandBuffer);
-                VulkanUtils::TransitionLayout(commandBuffer, image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL);
+            if (side == OpenXR::EyeSide::RIGHT) {
+                // render the imgui overlay on the right side
+                if (imguiOverlay && imguiOverlay->m_initialized) {
+                    // render imgui, and then copy the framebuffer to the 2D layer
+                    imguiOverlay->Render();
+                    imguiOverlay->DrawOverlayToImage(commandBuffer, image);
+                    VulkanUtils::DebugPipelineBarrier(commandBuffer);
+                    VulkanUtils::TransitionLayout(commandBuffer, image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL);
+                }
             }
-
-            if (!alreadyCopiedOrAtLeastSignaled && CemuHooks::GetSettings().ShowDebugOverlay()) {
-                // only copy the first attempt at capturing when GX2ClearColor is called with this capture index since the game/Cemu clears the 2D layer twice
-                SharedTexture* texture = layer2D->CopyColorToLayer(commandBuffer, image);
-                s_activeCopyOperations.emplace_back(commandBuffer, texture);
-            }
-
-            // const_cast<VkClearColorValue*>(pColor)[0] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            // pDispatch->CmdClearColorImage(commandBuffer, image, imageLayout, pColor, rangeCount, pRanges);
         }
         return;
     }
@@ -201,11 +203,19 @@ void VkDeviceOverrides::CmdClearColorImage(const vkroots::VkDeviceDispatch* pDis
 
 void VkDeviceOverrides::CmdClearDepthStencilImage(const vkroots::VkDeviceDispatch* pDispatch, VkCommandBuffer commandBuffer, VkImage image, VkImageLayout imageLayout, const VkClearDepthStencilValue* pDepthStencil, uint32_t rangeCount, const VkImageSubresourceRange* pRanges) {
     // check for magical clear values
-    if (rangeCount == 1 && pDepthStencil->depth >= 0.011456789 && pDepthStencil->depth <= 0.013456789) {
-        // stencil value is the capture idx
-        const uint32_t captureIdx = pDepthStencil->stencil;
-        const OpenXR::EyeSide side = captureIdx == 1 ? OpenXR::EyeSide::LEFT : OpenXR::EyeSide::RIGHT;
-        checkAssert(captureIdx == 1 || captureIdx == 2, "Invalid capture index!");
+    // check order and whether there's a match with the magical clear value
+    OpenXR::EyeSide side = (OpenXR::EyeSide)-1;
+    if (pDepthStencil->depth >= 0.011456789 && pDepthStencil->depth <= 0.013456789) { // 0.0123456789
+        side = OpenXR::EyeSide::LEFT;
+    }
+    else if (pDepthStencil->depth >= 0.153987654 && pDepthStencil->depth <= 0.173987654) { // 0.163987654
+        side = OpenXR::EyeSide::RIGHT;
+    }
+
+    if (rangeCount == 1 && side != (OpenXR::EyeSide)-1) {
+        // stencil value is the frame counter
+        const uint32_t frameCounter = pDepthStencil->stencil;
+        checkAssert(frameCounter == 0 || frameCounter == 1, "Invalid frame counter for depth clear!");
 
         auto& layer3D = VRManager::instance().XR->GetRenderer()->m_layer3D;
         auto& layer2D = VRManager::instance().XR->GetRenderer()->m_layer2D;
@@ -214,9 +224,9 @@ void VkDeviceOverrides::CmdClearDepthStencilImage(const vkroots::VkDeviceDispatc
             return;
         }
 
-        Log::print<RENDERING>("Clearing depth image for 3D layer for {} side ({})", side == OpenXR::EyeSide::LEFT ? "left" : "right", pDepthStencil->stencil);
+        Log::print<RENDERING>("[{}] Clearing depth image for 3D layer for {} side", frameCounter, side == OpenXR::EyeSide::LEFT ? "left" : "right");
 
-        if (captureIdx == 1 || captureIdx == 2) {
+        if (side == OpenXR::EyeSide::LEFT || side == OpenXR::EyeSide::RIGHT) {
             // 3D layer - depth texture for 3D rendering
             if (s_curr3DDepthImage == VK_NULL_HANDLE) {
                 lockImageResolutions.lock();
@@ -233,7 +243,7 @@ void VkDeviceOverrides::CmdClearDepthStencilImage(const vkroots::VkDeviceDispatc
                 return;
             }
 
-            if (layer3D->HasCopiedDepth(side)) {
+            if (layer3D->HasCopiedDepth(side, frameCounter)) {
                 // the depth texture has already been copied to the layer
                 Log::print<RENDERING>("A depth texture is already bound for the current frame!");
                 return;
@@ -247,7 +257,7 @@ void VkDeviceOverrides::CmdClearDepthStencilImage(const vkroots::VkDeviceDispatc
             //
             // checkAssert(layer3D.GetStatus() == Status3D::LEFT_BINDING_COLOR || layer3D.GetStatus() == Status3D::RIGHT_BINDING_COLOR, "3D layer is not in the correct state for capturing depth images!");
 
-            SharedTexture* texture = layer3D->CopyDepthToLayer(side, commandBuffer, image);
+            SharedTexture* texture = layer3D->CopyDepthToLayer(side, commandBuffer, image, frameCounter);
             s_activeCopyOperations.emplace_back(commandBuffer, texture);
             return;
         }

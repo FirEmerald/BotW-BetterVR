@@ -133,7 +133,7 @@ RND_Vulkan::ImGuiOverlay::ImGuiOverlay(VkCommandBuffer cb, uint32_t width, uint3
     struct EnumWindowsData {
         DWORD cemuPid;
         HWND outHwnd;
-    } enumData = { GetCurrentProcessId(), NULL };
+    } enumData = { .cemuPid = GetCurrentProcessId(), .outHwnd = NULL };
 
     EnumWindows([](HWND iteratedHwnd, LPARAM data) -> BOOL {
         EnumWindowsData* enumData = (EnumWindowsData*)data;

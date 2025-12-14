@@ -10,15 +10,20 @@ str_printClear3DBuffer_right:
 
 magic3DClearingValues:
 .float (0.0 / 32.0)
+magic3DColorValue_leftSide:
 .float 0.123456789
-.float 0.987654321
-magic3DClearValue_leftSide:
-.float 0.0
 magic3DColorValue_rightSide:
-.float 1.0
+.float 0.987654321
 
-magic3DDepthValue:
+magic3DDepthValue_leftSide:
 .float 0.0123456789
+magic3DDepthValue_rightSide:
+.float 0.163987654
+
+magic3DColorValue_cntr0:
+.float 0.0
+magic3DColorValue_cntr1:
+.float 1.0
 
 ; r10 holds the agl::RenderBuffer object
 hookPostHDRComposedImage:
@@ -54,47 +59,73 @@ cmpwi r4, 0
 beq exit_hookPostHDRComposedImage
 addi r4, r4, 0xBC ; r4 is now the agl::RenderBuffer::mDepthTarget::mGX2FrameBuffer object
 
-; use magic values for the color and depth buffer clears to be identified in the Vulkan layer
-lis r7, magic3DClearingValues@ha
-lfs f1, magic3DClearingValues@l+0x0(r7)
-lfs f2, magic3DClearingValues@l+0x4(r7)
-lfs f3, magic3DClearingValues@l+0x8(r7)
-
-lis r7, magic3DDepthValue@ha
-lfs f5, magic3DDepthValue@l+0x0(r7)
-li r6, 3 ; GX2ClearFlags: clear depth and stencil using the provided values
-
 ; use 0 and 1 as alpha clear values for the left/right eye, and use 1 and 2 as color clear values
 lis r7, currentEyeSide@ha
 lwz r7, currentEyeSide@l(r7)
 cmpwi r7, 0
-beq leftEyeValues
-b rightEyeValues
+beq leftEye3DValues
+b rightEye3DValues
 
-leftEyeValues:
-lis r7, magic3DClearValue_leftSide@ha
-lfs f4, magic3DClearValue_leftSide@l(r7)
-li r5, 1
+leftEye3DValues:
+; store the left and right values in a certain order to indicate which eye is being cleared
+lis r7, magic3DClearingValues@ha
+lfs f2, magic3DClearingValues@l+0x4(r7)
+lfs f3, magic3DClearingValues@l+0x8(r7)
+
+; depth clear value
+lis r7, magic3DDepthValue_leftSide@ha
+lfs f5, magic3DDepthValue_leftSide@l(r7)
+
+; log clearing action
+li r5, 0
 mr r8, r3
 lis r3, str_printClear3DBuffer_left@ha
 addi r3, r3, str_printClear3DBuffer_left@l
 bla import.coreinit.hook_OSReportToConsole
 mr r3, r8
-b continueToClear
+b continueTo3DClear
 
-rightEyeValues:
-lis r7, magic3DColorValue_rightSide@ha
-lfs f4, magic3DColorValue_rightSide@l(r7)
-li r5, 2
+rightEye3DValues:
+; store the left and right values in a certain order to indicate which eye is being cleared
+lis r7, magic3DClearingValues@ha
+lfs f3, magic3DClearingValues@l+0x4(r7)
+lfs f2, magic3DClearingValues@l+0x8(r7)
+; depth clear value
+lis r7, magic3DDepthValue_rightSide@ha
+lfs f5, magic3DDepthValue_rightSide@l(r7)
+
+; log clearing action
+li r5, 1
 mr r8, r3
 lis r3, str_printClear3DBuffer_right@ha
 addi r3, r3, str_printClear3DBuffer_right@l
 bla import.coreinit.hook_OSReportToConsole
 mr r3, r8
-b continueToClear
+b continueTo3DClear
 
 ; void GX2ClearBuffersEx(GX2ColorBuffer* colorBuffer, GX2DepthBuffer* depthBuffer, float r, float g, float b, float a, float depthClearValue, uint8 stencilClearValue, GX2ClearFlags clearFlags)
-continueToClear:
+continueTo3DClear:
+; identifier type of clear
+lis r7, magic3DClearingValues@ha
+lfs f1, magic3DClearingValues@l+0x0(r7)
+
+; store frame counter in alpha channel
+lis r12, currentFrameCounter@ha
+lwz r0, currentFrameCounter@l(r12)
+cmpwi r0, 0
+bne loadOneInAlphaChannel
+loadZeroInAlphaChannel:
+lis r12, magic3DColorValue_cntr0@ha
+lfs f4, magic3DColorValue_cntr0@l(r12)
+li r5, 0 ; stencil clear value for the depth buffer clearing to know its frame 0
+b continueAfterAlphaChannel
+loadOneInAlphaChannel:
+lis r12, magic3DColorValue_cntr1@ha
+lfs f4, magic3DColorValue_cntr1@l(r12)
+li r5, 1 ; stencil clear value for the depth buffer clearing to know its frame 1
+continueAfterAlphaChannel:
+; GX2ClearFlags: clear depth and stencil using the provided values
+li r6, 3
 bla import.gx2.GX2ClearBuffersEx
 
 exit_hookPostHDRComposedImage:

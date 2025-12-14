@@ -236,7 +236,13 @@ public:
         if constexpr (L == VERBOSE) {
             return true;
         }
+        //if constexpr (L == RENDERING) {
+        //    return true;
+        //}
         //if constexpr (L == CONTROLS) {
+        //    return true;
+        //}
+        //if constexpr (L == PPC) {
         //    return true;
         //}
 #endif

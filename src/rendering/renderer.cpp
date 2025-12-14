@@ -49,11 +49,21 @@ void RND_Renderer::EndFrame() {
     XrCompositionLayerProjection layer3D = { XR_TYPE_COMPOSITION_LAYER_PROJECTION };
     std::array<XrCompositionLayerProjectionView, 2> layer3DViews = {};
     // checkAssert( m_layer3D->HasCopied(OpenXR::EyeSide::LEFT) == m_layer3D->HasCopied(OpenXR::EyeSide::RIGHT), "3D layer should always be rendered for both eyes at once!");
-    if (m_layer3D && m_layer3D->HasCopied(OpenXR::EyeSide::LEFT) && m_layer3D->HasCopied(OpenXR::EyeSide::RIGHT)) {
+    
+    long frameIdx = -1;
+    if (m_layer3D) {
+        if (m_layer3D->HasCopied(OpenXR::EyeSide::LEFT, 0) && m_layer3D->HasCopied(OpenXR::EyeSide::RIGHT, 0)) {
+            frameIdx = 0;
+        } else if (m_layer3D->HasCopied(OpenXR::EyeSide::LEFT, 1) && m_layer3D->HasCopied(OpenXR::EyeSide::RIGHT, 1)) {
+            frameIdx = 1;
+        }
+    }
+
+    if (frameIdx != -1) {
         m_layer3D->StartRendering();
-        m_layer3D->Render(OpenXR::EyeSide::LEFT);
-        m_layer3D->Render(OpenXR::EyeSide::RIGHT);
-        layer3DViews = m_layer3D->FinishRendering();
+        m_layer3D->Render(OpenXR::EyeSide::LEFT, frameIdx);
+        m_layer3D->Render(OpenXR::EyeSide::RIGHT, frameIdx);
+        layer3DViews = m_layer3D->FinishRendering(frameIdx);
         layer3D.layerFlags = NULL;
         layer3D.space = VRManager::instance().XR->m_stageSpace;
         layer3D.viewCount = (uint32_t)layer3DViews.size();
@@ -65,14 +75,23 @@ void RND_Renderer::EndFrame() {
     }
 
     // todo: currently ignores m_frameState.shouldRender, but that's probably fine
-    m_presented2DLastFrame = m_layer2D && m_layer2D->HasCopied();
+    long frameIdx2D = -1;
+    if (m_layer2D) {
+        if (m_layer2D->HasCopied(0)) {
+            frameIdx2D = 0;
+        } else if (m_layer2D->HasCopied(1)) {
+            frameIdx2D = 1;
+        }
+    }
+
+    m_presented2DLastFrame = frameIdx2D != -1;
     std::vector<XrCompositionLayerQuad> layer2D;
     // checkAssert(m_presented2DLastFrame, "2D layer should always be rendered!");
     if (m_presented2DLastFrame) {
         // The HUD/menus aren't eye-specific, so present the most recent one for both eyes at once
         m_layer2D->StartRendering();
-        m_layer2D->Render();
-        layer2D = m_layer2D->FinishRendering(m_frameState.predictedDisplayTime);
+        m_layer2D->Render(frameIdx2D);
+        layer2D = m_layer2D->FinishRendering(m_frameState.predictedDisplayTime, frameIdx2D);
         for (auto& layer : layer2D) {
             compositionLayers.emplace_back(reinterpret_cast<XrCompositionLayerBaseHeader*>(&layer));
         }
@@ -104,15 +123,17 @@ RND_Renderer::Layer3D::Layer3D(VkExtent2D extent) {
     this->m_presentPipelines[OpenXR::EyeSide::RIGHT]->BindSettings((float)this->m_swapchains[OpenXR::EyeSide::RIGHT]->GetWidth(), (float)this->m_swapchains[OpenXR::EyeSide::RIGHT]->GetHeight());
 
     // initialize textures
-    this->m_textures[OpenXR::EyeSide::LEFT] = std::make_unique<SharedTexture>(extent.width, extent.height, VK_FORMAT_B10G11R11_UFLOAT_PACK32, D3D12Utils::ToDXGIFormat(VK_FORMAT_B10G11R11_UFLOAT_PACK32));
-    this->m_textures[OpenXR::EyeSide::RIGHT] = std::make_unique<SharedTexture>(extent.width, extent.height, VK_FORMAT_B10G11R11_UFLOAT_PACK32, D3D12Utils::ToDXGIFormat(VK_FORMAT_B10G11R11_UFLOAT_PACK32));
-    this->m_depthTextures[OpenXR::EyeSide::LEFT] = std::make_unique<SharedTexture>(extent.width, extent.height, VK_FORMAT_D32_SFLOAT, D3D12Utils::ToDXGIFormat(VK_FORMAT_D32_SFLOAT));
-    this->m_depthTextures[OpenXR::EyeSide::RIGHT] = std::make_unique<SharedTexture>(extent.width, extent.height, VK_FORMAT_D32_SFLOAT, D3D12Utils::ToDXGIFormat(VK_FORMAT_D32_SFLOAT));
+    for (int i = 0; i < 2; ++i) {
+        this->m_textures[OpenXR::EyeSide::LEFT][i] = std::make_unique<SharedTexture>(extent.width, extent.height, VK_FORMAT_B10G11R11_UFLOAT_PACK32, D3D12Utils::ToDXGIFormat(VK_FORMAT_B10G11R11_UFLOAT_PACK32));
+        this->m_textures[OpenXR::EyeSide::RIGHT][i] = std::make_unique<SharedTexture>(extent.width, extent.height, VK_FORMAT_B10G11R11_UFLOAT_PACK32, D3D12Utils::ToDXGIFormat(VK_FORMAT_B10G11R11_UFLOAT_PACK32));
+        this->m_depthTextures[OpenXR::EyeSide::LEFT][i] = std::make_unique<SharedTexture>(extent.width, extent.height, VK_FORMAT_D32_SFLOAT, D3D12Utils::ToDXGIFormat(VK_FORMAT_D32_SFLOAT));
+        this->m_depthTextures[OpenXR::EyeSide::RIGHT][i] = std::make_unique<SharedTexture>(extent.width, extent.height, VK_FORMAT_D32_SFLOAT, D3D12Utils::ToDXGIFormat(VK_FORMAT_D32_SFLOAT));
 
-    this->m_textures[OpenXR::EyeSide::LEFT]->d3d12GetTexture()->SetName(L"Layer3D - Left Color Texture");
-    this->m_textures[OpenXR::EyeSide::RIGHT]->d3d12GetTexture()->SetName(L"Layer3D - Right Color Texture");
-    this->m_depthTextures[OpenXR::EyeSide::LEFT]->d3d12GetTexture()->SetName(L"Layer3D - Left Depth Texture");
-    this->m_depthTextures[OpenXR::EyeSide::RIGHT]->d3d12GetTexture()->SetName(L"Layer3D - Right Depth Texture");
+        this->m_textures[OpenXR::EyeSide::LEFT][i]->d3d12GetTexture()->SetName(L"Layer3D - Left Color Texture");
+        this->m_textures[OpenXR::EyeSide::RIGHT][i]->d3d12GetTexture()->SetName(L"Layer3D - Right Color Texture");
+        this->m_depthTextures[OpenXR::EyeSide::LEFT][i]->d3d12GetTexture()->SetName(L"Layer3D - Left Depth Texture");
+        this->m_depthTextures[OpenXR::EyeSide::RIGHT][i]->d3d12GetTexture()->SetName(L"Layer3D - Right Depth Texture");
+    }
 
     ComPtr<ID3D12CommandAllocator> cmdAllocator;
     {
@@ -122,14 +143,21 @@ RND_Renderer::Layer3D::Layer3D(VkExtent2D extent) {
 
         RND_D3D12::CommandContext<true> transitionInitialTextures(d3d12Device, d3d12Queue, cmdAllocator.Get(), [this](RND_D3D12::CommandContext<true>* context) {
             context->GetRecordList()->SetName(L"transitionInitialTextures");
-            this->m_textures[OpenXR::EyeSide::LEFT]->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_COPY_DEST);
-            this->m_textures[OpenXR::EyeSide::RIGHT]->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_COPY_DEST);
-            this->m_depthTextures[OpenXR::EyeSide::LEFT]->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_COPY_DEST);
-            this->m_depthTextures[OpenXR::EyeSide::RIGHT]->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_COPY_DEST);
-            context->Signal(this->m_textures[OpenXR::EyeSide::LEFT].get(), 0);
-            context->Signal(this->m_textures[OpenXR::EyeSide::RIGHT].get(), 0);
-            context->Signal(this->m_depthTextures[OpenXR::EyeSide::LEFT].get(), 0);
-            context->Signal(this->m_depthTextures[OpenXR::EyeSide::RIGHT].get(), 0);
+            for (int i = 0; i < 2; ++i) {
+                this->m_textures[OpenXR::EyeSide::LEFT][i]->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_COPY_DEST);
+                this->m_textures[OpenXR::EyeSide::RIGHT][i]->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_COPY_DEST);
+                this->m_depthTextures[OpenXR::EyeSide::LEFT][i]->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_COPY_DEST);
+                this->m_depthTextures[OpenXR::EyeSide::RIGHT][i]->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_COPY_DEST);
+                context->Signal(this->m_textures[OpenXR::EyeSide::LEFT][i].get(), 0);
+                context->Signal(this->m_textures[OpenXR::EyeSide::RIGHT][i].get(), 0);
+                context->Signal(this->m_depthTextures[OpenXR::EyeSide::LEFT][i].get(), 0);
+                context->Signal(this->m_depthTextures[OpenXR::EyeSide::RIGHT][i].get(), 0);
+                
+                this->m_copiedColor[OpenXR::EyeSide::LEFT][i] = false;
+                this->m_copiedColor[OpenXR::EyeSide::RIGHT][i] = false;
+                this->m_copiedDepth[OpenXR::EyeSide::LEFT][i] = false;
+                this->m_copiedDepth[OpenXR::EyeSide::RIGHT][i] = false;
+            }
         });
     }
 }
@@ -140,17 +168,18 @@ RND_Renderer::Layer3D::~Layer3D() {
     }
 }
 
-SharedTexture* RND_Renderer::Layer3D::CopyColorToLayer(OpenXR::EyeSide side, VkCommandBuffer copyCmdBuffer, VkImage image) {
+SharedTexture* RND_Renderer::Layer3D::CopyColorToLayer(OpenXR::EyeSide side, VkCommandBuffer copyCmdBuffer, VkImage image, long frameIdx) {
     // Log::print("[VULKAN] Copying COLOR for {} side", side == OpenXR::EyeSide::LEFT ? "left" : "right");
-    m_textures[side]->CopyFromVkImage(copyCmdBuffer, image);
-    m_copiedColor[side] = true;
-    return m_textures[side].get();
+    m_currentFrameIdx = frameIdx;
+    m_textures[side][frameIdx]->CopyFromVkImage(copyCmdBuffer, image);
+    m_copiedColor[side][frameIdx] = true;
+    return m_textures[side][frameIdx].get();
 }
 
-SharedTexture* RND_Renderer::Layer3D::CopyDepthToLayer(OpenXR::EyeSide side, VkCommandBuffer copyCmdBuffer, VkImage image) {
-    m_depthTextures[side]->CopyFromVkImage(copyCmdBuffer, image);
-    m_copiedDepth[side] = true;
-    return m_depthTextures[side].get();
+SharedTexture* RND_Renderer::Layer3D::CopyDepthToLayer(OpenXR::EyeSide side, VkCommandBuffer copyCmdBuffer, VkImage image, long frameIdx) {
+    m_depthTextures[side][frameIdx]->CopyFromVkImage(copyCmdBuffer, image);
+    m_copiedDepth[side][frameIdx] = true;
+    return m_depthTextures[side][frameIdx].get();
 }
 
 void RND_Renderer::Layer3D::PrepareRendering(OpenXR::EyeSide side) {
@@ -178,49 +207,58 @@ std::optional<std::array<XrView, 2>> RND_Renderer::UpdateViews(XrTime predictedD
 void RND_Renderer::Layer3D::StartRendering() {
     // checkAssert((this->m_textures[OpenXR::EyeSide::LEFT] == nullptr && this->m_textures[OpenXR::EyeSide::RIGHT] == nullptr) || (this->m_textures[OpenXR::EyeSide::LEFT] != nullptr && this->m_textures[OpenXR::EyeSide::RIGHT] != nullptr), "Both textures must be either null or not null");
     // checkAssert((this->m_depthTextures[OpenXR::EyeSide::LEFT] == nullptr && this->m_depthTextures[OpenXR::EyeSide::RIGHT] == nullptr) || (this->m_depthTextures[OpenXR::EyeSide::LEFT] != nullptr && this->m_depthTextures[OpenXR::EyeSide::RIGHT] != nullptr), "Both depth textures must be either null or not null");
+    // checkAssert((this->m_textures[OpenXR::EyeSide::LEFT][0] == nullptr && this->m_textures[OpenXR::EyeSide::RIGHT][0] == nullptr) || (this->m_textures[OpenXR::EyeSide::LEFT][0] != nullptr && this->m_textures[OpenXR::EyeSide::RIGHT][0] != nullptr), "Both textures must be either null or not null");
+    // checkAssert((this->m_depthTextures[OpenXR::EyeSide::LEFT][0] == nullptr && this->m_depthTextures[OpenXR::EyeSide::RIGHT][0] == nullptr) || (this->m_depthTextures[OpenXR::EyeSide::LEFT][0] != nullptr && this->m_depthTextures[OpenXR::EyeSide::RIGHT][0] != nullptr), "Both depth textures must be either null or not null");
 
+    this->m_swapchains[OpenXR::EyeSide::LEFT]->PrepareRendering();
     this->m_swapchains[OpenXR::EyeSide::LEFT]->StartRendering();
+    this->m_depthSwapchains[OpenXR::EyeSide::LEFT]->PrepareRendering();
     this->m_depthSwapchains[OpenXR::EyeSide::LEFT]->StartRendering();
+    this->m_swapchains[OpenXR::EyeSide::RIGHT]->PrepareRendering();
     this->m_swapchains[OpenXR::EyeSide::RIGHT]->StartRendering();
+    this->m_depthSwapchains[OpenXR::EyeSide::RIGHT]->PrepareRendering();
     this->m_depthSwapchains[OpenXR::EyeSide::RIGHT]->StartRendering();
 }
 
-void RND_Renderer::Layer3D::Render(OpenXR::EyeSide side) {
+void RND_Renderer::Layer3D::Render(OpenXR::EyeSide side, long frameIdx) {
     ID3D12Device* device = VRManager::instance().D3D12->GetDevice();
     ID3D12CommandQueue* queue = VRManager::instance().D3D12->GetCommandQueue();
     ID3D12CommandAllocator* allocator = VRManager::instance().D3D12->GetFrameAllocator();
 
-    RND_D3D12::CommandContext<false> renderSharedTexture(device, queue, allocator, [this, side](RND_D3D12::CommandContext<false>* context) {
+    RND_D3D12::CommandContext<false> renderSharedTexture(device, queue, allocator, [this, side, frameIdx](RND_D3D12::CommandContext<false>* context) {
         context->GetRecordList()->SetName(L"RenderSharedTexture");
-        context->WaitFor(m_textures[side].get(), SEMAPHORE_TO_D3D12);
-        context->WaitFor(m_depthTextures[side].get(), SEMAPHORE_TO_D3D12);
-        m_textures[side]->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        m_depthTextures[side]->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        auto& texture = m_textures[side][frameIdx];
+        auto& depthTexture = m_depthTextures[side][frameIdx];
 
-        m_presentPipelines[side]->BindAttachment(0, m_textures[side]->d3d12GetTexture());
-        m_presentPipelines[side]->BindAttachment(1, m_depthTextures[side]->d3d12GetTexture(), DXGI_FORMAT_R32_FLOAT);
+        context->WaitFor(texture.get(), SEMAPHORE_TO_D3D12);
+        context->WaitFor(depthTexture.get(), SEMAPHORE_TO_D3D12);
+        texture->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        depthTexture->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+
+        m_presentPipelines[side]->BindAttachment(0, texture->d3d12GetTexture());
+        m_presentPipelines[side]->BindAttachment(1, depthTexture->d3d12GetTexture(), DXGI_FORMAT_R32_FLOAT);
         m_presentPipelines[side]->BindTarget(0, m_swapchains[side]->GetTexture(), m_swapchains[side]->GetFormat());
         m_presentPipelines[side]->BindDepthTarget(m_depthSwapchains[side]->GetTexture(), m_depthSwapchains[side]->GetFormat());
         m_presentPipelines[side]->Render(context->GetRecordList(), m_swapchains[side]->GetTexture());
 
-        m_textures[side]->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_COPY_DEST);
-        m_depthTextures[side]->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_COPY_DEST);
-        context->Signal(m_textures[side].get(), SEMAPHORE_TO_VULKAN);
-        context->Signal(m_depthTextures[side].get(), SEMAPHORE_TO_VULKAN);
+        texture->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_COPY_DEST);
+        depthTexture->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_COPY_DEST);
+        context->Signal(texture.get(), SEMAPHORE_TO_VULKAN);
+        context->Signal(depthTexture.get(), SEMAPHORE_TO_VULKAN);
     });
     // Log::print("[D3D12 - 3D Layer] Rendering finished");
 }
 
-const std::array<XrCompositionLayerProjectionView, 2>& RND_Renderer::Layer3D::FinishRendering() {
+const std::array<XrCompositionLayerProjectionView, 2>& RND_Renderer::Layer3D::FinishRendering(long frameIdx) {
     this->m_swapchains[OpenXR::EyeSide::LEFT]->FinishRendering();
     this->m_depthSwapchains[OpenXR::EyeSide::LEFT]->FinishRendering();
     this->m_swapchains[OpenXR::EyeSide::RIGHT]->FinishRendering();
     this->m_depthSwapchains[OpenXR::EyeSide::RIGHT]->FinishRendering();
 
-    this->m_copiedColor[OpenXR::EyeSide::LEFT] = false;
-    this->m_copiedColor[OpenXR::EyeSide::RIGHT] = false;
-    this->m_copiedDepth[OpenXR::EyeSide::LEFT] = false;
-    this->m_copiedDepth[OpenXR::EyeSide::RIGHT] = false;
+    this->m_copiedColor[OpenXR::EyeSide::LEFT][frameIdx] = false;
+    this->m_copiedColor[OpenXR::EyeSide::RIGHT][frameIdx] = false;
+    this->m_copiedDepth[OpenXR::EyeSide::LEFT][frameIdx] = false;
+    this->m_copiedDepth[OpenXR::EyeSide::RIGHT][frameIdx] = false;
 
     // clang-format off
     m_projectionViews[OpenXR::EyeSide::LEFT] = {
@@ -305,8 +343,10 @@ RND_Renderer::Layer2D::Layer2D(VkExtent2D extent) {
     this->m_presentPipeline->BindSettings((float)this->m_swapchain->GetWidth(), (float)this->m_swapchain->GetHeight());
 
     // initialize textures
-    this->m_texture = std::make_unique<SharedTexture>(extent.width, extent.height, VK_FORMAT_A2B10G10R10_UNORM_PACK32, D3D12Utils::ToDXGIFormat(VK_FORMAT_A2B10G10R10_UNORM_PACK32));
-    this->m_texture->d3d12GetTexture()->SetName(L"Layer2D - Color Texture");
+    for (int i = 0; i < 2; ++i) {
+        this->m_textures[i] = std::make_unique<SharedTexture>(extent.width, extent.height, VK_FORMAT_A2B10G10R10_UNORM_PACK32, D3D12Utils::ToDXGIFormat(VK_FORMAT_A2B10G10R10_UNORM_PACK32));
+        this->m_textures[i]->d3d12GetTexture()->SetName(L"Layer2D - Color Texture");
+    }
 
     ComPtr<ID3D12CommandAllocator> cmdAllocator;
     {
@@ -316,8 +356,11 @@ RND_Renderer::Layer2D::Layer2D(VkExtent2D extent) {
 
         RND_D3D12::CommandContext<true> transitionInitialTextures(d3d12Device, d3d12Queue, cmdAllocator.Get(), [this](RND_D3D12::CommandContext<true>* context) {
             context->GetRecordList()->SetName(L"transitionInitialTextures");
-            this->m_texture->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_COPY_DEST);
-            context->Signal(this->m_texture.get(), 0);
+            for (int i = 0; i < 2; ++i) {
+                this->m_textures[i]->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_COPY_DEST);
+                context->Signal(this->m_textures[i].get(), 0);
+                this->m_recordedCopy[i] = false;
+            }
         });
     }
 }
@@ -326,41 +369,43 @@ RND_Renderer::Layer2D::~Layer2D() {
     m_swapchain.reset();
 }
 
-SharedTexture* RND_Renderer::Layer2D::CopyColorToLayer(VkCommandBuffer copyCmdBuffer, VkImage image) {
-    m_swapchain->PrepareRendering();
-    m_texture->CopyFromVkImage(copyCmdBuffer, image);
-    m_recordedCopy = true;
-    return m_texture.get();
+SharedTexture* RND_Renderer::Layer2D::CopyColorToLayer(VkCommandBuffer copyCmdBuffer, VkImage image, long frameIdx) {
+    m_currentFrameIdx = frameIdx;
+    m_textures[frameIdx]->CopyFromVkImage(copyCmdBuffer, image);
+    m_recordedCopy[frameIdx] = true;
+    return m_textures[frameIdx].get();
 }
 
 void RND_Renderer::Layer2D::StartRendering() const {
+    m_swapchain->PrepareRendering();
     m_swapchain->StartRendering();
 }
 
-void RND_Renderer::Layer2D::Render() {
+void RND_Renderer::Layer2D::Render(long frameIdx) {
     ID3D12Device* device = VRManager::instance().D3D12->GetDevice();
     ID3D12CommandQueue* queue = VRManager::instance().D3D12->GetCommandQueue();
     ID3D12CommandAllocator* allocator = VRManager::instance().D3D12->GetFrameAllocator();
 
-    RND_D3D12::CommandContext<false> renderSharedTexture(device, queue, allocator, [this](RND_D3D12::CommandContext<false>* context) {
+    RND_D3D12::CommandContext<false> renderSharedTexture(device, queue, allocator, [this, frameIdx](RND_D3D12::CommandContext<false>* context) {
         context->GetRecordList()->SetName(L"RenderSharedTexture");
 
         // wait for both since we only have one 2D swap buffer to render to
         // fixme: Why do we signal to the global command list instead of the local one?!
-        context->WaitFor(m_texture.get(), SEMAPHORE_TO_D3D12);
-        m_texture->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        auto& texture = m_textures[frameIdx];
+        context->WaitFor(texture.get(), SEMAPHORE_TO_D3D12);
+        texture->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-        m_presentPipeline->BindAttachment(0, m_texture->d3d12GetTexture());
+        m_presentPipeline->BindAttachment(0, texture->d3d12GetTexture());
         m_presentPipeline->BindTarget(0, m_swapchain->GetTexture(), m_swapchain->GetFormat());
         m_presentPipeline->Render(context->GetRecordList(), m_swapchain->GetTexture());
 
-        m_texture->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_COPY_DEST);
-        context->Signal(m_texture.get(), SEMAPHORE_TO_VULKAN);
+        texture->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_COPY_DEST);
+        context->Signal(texture.get(), SEMAPHORE_TO_VULKAN);
     });
-    m_recordedCopy = false;
+    m_recordedCopy[frameIdx] = false;
 }
 
-std::vector<XrCompositionLayerQuad> RND_Renderer::Layer2D::FinishRendering(XrTime predictedDisplayTime) {
+std::vector<XrCompositionLayerQuad> RND_Renderer::Layer2D::FinishRendering(XrTime predictedDisplayTime, long frameIdx) {
     this->m_swapchain->FinishRendering();
 
     XrSpaceLocation spaceLocation = { XR_TYPE_SPACE_LOCATION };
@@ -390,7 +435,7 @@ std::vector<XrCompositionLayerQuad> RND_Renderer::Layer2D::FinishRendering(XrTim
         spaceLocation.pose.orientation = { 0.0f, 0.0f, 0.0f, 1.0f };
     }
 
-    const float aspectRatio = (float)this->m_texture->d3d12GetTexture()->GetDesc().Width / (float)this->m_texture->d3d12GetTexture()->GetDesc().Height;
+    const float aspectRatio = (float)this->m_textures[frameIdx]->d3d12GetTexture()->GetDesc().Width / (float)this->m_textures[frameIdx]->d3d12GetTexture()->GetDesc().Height;
 
     const float width = aspectRatio > 1.0f ? aspectRatio : 1.0f;
     const float height = aspectRatio <= 1.0f ? 1.0f / aspectRatio : 1.0f;

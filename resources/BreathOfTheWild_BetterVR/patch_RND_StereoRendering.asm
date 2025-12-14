@@ -17,6 +17,10 @@ moduleMatches = 0x6267BFD0
 currentEyeSide:
 .int 0
 
+; This is just a 0-1 counter. This is enough to have a two in-flight frames. Could be expanded, but BotW is fine with two.
+currentFrameCounter:
+.int 0
+
 0x031FB1B4 = sub_31FB1B4_getTimeForGameUpdateMaybe:
 0x0309F72C = sead_GameFramework_lockFrameDrawContext:
 0x0309F744 = sead_GameFramework_unlockFrameDrawContext:
@@ -99,6 +103,17 @@ stw r0, currentEyeSide@l(r12)
 li r3, 1
 bl import.coreinit.hook_EndCameraSide
 
+; increase frame counter
+lis r12, currentFrameCounter@ha
+lwz r3, currentFrameCounter@l(r12)
+addi r3, r3, 1
+cmpwi r3, 2 ; limit to 2 in-flight frames (so 0 and 1) for now
+bne skip_resetFrameCounter
+li r3, 0
+skip_resetFrameCounter:
+stw r3, currentFrameCounter@l(r12)
+
+; start rendering for the left eye
 li r0, 0
 lis r12, currentEyeSide@ha
 stw r0, currentEyeSide@l(r12)
@@ -198,6 +213,7 @@ loc_31FA95C:
 ; ========================================================================
 
 continueWithRendering:
+; regular continue code below
 lis r3, sead_GameFramework_unlockFrameDrawContext@ha
 addi r3, r3, sead_GameFramework_unlockFrameDrawContext@l
 mtctr r3
