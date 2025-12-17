@@ -172,7 +172,7 @@ RND_Renderer::ImGuiOverlay::ImGuiOverlay(VkCommandBuffer cb, uint32_t width, uin
 
         frame.mainFramebuffer->vkPipelineBarrier(cb);
         frame.mainFramebuffer->vkTransitionLayout(cb, VK_IMAGE_LAYOUT_GENERAL);
-        frame.mainFramebuffer->vkClear(cb, { 0.0f, 1.0f, 0.0f, 1.0f });
+        frame.mainFramebuffer->vkClear(cb, { 0.0f, 0.0f, 0.0f, 1.0f });
 
         frame.hudFramebuffer->vkPipelineBarrier(cb);
         frame.hudFramebuffer->vkTransitionLayout(cb, VK_IMAGE_LAYOUT_GENERAL);
@@ -319,7 +319,7 @@ void RND_Renderer::ImGuiOverlay::BeginFrame(long frameIdx, bool renderBackground
             ImGui::SetNextWindowSize(ImGui::GetMainViewport()->WorkSize);
 
             ImGui::Begin("HUD Background", nullptr, FULLSCREEN_WINDOW_FLAGS);
-            ImGui::Image((ImTextureID)(frame.hudFramebufferDS), windowSize);
+            ImGui::Image((ImTextureID)(VRManager::instance().XR->GetRenderer()->IsRendering3D(frameIdx) ? frame.hudFramebufferDS : frame.hudWithoutAlphaFramebufferDS), windowSize);
             ImGui::End();
             ImGui::PopStyleVar();
             ImGui::PopStyleVar();
