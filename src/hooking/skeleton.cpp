@@ -262,10 +262,14 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
     const uint32_t matrixPtr = hCPU->gpr[4];
     const uint32_t scalePtr = hCPU->gpr[5];
     const uint32_t boneNamePtr = hCPU->gpr[6];
+    const uint32_t frameCounter = hCPU->gpr[7];
     if (!gsysModelPtr || !matrixPtr || !scalePtr || !boneNamePtr) return;
 
     const auto modelName = getMemory<sead::FixedSafeString100>(gsysModelPtr + 0x128);
     if (modelName.getLE() != "GameROMPlayer") return;
+
+    // get frame data
+    auto& frame = VRManager::instance().XR->GetRenderer()->GetFrame(frameCounter);
 
     // get bone data
     std::string boneName((char*)(s_memoryBaseAddress + boneNamePtr));
@@ -289,11 +293,18 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
     glm::mat4 cameraRotationOnlyMtx = glm::mat4_cast(cameraQuat);
 
     // get vr controller position and rotation
-    const OpenXR::InputState inputs = VRManager::instance().XR->m_input.load();
-    if (!inputs.inGame.in_game || !inputs.inGame.pose[side].isActive)
+    const auto& inputsOpt = frame.inputs;
+    if (!inputsOpt.has_value()) return;
+    const auto& inputs = inputsOpt.value();
+
+    auto& controllerPosesOpt = VRManager::instance().XR->GetRenderer()->GetFrame(frameCounter).controllerPoses;
+    if (!controllerPosesOpt.has_value()) return;
+    const auto& controllerPoses = controllerPosesOpt.value();
+
+    if (!controllerPoses.pose[side].isActive)
         return;
 
-    const auto& pose = inputs.inGame.poseLocation[side];
+    const auto& pose = controllerPoses.poseLocation[side];
     glm::fvec3 controllerPos = glm::fvec3();
     glm::fquat controllerRot = glm::identity<glm::fquat>();
     if (pose.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) {
@@ -351,7 +362,7 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
 
     // override the root transform so the body aligns with the headset yaw
     if (boneName == "Skl_Root") {
-        auto headsetPose = VRManager::instance().XR->GetRenderer()->GetMiddlePose();
+        auto headsetPose = VRManager::instance().XR->GetRenderer()->GetMiddlePose(frameCounter);
         glm::mat4 s_headsetMtx = headsetPose.value_or(ToMat4(glm::fvec3(0)));
 
         // calculate eye offset from eyeball bones

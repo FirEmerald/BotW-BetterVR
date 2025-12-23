@@ -35,6 +35,8 @@ cmpwi r7, 0
 
 ; override input with XR input
 lwz r7, 0x04(r1)
+lis r7, currentFrameCounter@ha
+lwz r7, currentFrameCounter@l(r7)
 bl import.coreinit.hook_InjectXRInput
 ; override status with OK if injection was successful
 cmpwi r3, 1

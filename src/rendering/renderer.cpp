@@ -25,8 +25,10 @@ RND_Renderer::~RND_Renderer() {
     }
 }
 
-void RND_Renderer::StartFrame() {
+void RND_Renderer::StartFrame(long ppcFrameIdx) {
     m_isInitialized = true;
+
+    m_currentFrameIdx = ppcFrameIdx;
 
     XrFrameWaitInfo waitFrameInfo = { XR_TYPE_FRAME_WAIT_INFO };
     checkXRResult(xrWaitFrame(m_session, &waitFrameInfo, &m_frameState), "Failed to wait for next frame!");
@@ -34,26 +36,35 @@ void RND_Renderer::StartFrame() {
     XrFrameBeginInfo beginFrameInfo = { XR_TYPE_FRAME_BEGIN_INFO };
     checkXRResult(xrBeginFrame(m_session, &beginFrameInfo), "Couldn't begin OpenXR frame!");
 
+    RenderFrame& currentFrame = this->GetFrame(ppcFrameIdx);
+    currentFrame.predictedDisplayTime = m_frameState.predictedDisplayTime;
+
     VRManager::instance().D3D12->StartFrame();
-    this->UpdateViews(m_frameState.predictedDisplayTime);
+    currentFrame.views = this->UpdateViews(currentFrame.predictedDisplayTime);
 
     // todo: update this as late as possible
-    //VRManager::instance().XR->UpdateSpaces(m_frameState.predictedDisplayTime);
+    VRManager::instance().XR->UpdateSpaces(currentFrame.predictedDisplayTime);
 
-    // todo: should we really not update actions if the camera is middle pose is not available?
-    auto headsetRotation = VRManager::instance().XR->GetRenderer()->GetMiddlePose();
+    currentFrame.inGame = CemuHooks::IsInGame();
+
+    // todo: should we really not update actions if the camera's middle pose is not available?
+    auto headsetRotation = VRManager::instance().XR->GetRenderer()->GetMiddlePose(ppcFrameIdx);
     if (headsetRotation.has_value()) {
-        // todo: update this as late as possible
-        VRManager::instance().XR->UpdateActions(m_frameState.predictedDisplayTime, headsetRotation.value(), !VRManager::instance().Hooks->IsInGame());
+        auto [inputState, controllerPoses] = VRManager::instance().XR->UpdateActions(currentFrame.predictedDisplayTime, !currentFrame.inGame);
+        currentFrame.controllerPoses = controllerPoses;
+        currentFrame.inputs = inputState;
     }
 }
 
 
-void RND_Renderer::EndFrame() {
+void RND_Renderer::EndFrame(long ppcFrameIdx) {
     std::vector<XrCompositionLayerBaseHeader*> compositionLayers;
+
+    auto& frame = this->GetFrame(ppcFrameIdx);
 
     m_presented2DLastFrame = false;
 
+    // put in outer scope since its referenced inside compositionLayers, so it needs to stay alive until xrEndFrame
     XrCompositionLayerProjection layer3D = { XR_TYPE_COMPOSITION_LAYER_PROJECTION };
     std::array<XrCompositionLayerProjectionView, 2> layer3DViews = {};
     std::vector<XrCompositionLayerQuad> layer2DQuads;
@@ -76,8 +87,8 @@ void RND_Renderer::EndFrame() {
         if (m_layer3D) {
             if (m_renderFrames[frameIdx].Is3DComplete()) {
                 m_layer3D->StartRendering();
-                m_layer3D->Render(OpenXR::EyeSide::LEFT, frameIdx);
-                m_layer3D->Render(OpenXR::EyeSide::RIGHT, frameIdx);
+                m_layer3D->Render(EyeSide::LEFT, frameIdx);
+                m_layer3D->Render(EyeSide::RIGHT, frameIdx);
                 layer3DViews = m_layer3D->FinishRendering(frameIdx);
                 layer3D.layerFlags = 0;
                 layer3D.space = VRManager::instance().XR->m_stageSpace;
@@ -98,7 +109,7 @@ void RND_Renderer::EndFrame() {
         if (m_layer2D) {
             m_layer2D->StartRendering();
             m_layer2D->Render(frameIdx);
-            layer2DQuads = m_layer2D->FinishRendering(m_frameState.predictedDisplayTime, frameIdx);
+            layer2DQuads = m_layer2D->FinishRendering(frame.predictedDisplayTime, frameIdx);
             m_presented2DLastFrame = true;
             for (auto& layer : layer2DQuads) {
                 compositionLayers.emplace_back(reinterpret_cast<XrCompositionLayerBaseHeader*>(&layer));
@@ -109,7 +120,7 @@ void RND_Renderer::EndFrame() {
     }
 
     XrFrameEndInfo frameEndInfo = { XR_TYPE_FRAME_END_INFO };
-    frameEndInfo.displayTime = m_frameState.predictedDisplayTime;
+    frameEndInfo.displayTime = frame.predictedDisplayTime;
     frameEndInfo.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
     frameEndInfo.layerCount = (uint32_t)compositionLayers.size();
     frameEndInfo.layers = compositionLayers.data();
@@ -204,8 +215,7 @@ std::optional<std::array<XrView, 2>> RND_Renderer::UpdateViews(XrTime predictedD
     if ((viewState.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT) == 0)
         return std::nullopt; // what should occur when the orientation is invalid? keep rendering using old values?
 
-    m_currViews = newViews;
-    return m_currViews;
+    return newViews;
 }
 
 void RND_Renderer::Layer3D::StartRendering() {
@@ -463,13 +473,17 @@ std::vector<XrCompositionLayerQuad> RND_Renderer::Layer2D::FinishRendering(XrTim
     // clang-format on
 
     // render layer twice to visualize the controller positions in debug mode
-    auto inputs = VRManager::instance().XR->m_input.load();
+    const auto& frame = VRManager::instance().XR->GetRenderer()->GetFrame(frameIdx);
+    if (!frame.controllerPoses.has_value()) {
+        return layers;
+    }
+    const auto& poses = frame.controllerPoses.value();
 
-    if (!(inputs.inGame.in_game && inputs.inGame.pose[OpenXR::EyeSide::LEFT].isActive && inputs.inGame.pose[OpenXR::EyeSide::RIGHT].isActive)) {
+    if (!(poses.pose[EyeSide::LEFT].isActive && poses.pose[EyeSide::RIGHT].isActive)) {
         return layers;
     }
 
-    return layers;
+    //return layers;
 
     auto movePoseToHandPosition = [](XrPosef& inputPose) {
         glm::fquat modifiedRotation = ToGLM(inputPose.orientation);
@@ -482,8 +496,9 @@ std::vector<XrCompositionLayerQuad> RND_Renderer::Layer2D::FinishRendering(XrTim
         inputPose.position = ToXR(modifiedPosition);
     };
 
-    if ((inputs.inGame.poseLocation[OpenXR::EyeSide::LEFT].locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) == 1 || (inputs.inGame.poseLocation[OpenXR::EyeSide::LEFT].locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) == 1) {
-        movePoseToHandPosition(inputs.inGame.poseLocation[OpenXR::EyeSide::LEFT].pose);
+    if ((poses.poseLocation[OpenXR::EyeSide::LEFT].locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) == 1 || (poses.poseLocation[OpenXR::EyeSide::LEFT].locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) == 1) {
+        auto pose = poses.poseLocation[OpenXR::EyeSide::LEFT].pose;
+        movePoseToHandPosition(pose);
         // clang-format off
         layers.push_back({
             .type = XR_TYPE_COMPOSITION_LAYER_QUAD,
@@ -500,14 +515,15 @@ std::vector<XrCompositionLayerQuad> RND_Renderer::Layer2D::FinishRendering(XrTim
                     }
                 }
             },
-            .pose = inputs.inGame.poseLocation[OpenXR::EyeSide::LEFT].pose,
+            .pose = pose,
             .size = { 0.15f, 0.15f }
         });
         // clang-format on
     }
 
-    if ((inputs.inGame.poseLocation[OpenXR::EyeSide::RIGHT].locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) == 1 || (inputs.inGame.poseLocation[OpenXR::EyeSide::RIGHT].locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) == 1) {
-        movePoseToHandPosition(inputs.inGame.poseLocation[OpenXR::EyeSide::RIGHT].pose);
+    if ((poses.poseLocation[OpenXR::EyeSide::RIGHT].locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) == 1 || (poses.poseLocation[OpenXR::EyeSide::RIGHT].locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) == 1) {
+        auto pose = poses.poseLocation[OpenXR::EyeSide::RIGHT].pose;
+        movePoseToHandPosition(pose);
 
         // clang-format off
         layers.push_back({
@@ -525,7 +541,7 @@ std::vector<XrCompositionLayerQuad> RND_Renderer::Layer2D::FinishRendering(XrTim
                     }
                 }
             },
-            .pose = inputs.inGame.poseLocation[OpenXR::EyeSide::RIGHT].pose,
+            .pose = pose,
             .size = { 0.15f, 0.15f }
         });
         // clang-format on

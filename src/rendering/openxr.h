@@ -23,6 +23,12 @@ public:
         bool isOculusLinkRuntime;
     } m_capabilities = {};
 
+    struct ControllerPoses {
+        std::array<XrActionStatePose, 2> pose;
+        std::array<XrSpaceLocation, 2> poseLocation;
+        std::array<XrSpaceVelocity, 2> poseVelocity;
+    };
+
     union InputState {
         struct InGame {
             bool in_game = true;
@@ -48,7 +54,6 @@ public:
             XrActionStateBoolean cancel;
             XrActionStateBoolean interact;
             std::array<XrActionStateBoolean, 2> grab;
-            std::array<bool, 2> drop_weapon; // LEFT/RIGHT
 
             struct ButtonState {
                 enum class Event {
@@ -76,11 +81,6 @@ public:
             std::array<ButtonState, 2> grabState; // LEFT/RIGHT
             ButtonState runState;
             ButtonState mapAndInventoryState;
-            std::array<XrActionStatePose, 2> pose;
-            std::array<XrSpaceLocation, 2> poseLocation;
-            std::array<XrSpaceVelocity, 2> poseVelocity;
-            // todo: remove relative controller positions if it turns out to be unnecessary
-            std::array<XrSpaceLocation, 2> hmdRelativePoseLocation;
         } inGame;
         struct InMenu {
             bool in_game = false;
@@ -106,8 +106,6 @@ public:
             XrActionStateBoolean rightGrip;
         } inMenu;
     };
-    std::atomic<InputState> m_input = InputState{};
-    std::atomic<glm::fquat> m_inputCameraRotation = glm::identity<glm::fquat>();
 
     struct GameState {
         bool in_game = false;
@@ -117,6 +115,7 @@ public:
         std::chrono::steady_clock::time_point prevent_menu_time;
         bool prevent_grab_inputs = false;
         std::chrono::steady_clock::time_point prevent_grab_time;
+        std::array<bool, 2> drop_weapon; // LEFT/RIGHT
     } gameState ;
 
     std::atomic<GameState> m_gameState{};
@@ -125,7 +124,7 @@ public:
     void CreateActions();
     std::array<XrViewConfigurationView, 2> GetViewConfigurations();
     std::optional<XrSpaceLocation> UpdateSpaces(XrTime predictedDisplayTime);
-    std::optional<InputState> UpdateActions(XrTime predictedFrameTime, glm::fquat controllerRotation, bool inMenu);
+    std::pair<std::optional<InputState>, std::optional<ControllerPoses>> UpdateActions(XrTime predictedFrameTime, bool inMenu);
    
     void ProcessEvents();
 

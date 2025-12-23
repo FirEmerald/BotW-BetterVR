@@ -101,6 +101,8 @@ bctrl ; sead__GameFrameworkCafe__procDraw
 li r0, 0
 lis r12, currentEyeSide@ha
 stw r0, currentEyeSide@l(r12)
+lis r12, currentFrameCounter@ha
+lwz r0, currentFrameCounter@l(r12)
 li r3, 1
 bl import.coreinit.hook_EndCameraSide
 
@@ -118,6 +120,8 @@ stw r3, currentFrameCounter@l(r12)
 li r0, 0
 lis r12, currentEyeSide@ha
 stw r0, currentEyeSide@l(r12)
+lis r12, currentFrameCounter@ha
+lwz r0, currentFrameCounter@l(r12)
 li r3, 0
 bl import.coreinit.hook_BeginCameraSide
 
@@ -173,6 +177,9 @@ mr r4, r11
 bl import.gx2.GX2DrawDone
 skipStallDuringLoadingScreens_one:
 
+
+lis r12, currentFrameCounter@ha
+lwz r0, currentFrameCounter@l(r12)
 li r3, 0
 bl import.coreinit.hook_EndCameraSide
 
@@ -180,6 +187,8 @@ bl import.coreinit.hook_EndCameraSide
 li r0, 1
 lis r12, currentEyeSide@ha
 stw r0, currentEyeSide@l(r12)
+lis r12, currentFrameCounter@ha
+lwz r0, currentFrameCounter@l(r12)
 li r3, 1
 bl import.coreinit.hook_BeginCameraSide
 

@@ -2,11 +2,11 @@
 #include "instance.h"
 #include "rendering/openxr.h"
 
-
 void CemuHooks::hook_BeginCameraSide(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
 
-    OpenXR::EyeSide side = hCPU->gpr[0] == 0 ? OpenXR::EyeSide::LEFT : OpenXR::EyeSide::RIGHT;
+    EyeSide side = hCPU->gpr[3] == 0 ? EyeSide::LEFT : EyeSide::RIGHT;
+    uint32_t ppcFrameIdx = hCPU->gpr[0];
 
     Log::print<RENDERING>("");
     Log::print<RENDERING>("===============================================================================");
@@ -15,8 +15,8 @@ void CemuHooks::hook_BeginCameraSide(PPCInterpreter_t* hCPU) {
     RND_Renderer* renderer = VRManager::instance().XR->GetRenderer();
 
     bool layersInitialized = renderer->m_layer3D && renderer->m_layer2D && renderer->m_imguiOverlay;
-    if (layersInitialized && side == OpenXR::EyeSide::LEFT) {
-        VRManager::instance().XR->GetRenderer()->StartFrame();
+    if (layersInitialized && side == EyeSide::LEFT) {
+        VRManager::instance().XR->GetRenderer()->StartFrame(ppcFrameIdx);
     }
 }
 
@@ -87,7 +87,7 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
     }
 
     // current VR headset camera matrix
-    auto viewsOpt = VRManager::instance().XR->GetRenderer()->GetMiddlePose();
+    auto viewsOpt = VRManager::instance().XR->GetRenderer()->GetMiddlePose(VRManager::instance().XR->GetRenderer()->GetCurrentFrameIdx());
     if (!viewsOpt) {
         Log::print<ERROR>("hook_UpdateCameraForGameplay: No views available for the middle pose.");
         return;
@@ -165,7 +165,7 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
     s_lastCameraMtx = glm::fmat4x3(glm::translate(glm::identity<glm::fmat4>(), basePos) * glm::mat4(baseRot));
 
     // vr camera
-    std::optional<XrPosef> currPoseOpt = VRManager::instance().XR->GetRenderer()->GetPose(side);
+    std::optional<XrPosef> currPoseOpt = VRManager::instance().XR->GetRenderer()->GetPose(side, VRManager::instance().XR->GetRenderer()->GetCurrentFrameIdx());
     if (!currPoseOpt.has_value())
         return;
     glm::fvec3 eyePos = ToGLM(currPoseOpt.value().position);
@@ -268,10 +268,11 @@ void CemuHooks::hook_GetRenderProjection(PPCInterpreter_t* hCPU) {
     perspectiveProjection.zFar = GetSettings().GetZFar();
     perspectiveProjection.zNear = GetSettings().GetZNear();
 
-    if (!VRManager::instance().XR->GetRenderer()->GetFOV(side).has_value()) {
+    auto currFOVOpt = VRManager::instance().XR->GetRenderer()->GetFOV(side, VRManager::instance().XR->GetRenderer()->GetCurrentFrameIdx());
+    if (!currFOVOpt) {
         return;
     }
-    XrFovf currFOV = VRManager::instance().XR->GetRenderer()->GetFOV(side).value();
+    XrFovf currFOV = currFOVOpt.value();
     auto newProjection = calculateFOVAndOffset(currFOV);
 
     perspectiveProjection.aspect = newProjection.aspectRatio;
@@ -324,14 +325,14 @@ void CemuHooks::hook_ModifyLightPrePassProjectionMatrix(PPCInterpreter_t* hCPU) 
     BESeadPerspectiveProjection perspectiveProjection = {};
     readMemory(projectionIn, &perspectiveProjection);
 
-    if (!VRManager::instance().XR->GetRenderer()->GetFOV(side).has_value()) {
+    if (!VRManager::instance().XR->GetRenderer()->GetFOV(side, VRManager::instance().XR->GetRenderer()->GetCurrentFrameIdx()).has_value()) {
         return;
     }
 
     Log::print<RENDERING>("[{}] Modify light prepass projection", side);
 
 
-    XrFovf currFOV = VRManager::instance().XR->GetRenderer()->GetFOV(side).value();
+    XrFovf currFOV = VRManager::instance().XR->GetRenderer()->GetFOV(side, VRManager::instance().XR->GetRenderer()->GetCurrentFrameIdx()).value();
     auto newProjection = calculateFOVAndOffset(currFOV);
 
     perspectiveProjection.aspect = newProjection.aspectRatio;
@@ -368,11 +369,12 @@ void CemuHooks::hook_ModifyLightPrePassProjectionMatrix(PPCInterpreter_t* hCPU) 
 void CemuHooks::hook_EndCameraSide(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
 
-    OpenXR::EyeSide side = hCPU->gpr[3] == 0 ? OpenXR::EyeSide::LEFT : OpenXR::EyeSide::RIGHT;
+    uint32_t frameCounterIdx = hCPU->gpr[0];
+    OpenXR::EyeSide side = hCPU->gpr[3] == 0 ? EyeSide::LEFT : EyeSide::RIGHT;
 
     // todo: sometimes this can deadlock apparently?
-    if (VRManager::instance().XR->GetRenderer()->IsInitialized() && side == OpenXR::EyeSide::RIGHT) {
-        VRManager::instance().XR->GetRenderer()->EndFrame();
+    if (VRManager::instance().XR->GetRenderer()->IsInitialized() && side == EyeSide::RIGHT) {
+        VRManager::instance().XR->GetRenderer()->EndFrame(frameCounterIdx);
         CemuHooks::m_heldWeaponsLastUpdate[0] = CemuHooks::m_heldWeaponsLastUpdate[0]++;
         CemuHooks::m_heldWeaponsLastUpdate[1] = CemuHooks::m_heldWeaponsLastUpdate[1]++;
         if (CemuHooks::m_heldWeaponsLastUpdate[0] >= 6) {

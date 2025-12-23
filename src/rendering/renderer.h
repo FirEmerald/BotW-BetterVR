@@ -15,10 +15,15 @@ public:
 
     struct RenderFrame {
         std::optional<std::array<XrView, 2>> views;
+        std::optional<OpenXR::ControllerPoses> controllerPoses;
+        std::optional<OpenXR::InputState> inputs;
+        XrTime predictedDisplayTime = 0;
         std::atomic_bool copiedColor[2] = { false, false };
         std::atomic_bool copiedDepth[2] = { false, false };
         std::atomic_bool copied2D = false;
         std::atomic_bool presented3D = false;
+        
+        std::atomic_bool inGame = false;
 
         std::unique_ptr<VulkanTexture> mainFramebuffer;
         std::unique_ptr<VulkanTexture> hudFramebuffer;
@@ -36,47 +41,52 @@ public:
 
         void Reset() {
             views = std::nullopt;
+            controllerPoses = std::nullopt;
+            inputs = std::nullopt;
+            predictedDisplayTime = 0;
+
             copiedColor[0] = false;
             copiedColor[1] = false;
             copiedDepth[0] = false;
             copiedDepth[1] = false;
             copied2D = false;
 
+
             ranMotionAnalysis[0] = false;
             ranMotionAnalysis[1] = false;
         }
     };
 
-    void StartFrame();
-    void EndFrame();
+    void StartFrame(long ppcFrameIdx);
+    void EndFrame(long ppcFrameIdx);
     std::optional<std::array<XrView, 2>> UpdateViews(XrTime predictedDisplayTime);
+    long GetCurrentFrameIdx() const { return m_currentFrameIdx; }
+    RenderFrame& GetCurrentFrame() { return m_renderFrames[m_currentFrameIdx]; }
+    long m_currentFrameIdx = -1;
+
     
-    std::optional<std::array<XrView, 2>> GetPoses(long frameIdx = -1) const { 
-        if (frameIdx != -1 && m_renderFrames[frameIdx].views.has_value()) return m_renderFrames[frameIdx].views;
-        return m_currViews; 
-    }
-    
-    std::optional<XrFovf> GetFOV(OpenXR::EyeSide side, long frameIdx = -1) const { 
-        const auto& views = (frameIdx != -1 && m_renderFrames[frameIdx].views.has_value()) ? m_renderFrames[frameIdx].views : m_currViews;
+    std::optional<XrFovf> GetFOV(OpenXR::EyeSide side, long frameIdx) const {
+        const auto& views = m_renderFrames[frameIdx].views;
         return views.transform([side](auto& views) { return views[side].fov; }); 
     }
     
-    std::optional<XrPosef> GetPose(OpenXR::EyeSide side, long frameIdx = -1) const { 
-        const auto& views = (frameIdx != -1 && m_renderFrames[frameIdx].views.has_value()) ? m_renderFrames[frameIdx].views : m_currViews;
+    std::optional<XrPosef> GetPose(OpenXR::EyeSide side, long frameIdx) const {
+        const auto& views = m_renderFrames[frameIdx].views;
         return views.transform([side](auto& views) { return views[side].pose; }); 
     }
     
-    std::optional<glm::fmat4> GetPoseAsMatrix(OpenXR::EyeSide side, long frameIdx = -1) const {
-        const auto& views = (frameIdx != -1 && m_renderFrames[frameIdx].views.has_value()) ? m_renderFrames[frameIdx].views : m_currViews;
+    std::optional<glm::fmat4> GetPoseAsMatrix(OpenXR::EyeSide side, long frameIdx) const {
+        const auto& views = m_renderFrames[frameIdx].views;
         return views.transform([side](auto& views) {
             const XrPosef& pose = views[side].pose;
             return ToMat4(ToGLM(pose.position), ToGLM(pose.orientation));
         });
     };
     
-    std::optional<glm::fmat4> GetMiddlePose(long frameIdx = -1) const {
-        const auto& views = (frameIdx != -1 && m_renderFrames[frameIdx].views.has_value()) ? m_renderFrames[frameIdx].views : m_currViews;
+    std::optional<glm::fmat4> GetMiddlePose(long frameIdx) const {
+        const auto& views = m_renderFrames[frameIdx].views;
         if (!views.has_value()) return std::nullopt;
+
         const XrPosef& leftPose = views->at(OpenXR::EyeSide::LEFT).pose;
         const XrPosef& rightPose = views->at(OpenXR::EyeSide::RIGHT).pose;
         glm::fvec3 middlePos = (ToGLM(leftPose.position) + ToGLM(rightPose.position)) * 0.5f;
@@ -87,12 +97,10 @@ public:
 
     void On3DColorCopied(OpenXR::EyeSide side, long frameIdx) {
         m_renderFrames[frameIdx].copiedColor[side] = true;
-        if (!m_renderFrames[frameIdx].views.has_value()) m_renderFrames[frameIdx].views = m_currViews;
     }
 
     void On3DDepthCopied(OpenXR::EyeSide side, long frameIdx) {
         m_renderFrames[frameIdx].copiedDepth[side] = true;
-        if (!m_renderFrames[frameIdx].views.has_value()) m_renderFrames[frameIdx].views = m_currViews;
     }
 
     void On2DCopied(long frameIdx) {
@@ -195,7 +203,7 @@ public:
 protected:
     XrSession m_session;
     XrFrameState m_frameState = { XR_TYPE_FRAME_STATE };
-    std::optional<std::array<XrView, 2>> m_currViews;
+    XrTime m_currInputTime = 0;
     std::array<RenderFrame, 2> m_renderFrames;
 
     std::atomic_bool m_isInitialized = false;

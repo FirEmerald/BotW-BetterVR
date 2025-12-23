@@ -100,13 +100,16 @@ JoyDir GetJoystickDirection(const XrVector2f& stick)
 void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
 
-    auto mapXRButtonToVpad = [](XrActionStateBoolean& state, VPADButtons mapping) -> uint32_t {
+
+    auto mapXRButtonToVpad = [](const XrActionStateBoolean& state, VPADButtons mapping) -> uint32_t {
         return state.currentState ? mapping : 0;
     };
 
     // read existing vpad as to not overwrite it
     uint32_t vpadStatusOffset = hCPU->gpr[4];
     VPADStatus vpadStatus = {};
+    uint32_t frameCounter = hCPU->gpr[7];
+
 
     auto* renderer = VRManager::instance().XR->GetRenderer();
     // todo: revert this to unblock gamepad input
@@ -114,11 +117,18 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         readMemory(vpadStatusOffset, &vpadStatus);
     }
 
-    OpenXR::InputState inputs = VRManager::instance().XR->m_input.load();
-    inputs.inGame.drop_weapon[0] = inputs.inGame.drop_weapon[1] = false;
+    if (renderer == nullptr || !renderer->GetFrame(frameCounter).inputs.has_value()) {
+        Log::print<WARNING>("InjectXRInput: No renderer or inputs not ready");
+        return;
+    }
+
+    const OpenXR::InputState inputs = renderer->GetFrame(frameCounter).inputs.value();
+    auto& controllerPosesOpt = renderer->GetFrame(frameCounter).controllerPoses;
+
     // fetch game state
     auto gameState = VRManager::instance().XR->m_gameState.load();
     gameState.in_game = inputs.inGame.in_game;
+    gameState.drop_weapon[0] = gameState.drop_weapon[1] = false;
 
     // buttons
     static uint32_t oldCombinedHold = 0;
@@ -131,16 +141,17 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     bool rightHandCloseEnoughFromHead = false;
 
     // fetching motion states for gesture based inputs
-    const auto headset = VRManager::instance().XR->GetRenderer()->GetMiddlePose();
-    if (headset.has_value()) {
+    const auto headset = renderer->GetMiddlePose(frameCounter);
+    if (headset.has_value() && controllerPosesOpt.has_value()) {
+        const auto& controllerPoses = controllerPosesOpt.value();
         const auto headsetMtx = headset.value();
         const auto headsetPosition = glm::fvec3(headsetMtx[3]);
         const glm::fquat headsetRotation = glm::quat_cast(headsetMtx);
         glm::fvec3 headsetForward = -glm::normalize(glm::fvec3(headsetMtx[2]));
         headsetForward.y = 0.0f;
         headsetForward = glm::normalize(headsetForward);
-        const auto leftHandPosition = ToGLM(inputs.inGame.poseLocation[0].pose.position);
-        const auto rightHandPosition = ToGLM(inputs.inGame.poseLocation[1].pose.position);
+        const auto leftHandPosition = ToGLM(controllerPoses.poseLocation[0].pose.position);
+        const auto rightHandPosition = ToGLM(controllerPoses.poseLocation[1].pose.position);
         const glm::fvec3 headToleftHand = leftHandPosition - headsetPosition;
         const glm::fvec3 headToRightHand = rightHandPosition - headsetPosition;
 
@@ -158,8 +169,8 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     }
 
     // fetching stick inputs
-    XrActionStateVector2f& leftStickSource = gameState.in_game ? inputs.inGame.move : inputs.inMenu.navigate;
-    XrActionStateVector2f& rightStickSource = gameState.in_game ? inputs.inGame.camera : inputs.inMenu.scroll;
+    XrActionStateVector2f leftStickSource = gameState.in_game ? inputs.inGame.move : inputs.inMenu.navigate;
+    XrActionStateVector2f rightStickSource = gameState.in_game ? inputs.inGame.camera : inputs.inMenu.scroll;
 
     JoyDir leftJoystickDir = GetJoystickDirection(leftStickSource.currentState);
     JoyDir rightJoystickDir = GetJoystickDirection(rightStickSource.currentState);
@@ -257,7 +268,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
                 //Drop
                 if (rightJoystickDir == JoyDir::Down)
                 {
-                    inputs.inGame.drop_weapon[1] = true;
+                    gameState.drop_weapon[1] = true;
                     gameState.prevent_grab_inputs = true;
                     gameState.prevent_grab_time = now;
                 }  
@@ -323,38 +334,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     uint32_t newXRStickHold = 0;
 
     // movement/navigation stick
-    if (inputs.inGame.in_game) {
-        auto isolateYaw = [](const glm::fquat& q) -> glm::fquat {
-            glm::vec3 euler = glm::eulerAngles(q);
-            euler.x = 0.0f;
-            euler.z = 0.0f;
-            return glm::angleAxis(euler.y, glm::vec3(0, 1, 0));
-        };
-
-        glm::fquat controllerRotation = ToGLM(inputs.inGame.poseLocation[OpenXR::EyeSide::LEFT].pose.orientation);
-        glm::fquat controllerYawRotation = isolateYaw(controllerRotation);
-
-        glm::fquat moveRotation = inputs.inGame.pose[OpenXR::EyeSide::LEFT].isActive ? glm::inverse(VRManager::instance().XR->m_inputCameraRotation.load() * controllerYawRotation) : glm::identity<glm::fquat>();
-
-        glm::vec3 localMoveVec(leftStickSource.currentState.x, 0.0f, leftStickSource.currentState.y);
-
-        glm::vec3 worldMoveVec = moveRotation * localMoveVec;
-
-        float inputLen = glm::length(glm::vec2(leftStickSource.currentState.x, leftStickSource.currentState.y));
-        if (inputLen > 1e-3f) {
-            worldMoveVec = glm::normalize(worldMoveVec) * inputLen;
-        }
-        else {
-            worldMoveVec = glm::vec3(0.0f);
-        }
-
-        worldMoveVec = {0, 0, 0};
-
-        vpadStatus.leftStick = { worldMoveVec.x + leftStickSource.currentState.x + vpadStatus.leftStick.x.getLE(), worldMoveVec.z + leftStickSource.currentState.y + vpadStatus.leftStick.y.getLE() };
-    }
-    else {
-        vpadStatus.leftStick = { leftStickSource.currentState.x + vpadStatus.leftStick.x.getLE(), leftStickSource.currentState.y + vpadStatus.leftStick.y.getLE() };
-    }
+    vpadStatus.leftStick = { leftStickSource.currentState.x + vpadStatus.leftStick.x.getLE(), leftStickSource.currentState.y + vpadStatus.leftStick.y.getLE() };
 
     if (leftStickSource.currentState.x <= -AXIS_THRESHOLD || (HAS_FLAG(oldXRStickHold, VPAD_STICK_L_EMULATION_LEFT) && leftStickSource.currentState.x <= -HOLD_THRESHOLD))
         newXRStickHold |= VPAD_STICK_L_EMULATION_LEFT;
@@ -415,15 +395,8 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     // set previous game states
     gameState.was_in_game = gameState.in_game;
     VRManager::instance().XR->m_gameState.store(gameState);
-    VRManager::instance().XR->m_input.store(inputs);
 }
 
-
-// some ideas:
-// - quickly pressing the grip button without a weapon while there's a nearby weapon and there's enough slots = pick up weapon
-// - holding the grip button without a weapon while there's a nearby weapon = temporarily hold weapon
-// - holding the grip button a weapon equipped = opens weapon dpad menu
-// - quickly press the grip button while holding a weapon = drops current weapon
 
 void CemuHooks::hook_CreateNewActor(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;

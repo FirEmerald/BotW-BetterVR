@@ -446,7 +446,7 @@ void CheckButtonState(XrActionStateBoolean& action, ButtonState& buttonState) {
     buttonState.wasDownLastFrame = down;
 }
 
-std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTime, glm::fquat controllerRotation, bool inMenu) {
+std::pair<std::optional<OpenXR::InputState>, std::optional<OpenXR::ControllerPoses>> OpenXR::UpdateActions(XrTime predictedFrameTime, bool inMenu) {
     XrActiveActionSet activeActionSet = { (inMenu ? m_menuActionSet : m_gameplayActionSet), XR_NULL_PATH };
 
     XrActionsSyncInfo syncInfo = { XR_TYPE_ACTIONS_SYNC_INFO };
@@ -454,12 +454,15 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
     syncInfo.activeActionSets = &activeActionSet;
     checkXRResult(xrSyncActions(m_session, &syncInfo), "Failed to sync actions!");
 
-    InputState newState = m_input.load();
+    InputState newState = {
+    };
     newState.inGame.in_game = !inMenu;
     newState.inGame.inputTime = predictedFrameTime;
     //newState.inGame.lastPickupSide = m_input.load().inGame.lastPickupSide;
     //newState.inGame.grabState = m_input.load().inGame.grabState;
     //newState.inGame.mapAndInventoryState = m_input.load().inGame.mapAndInventoryState;
+
+    ControllerPoses newPoses = {};
 
     if (inMenu) {
         XrActionStateGetInfo getScrollInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
@@ -526,47 +529,37 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
         getRightTriggerInfo.subactionPath = XR_NULL_PATH;
         newState.inMenu.rightTrigger = { XR_TYPE_ACTION_STATE_BOOLEAN };
         checkXRResult(xrGetActionStateBoolean(m_session, &getRightTriggerInfo, &newState.inMenu.rightTrigger), "Failed to get right trigger action value!");
-
     }
     else {
         for (EyeSide side : { EyeSide::LEFT, EyeSide::RIGHT }) {
             XrActionStateGetInfo getPoseInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
             getPoseInfo.action = m_gripPoseAction;
             getPoseInfo.subactionPath = m_handPaths[side];
-            newState.inGame.pose[side] = { XR_TYPE_ACTION_STATE_POSE };
-            checkXRResult(xrGetActionStatePose(m_session, &getPoseInfo, &newState.inGame.pose[side]), "Failed to get pose of controller!");
+            newPoses.pose[side] = { XR_TYPE_ACTION_STATE_POSE };
+            checkXRResult(xrGetActionStatePose(m_session, &getPoseInfo, &newPoses.pose[side]), "Failed to get pose of controller!");
 
-            if (newState.inGame.pose[side].isActive) {
-                {
-                    XrSpaceLocation spaceLocation = { XR_TYPE_SPACE_LOCATION };
-                    XrSpaceVelocity spaceVelocity = { XR_TYPE_SPACE_VELOCITY };
-                    spaceLocation.next = &spaceVelocity;
-                    newState.inGame.poseVelocity[side].linearVelocity = { 0.0f, 0.0f, 0.0f };
-                    newState.inGame.poseVelocity[side].angularVelocity = { 0.0f, 0.0f, 0.0f };
-                    checkXRResult(xrLocateSpace(m_handSpaces[side], m_stageSpace, predictedFrameTime, &spaceLocation), "Failed to get location from controllers!");
-                    if ((spaceLocation.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 && (spaceLocation.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0) {
-                        newState.inGame.poseLocation[side] = spaceLocation;
+            if (newPoses.pose[side].isActive) {
+                XrSpaceLocation spaceLocation = { XR_TYPE_SPACE_LOCATION };
+                XrSpaceVelocity spaceVelocity = { XR_TYPE_SPACE_VELOCITY };
+                spaceLocation.next = &spaceVelocity;
+                newPoses.poseVelocity[side].linearVelocity = { 0.0f, 0.0f, 0.0f };
+                newPoses.poseVelocity[side].angularVelocity = { 0.0f, 0.0f, 0.0f };
+                checkXRResult(xrLocateSpace(m_handSpaces[side], m_stageSpace, predictedFrameTime, &spaceLocation), "Failed to get location from controllers!");
+                if ((spaceLocation.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 && (spaceLocation.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0) {
+                    newPoses.poseLocation[side] = spaceLocation;
 
-                        if ((spaceLocation.locationFlags & XR_SPACE_VELOCITY_LINEAR_VALID_BIT) != 0 && (spaceLocation.locationFlags & XR_SPACE_VELOCITY_ANGULAR_VALID_BIT) != 0) {
-                            // rotate angular velocity to world space when it's using a buggy runtime
-                            auto mode = CemuHooks::GetSettings().AngularVelocityFixer_GetMode();
-                            bool isUsingQuestRuntime = m_capabilities.isOculusLinkRuntime;
-                            if ((mode == data_VRSettingsIn::AngularVelocityFixerMode::AUTO && isUsingQuestRuntime) || mode == data_VRSettingsIn::AngularVelocityFixerMode::FORCED_ON) {
-                                glm::vec3 angularVelocity = ToGLM(spaceVelocity.angularVelocity);
-                                glm::fquat fix_angle = glm::fquat(0.924, -0.383, 0, 0);
-                                angularVelocity = (ToGLM(spaceLocation.pose.orientation) * (fix_angle * angularVelocity)); // TOD: Contact other modders for similar issues with angular velocity being not on the grip rotation (quest 2) + Tune the angular velocity based on manually calculated on rotation positions
-                                spaceVelocity.angularVelocity = { angularVelocity.x, angularVelocity.y, angularVelocity.z };
-                            }
-
-                            newState.inGame.poseVelocity[side] = spaceVelocity;
+                    if ((spaceLocation.locationFlags & XR_SPACE_VELOCITY_LINEAR_VALID_BIT) != 0 && (spaceLocation.locationFlags & XR_SPACE_VELOCITY_ANGULAR_VALID_BIT) != 0) {
+                        // rotate angular velocity to world space when it's using a buggy runtime
+                        auto mode = CemuHooks::GetSettings().AngularVelocityFixer_GetMode();
+                        bool isUsingQuestRuntime = m_capabilities.isOculusLinkRuntime;
+                        if ((mode == data_VRSettingsIn::AngularVelocityFixerMode::AUTO && isUsingQuestRuntime) || mode == data_VRSettingsIn::AngularVelocityFixerMode::FORCED_ON) {
+                            glm::vec3 angularVelocity = ToGLM(spaceVelocity.angularVelocity);
+                            glm::fquat fix_angle = glm::fquat(0.924, -0.383, 0, 0);
+                            angularVelocity = (ToGLM(spaceLocation.pose.orientation) * (fix_angle * angularVelocity)); // TOD: Contact other modders for similar issues with angular velocity being not on the grip rotation (quest 2) + Tune the angular velocity based on manually calculated on rotation positions
+                            spaceVelocity.angularVelocity = { angularVelocity.x, angularVelocity.y, angularVelocity.z };
                         }
-                    }
-                }
-                {
-                    XrSpaceLocation spaceLocation = { XR_TYPE_SPACE_LOCATION };
-                    checkXRResult(xrLocateSpace(m_handSpaces[side], m_headSpace, predictedFrameTime, &spaceLocation), "Failed to get location from controllers!");
-                    if ((spaceLocation.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 && (spaceLocation.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0) {
-                        newState.inGame.hmdRelativePoseLocation[side] = spaceLocation;
+
+                        newPoses.poseVelocity[side] = spaceVelocity;
                     }
                 }
             }
@@ -671,9 +664,8 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
         getRightTriggerInfo.subactionPath = XR_NULL_PATH;
         newState.inGame.rightTrigger = { XR_TYPE_ACTION_STATE_BOOLEAN };
         checkXRResult(xrGetActionStateBoolean(m_session, &getRightTriggerInfo, &newState.inGame.rightTrigger), "Failed to get right trigger action value!");
-}
-    this->m_input.store(newState);
-    return newState;
+    }
+    return { newState, inMenu ? std::nullopt : std::make_optional(newPoses) };
 }
 
 

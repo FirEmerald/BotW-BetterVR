@@ -165,10 +165,10 @@ void CemuHooks::hook_ChangeWeaponMtx(PPCInterpreter_t* hCPU) {
         readMemory(targetActorPtr, &targetActor);
 
         // check if weapon is held and if the grip button is held, drop it
-        auto input = VRManager::instance().XR->m_input.load();
-        auto dropSide = input.inGame.drop_weapon[side];
+        bool isInGame = VRManager::instance().XR->GetRenderer()->GetCurrentFrame().inGame;
+        auto isToBeDropped = VRManager::instance().XR->m_gameState.load().drop_weapon[side];
 
-        if (input.inGame.in_game && dropSide && isDroppable(targetActor.name.getLE())) {
+        if (isInGame && isToBeDropped && isDroppable(targetActor.name.getLE())) {
             Log::print<INFO>("Dropping weapon {} with type of {} due to double press on grab button", targetActor.name.getLE().c_str(), (uint32_t)targetActor.type.getLE());
             hCPU->gpr[11] = 1;
             hCPU->gpr[9] = 1;
@@ -276,7 +276,7 @@ void CemuHooks::hook_EnableWeaponAttackSensor(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
 
 
-    if (GetSettings().IsThirdPersonMode()) {
+    if (IsThirdPerson() || IsInGame()) {
         return;
     }
 
@@ -301,6 +301,12 @@ void CemuHooks::hook_EnableWeaponAttackSensor(PPCInterpreter_t* hCPU) {
     }
 
     auto& currFrame = VRManager::instance().XR->GetRenderer()->GetFrame(frameCounter);
+    if (currFrame.controllerPoses.has_value() == false) {
+        Log::print<CONTROLS>("Skipping motion analysis for {}: no controller poses for frame {}", heldIndex, frameCounter);
+        return;
+    }
+    auto& posesCurrFrame = currFrame.controllerPoses.value();
+
     if (currFrame.ranMotionAnalysis[heldIndex]) {
         Log::print<CONTROLS>("Skipping motion analysis for {}: already ran this frame", heldIndex);
         return;
@@ -309,17 +315,14 @@ void CemuHooks::hook_EnableWeaponAttackSensor(PPCInterpreter_t* hCPU) {
 
     heldIndex = heldIndex == 0 ? 1 : 0;
 
-
-    //Log::print("!! Running weapon analysis for {}", heldIndex);
-
-    auto state = VRManager::instance().XR->m_input.load();
-    auto headset = VRManager::instance().XR->GetRenderer()->GetMiddlePose();
-    if (!headset.has_value()) {
+    auto headset = VRManager::instance().XR->GetRenderer()->GetMiddlePose(frameCounter);
+    if (headset.has_value() == false) {
+        Log::print<CONTROLS>("Skipping motion analysis for {}: no headset pose for frame {}", heldIndex, frameCounter);
         return;
     }
 
     m_motionAnalyzers[heldIndex].ResetIfWeaponTypeChanged(weaponType);
-    m_motionAnalyzers[heldIndex].Update(state.inGame.poseLocation[heldIndex], state.inGame.poseVelocity[heldIndex], headset.value(), state.inGame.inputTime);
+    m_motionAnalyzers[heldIndex].Update(posesCurrFrame.poseLocation[heldIndex], posesCurrFrame.poseVelocity[heldIndex], headset.value(), currFrame.predictedDisplayTime);
 
     // Use the analysed motion to determine whether the weapon is swinging or stabbing, and whether the attackSensor should be active this frame
     bool CHEAT_alwaysEnableWeaponCollision = false;
@@ -380,20 +383,20 @@ void CemuHooks::hook_SetPlayerWeaponScale(PPCInterpreter_t* hCPU) {
 void CemuHooks::hook_EquipWeapon(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
 
-    auto input = VRManager::instance().XR->m_input.load();
-    // Check both hands for a short press to pick up weapon
-    for (int side = 0; side < 2; ++side) {
-        auto& grabState = input.inGame.grabState[side];
-        // todo: Make sword smaller while its equipped. I think this might be a member value, but otherwise we can just scale the weapon matrix.
+    //auto input = VRManager::instance().XR->m_input.load();
+    //// Check both hands for a short press to pick up weapon
+    //for (int side = 0; side < 2; ++side) {
+    //    auto& grabState = input.inGame.grabState[side];
+    //    // todo: Make sword smaller while its equipped. I think this might be a member value, but otherwise we can just scale the weapon matrix.
 
-        //if (input.inGame.in_game && grabState.shortPress) {
-        //    // Set the slot to equip based on which hand was pressed
-        //    hCPU->gpr[25] = side; // 0 = LEFT, 1 = RIGHT
-        //    Log::print("!! Short grip press detected on side {}: equipping weapon", side);
-        //    grabState.shortPress = false; // Reset after use
-        //    return;
-        //}
-    }
+    //    //if (input.inGame.in_game && grabState.shortPress) {
+    //    //    // Set the slot to equip based on which hand was pressed
+    //    //    hCPU->gpr[25] = side; // 0 = LEFT, 1 = RIGHT
+    //    //    Log::print("!! Short grip press detected on side {}: equipping weapon", side);
+    //    //    grabState.shortPress = false; // Reset after use
+    //    //    return;
+    //    //}
+    //}
     // Default behavior if no short press
     // (leave as is, or add fallback logic if needed)
 }

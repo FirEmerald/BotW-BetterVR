@@ -52,16 +52,19 @@ stfs f0, 8(r30)
 ; r3 = gsys::ModelUnit*
 
 mr r27, r6
+mr r28, r7
 
 lwz r6, 0x20(r1) ; load name
 
 lwz r3, 0x0C(r1) ; r31 = ksys::phys::ModelBoneAccessor*
 lwz r3, 0x10(r3) ; ModelBoneAccessor::gsysModel
-
+lis r7, currentFrameCounter@ha
+lwz r7, currentFrameCounter@l(r7)
 bla import.coreinit.hook_ModifyBoneMatrix
 
 ; restore bone index finally
 mr r6, r27
+mr r7, r28
 
 ; prologue
 lwz r0, 0x34(r1)
