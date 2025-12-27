@@ -602,7 +602,7 @@ void CemuHooks::hook_OverwriteCameraParam(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
     if (paramNameStr == "JumpHeight") {
         // override jump height to 1.2 in first person mode to temporarily workaround the increased gravity effect
-        uint32_t superLowAddress = 0x1031ADA4; // points to 1.2
+        uint32_t superLowAddress = 0x100C50D0; // points to 1.2
         writeMemoryBE(hCPU->gpr[4], &superLowAddress);
         return;
     }
