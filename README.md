@@ -71,21 +71,28 @@ While more integrated solutions are being found out, there's probably ways to se
 
 2. Extract the contents of the downloaded `.zip` file into the same folder where your `Cemu.exe` is stored.
    There should now be **at least** .dll, .json and multiple .bat files in the same folder as your `Cemu.exe`.
-   Make sure you start Cemu.exe once so that it can create the folder structure, if you've never done that before.
+   
+3. Open Cemu normally through the `Cemu.exe` (not the .bat file!).
+    - Cemu's window title should state Cemu 2.6 or newer. Any older version isn't supported.
+    - The game should say V208 inside the update column in Cemu's game list. Otherwise it's outdated/not updated, and won't work.
+    - Go to `Options`->`General Settings`, and then under the `Graphics` tab make sure that you're using Vulkan and that the right GPU is selected.
+    
+    If all that is true, continue to the next step by closing the settings window and then Cemu entirely. Otherwise, fix those issues before continuing.
 
-3. Double-click on `BetterVR LAUNCH CEMU IN VR.bat` to start Cemu. This'll install the graphic pack automatically to the right folder.
+4. Double-click on `BetterVR LAUNCH CEMU IN VR.bat` to start Cemu. This'll install the graphic pack automatically to the right folder.
 
-4. Go to `Options`-> `Graphic packs`-> `The Legend of Zelda: Breath of the Wild` and make sure that the graphic pack named `BetterVR` is enabled.
+5. Go to `Options`-> `Graphic packs`-> `The Legend of Zelda: Breath of the Wild` and make sure that the graphic pack named `BetterVR` is enabled.
    This is ALSO where you can change any VR settings like the first/third-person mode etc.
    **You'll also want to enable the FPS++ graphic pack, or else the game will crash!**
    **You can't change the BetterVR options while you're in-game.**
 
-5. (Recommended) For an enjoyable experience you should change some other graphic packs in this same window too:
+6. For an enjoyable experience you should change some other graphic packs in this same window too:
    - `Graphics` graphic pack: Use any (non-ultrawide!) resolution of 1440p (2k) or higher for clarity. Also change anti-aliasing to Nvidia FXAA.
    - `FPS++` graphic pack: Change the FPS limit to at least 120FPS or 144FPS. The OpenXR headset will dictate the framerate anyway.
    - `Enhancements`: graphic pack: Change anisotropic filtering to 16x and use your preferred preset.
+   - Any other settings like shadows, draw distance etc. You can always play around with this to see what the performance hit is.
 
-6. Close the settings and start the game like normal from Cemu's game list. You can now put on your VR headset and if installed correctly it should now work!
+7. Close the settings and start the game like normal from Cemu's game list. You can now put on your VR headset and if installed correctly it should now work!
 
 From now on you can play the game in VR by just starting the `BetterVR LAUNCH CEMU IN VR.bat` file.  
 If you want to undo the installation (temporarily) to play the game without VR, use the `BetterVR UNINSTALL.bat` file.  
