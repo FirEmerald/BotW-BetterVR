@@ -95,6 +95,9 @@ public:
         // todo: check if 3 frames is the right threshold
         return GetFramesSinceLastCameraUpdate() <= 4;
     }
+    static bool IsShowingMenu() {
+        return !IsInGame() || IsScreenOpen(ScreenId::ShopBG_00) || IsScreenOpen(ScreenId::MessageDialog);
+    }
 
     static std::string s_currentEvent;
     static HybridEventSettings s_currentEventSettings;
@@ -184,6 +187,7 @@ private:
     static uint64_t s_memoryBaseAddress;
     static std::atomic_uint32_t s_framesSinceLastCameraUpdate;
 
+    static bool IsScreenOpen(ScreenId screen);
     static void hook_UpdateSettings(PPCInterpreter_t* hCPU);
 
     // Actor Hooks

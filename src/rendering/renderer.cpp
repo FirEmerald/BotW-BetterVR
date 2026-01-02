@@ -44,7 +44,7 @@ void RND_Renderer::StartFrame() {
     auto headsetRotation = VRManager::instance().XR->GetRenderer()->GetMiddlePose();
     if (headsetRotation.has_value()) {
         // todo: update this as late as possible
-        VRManager::instance().XR->UpdateActions(m_frameState.predictedDisplayTime, headsetRotation.value(), !VRManager::instance().Hooks->IsInGame());
+        VRManager::instance().XR->UpdateActions(m_frameState.predictedDisplayTime, headsetRotation.value(), VRManager::instance().Hooks->IsShowingMenu());
     }
 }
 
