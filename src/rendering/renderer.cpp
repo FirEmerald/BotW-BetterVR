@@ -97,8 +97,7 @@ void RND_Renderer::EndFrame() {
         if (m_layer3D) {
             if (m_renderFrames[frameIdx].Is3DComplete()) {
                 m_layer3D->StartRendering();
-                m_layer3D->Render(OpenXR::EyeSide::LEFT, frameIdx);
-                m_layer3D->Render(OpenXR::EyeSide::RIGHT, frameIdx);
+                m_layer3D->Render(frameIdx);
                 layer3DViews = m_layer3D->FinishRendering(frameIdx);
                 layer3D.layerFlags = 0;
                 layer3D.space = VRManager::instance().XR->m_stageSpace;
@@ -155,19 +154,24 @@ void RND_Renderer::EndFrame() {
 RND_Renderer::Layer3D::Layer3D(VkExtent2D inputRes, VkExtent2D outputRes) {
     auto viewConfs = VRManager::instance().XR->GetViewConfigurations();
 
-    this->m_recommendedAspectRatios[OpenXR::EyeSide::LEFT] = (float)viewConfs[0].recommendedImageRectWidth / (float)viewConfs[0].recommendedImageRectHeight;
-    this->m_recommendedAspectRatios[OpenXR::EyeSide::RIGHT] = (float)viewConfs[1].recommendedImageRectWidth / (float)viewConfs[1].recommendedImageRectHeight;
+    const auto& leftView = viewConfs[OpenXR::EyeSide::LEFT];
+    const auto& rightView = viewConfs[OpenXR::EyeSide::RIGHT];
+    if (leftView.recommendedImageRectWidth != rightView.recommendedImageRectWidth || leftView.recommendedImageRectHeight != rightView.recommendedImageRectHeight) {
+        Log::print<WARNING>("Eye view resolutions differ (L {}x{}, R {}x{}); using max for stereo swapchain.",
+            leftView.recommendedImageRectWidth, leftView.recommendedImageRectHeight,
+            rightView.recommendedImageRectWidth, rightView.recommendedImageRectHeight);
+    }
 
-    this->m_presentPipelines[OpenXR::EyeSide::LEFT] = std::make_unique<RND_D3D12::PresentPipeline<true>>(VRManager::instance().XR->GetRenderer());
-    this->m_presentPipelines[OpenXR::EyeSide::RIGHT] = std::make_unique<RND_D3D12::PresentPipeline<true>>(VRManager::instance().XR->GetRenderer());
+    // Force sample count to 1 - our PSO is hardcoded to single-sample and we don't resolve MSAA
+    constexpr uint32_t sampleCount = 1;
 
-    this->m_swapchains[OpenXR::EyeSide::LEFT] = std::make_unique<Swapchain<DXGI_FORMAT_R8G8B8A8_UNORM_SRGB>>(outputRes.width, outputRes.height, viewConfs[0].recommendedSwapchainSampleCount);
-    this->m_swapchains[OpenXR::EyeSide::RIGHT] = std::make_unique<Swapchain<DXGI_FORMAT_R8G8B8A8_UNORM_SRGB>>(outputRes.width, outputRes.height, viewConfs[1].recommendedSwapchainSampleCount);
-    this->m_depthSwapchains[OpenXR::EyeSide::LEFT] = std::make_unique<Swapchain<DXGI_FORMAT_D32_FLOAT>>(outputRes.width, outputRes.height, viewConfs[0].recommendedSwapchainSampleCount);
-    this->m_depthSwapchains[OpenXR::EyeSide::RIGHT] = std::make_unique<Swapchain<DXGI_FORMAT_D32_FLOAT>>(outputRes.width, outputRes.height, viewConfs[1].recommendedSwapchainSampleCount);
+    this->m_presentPipeline = std::make_unique<RND_D3D12::PresentPipeline<true, true>>(VRManager::instance().XR->GetRenderer());
 
-    this->m_presentPipelines[OpenXR::EyeSide::LEFT]->BindSettings((float)outputRes.width, (float)outputRes.height);
-    this->m_presentPipelines[OpenXR::EyeSide::RIGHT]->BindSettings((float)outputRes.width, (float)outputRes.height);
+    // note: it's possible to make a swapchain that matches Cemu's internal resolution and let the headset downsample it, although I doubt there's a benefit
+    this->m_swapchain = std::make_unique<Swapchain<DXGI_FORMAT_R8G8B8A8_UNORM_SRGB>>(outputRes.width, outputRes.height, sampleCount, 2);
+    this->m_depthSwapchain = std::make_unique<Swapchain<DXGI_FORMAT_D32_FLOAT>>(outputRes.width, outputRes.height, sampleCount, 2);
+
+    this->m_presentPipeline->BindSettings((float)this->m_swapchain->GetWidth(), (float)this->m_swapchain->GetHeight());
 
     // initialize textures
     for (int i = 0; i < 2; ++i) {
@@ -201,12 +205,8 @@ RND_Renderer::Layer3D::Layer3D(VkExtent2D inputRes, VkExtent2D outputRes) {
 }
 
 RND_Renderer::Layer3D::~Layer3D() {
-    for (auto& swapchain : m_swapchains) {
-        swapchain.reset();
-    }
-    for (auto& swapchain : m_depthSwapchains) {
-        swapchain.reset();
-    }
+    m_swapchain.reset();
+    m_depthSwapchain.reset();
 }
 
 SharedTexture* RND_Renderer::Layer3D::CopyColorToLayer(OpenXR::EyeSide side, VkCommandBuffer copyCmdBuffer, VkImage image, long frameIdx) {
@@ -233,10 +233,9 @@ SharedTexture* RND_Renderer::Layer3D::CopyDepthToLayer(OpenXR::EyeSide side, VkC
     return m_depthTextures[side][frameIdx].get();
 }
 
-void RND_Renderer::Layer3D::PrepareRendering(OpenXR::EyeSide side) {
-    // Log::print("Preparing rendering for {} side", side == OpenXR::EyeSide::LEFT ? "left" : "right");
-    m_swapchains[side]->PrepareRendering();
-    m_depthSwapchains[side]->PrepareRendering();
+void RND_Renderer::Layer3D::PrepareRendering() {
+    m_swapchain->PrepareRendering();
+    m_depthSwapchain->PrepareRendering();
 }
 
 std::optional<std::array<XrView, 2>> RND_Renderer::UpdateViews(XrTime predictedDisplayTime) {
@@ -261,55 +260,92 @@ std::optional<std::array<XrView, 2>> RND_Renderer::UpdateViews(XrTime predictedD
 }
 
 void RND_Renderer::Layer3D::StartRendering() {
-    // checkAssert((this->m_textures[OpenXR::EyeSide::LEFT] == nullptr && this->m_textures[OpenXR::EyeSide::RIGHT] == nullptr) || (this->m_textures[OpenXR::EyeSide::LEFT] != nullptr && this->m_textures[OpenXR::EyeSide::RIGHT] != nullptr), "Both textures must be either null or not null");
-    // checkAssert((this->m_depthTextures[OpenXR::EyeSide::LEFT] == nullptr && this->m_depthTextures[OpenXR::EyeSide::RIGHT] == nullptr) || (this->m_depthTextures[OpenXR::EyeSide::LEFT] != nullptr && this->m_depthTextures[OpenXR::EyeSide::RIGHT] != nullptr), "Both depth textures must be either null or not null");
-    // checkAssert((this->m_textures[OpenXR::EyeSide::LEFT][0] == nullptr && this->m_textures[OpenXR::EyeSide::RIGHT][0] == nullptr) || (this->m_textures[OpenXR::EyeSide::LEFT][0] != nullptr && this->m_textures[OpenXR::EyeSide::RIGHT][0] != nullptr), "Both textures must be either null or not null");
-    // checkAssert((this->m_depthTextures[OpenXR::EyeSide::LEFT][0] == nullptr && this->m_depthTextures[OpenXR::EyeSide::RIGHT][0] == nullptr) || (this->m_depthTextures[OpenXR::EyeSide::LEFT][0] != nullptr && this->m_depthTextures[OpenXR::EyeSide::RIGHT][0] != nullptr), "Both depth textures must be either null or not null");
-
-    this->m_swapchains[OpenXR::EyeSide::LEFT]->PrepareRendering();
-    this->m_swapchains[OpenXR::EyeSide::LEFT]->StartRendering();
-    this->m_depthSwapchains[OpenXR::EyeSide::LEFT]->PrepareRendering();
-    this->m_depthSwapchains[OpenXR::EyeSide::LEFT]->StartRendering();
-    this->m_swapchains[OpenXR::EyeSide::RIGHT]->PrepareRendering();
-    this->m_swapchains[OpenXR::EyeSide::RIGHT]->StartRendering();
-    this->m_depthSwapchains[OpenXR::EyeSide::RIGHT]->PrepareRendering();
-    this->m_depthSwapchains[OpenXR::EyeSide::RIGHT]->StartRendering();
+    this->m_swapchain->PrepareRendering();
+    this->m_swapchain->StartRendering();
+    this->m_depthSwapchain->PrepareRendering();
+    this->m_depthSwapchain->StartRendering();
 }
 
-void RND_Renderer::Layer3D::Render(OpenXR::EyeSide side, long frameIdx) {
+void RND_Renderer::Layer3D::Render(long frameIdx) {
     ID3D12Device* device = VRManager::instance().D3D12->GetDevice();
     ID3D12CommandQueue* queue = VRManager::instance().D3D12->GetCommandQueue();
     ID3D12CommandAllocator* allocator = VRManager::instance().D3D12->GetFrameAllocator();
 
-    RND_D3D12::CommandContext<false> renderSharedTexture(device, queue, allocator, [this, side, frameIdx](RND_D3D12::CommandContext<false>* context) {
+    RND_D3D12::CommandContext<false> renderSharedTexture(device, queue, allocator, [this, frameIdx](RND_D3D12::CommandContext<false>* context) {
         context->GetRecordList()->SetName(L"RenderSharedTexture");
-        auto& texture = m_textures[side][frameIdx];
-        auto& depthTexture = m_depthTextures[side][frameIdx];
+        auto& leftTexture = m_textures[OpenXR::EyeSide::LEFT][frameIdx];
+        auto& rightTexture = m_textures[OpenXR::EyeSide::RIGHT][frameIdx];
+        auto& leftDepthTexture = m_depthTextures[OpenXR::EyeSide::LEFT][frameIdx];
+        auto& rightDepthTexture = m_depthTextures[OpenXR::EyeSide::RIGHT][frameIdx];
 
-        context->WaitFor(texture.get(), texture->GetD3D12WaitValue());
-        context->WaitFor(depthTexture.get(), depthTexture->GetD3D12WaitValue());
+        // AMD GPU FIX: Use monotonically increasing fence values
+        context->WaitFor(leftTexture.get(), leftTexture->GetD3D12WaitValue());
+        context->WaitFor(rightTexture.get(), rightTexture->GetD3D12WaitValue());
+        context->WaitFor(leftDepthTexture.get(), leftDepthTexture->GetD3D12WaitValue());
+        context->WaitFor(rightDepthTexture.get(), rightDepthTexture->GetD3D12WaitValue());
 
-        // swapchains are already in D3D12_RESOURCE_STATE_RENDER_TARGET and depth in D3D12_RESOURCE_STATE_DEPTH_WRITE according to OpenXR spec
+        // Transition input textures to PIXEL_SHADER_RESOURCE
+        leftTexture->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        rightTexture->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        leftDepthTexture->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        rightDepthTexture->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-        m_presentPipelines[side]->BindAttachment(0, texture->d3d12GetTexture());
-        m_presentPipelines[side]->BindAttachment(1, depthTexture->d3d12GetTexture(), DXGI_FORMAT_R32_FLOAT);
-        m_presentPipelines[side]->BindTarget(0, m_swapchains[side]->GetTexture(), m_swapchains[side]->GetFormat());
-        m_presentPipelines[side]->BindDepthTarget(m_depthSwapchains[side]->GetTexture(), m_depthSwapchains[side]->GetFormat());
-        m_presentPipelines[side]->Render(context->GetRecordList(), m_swapchains[side]->GetTexture());
+        // Transition OpenXR swapchain images to render target states
+        // OpenXR swapchain images are acquired in COMMON state
+        D3D12_RESOURCE_BARRIER preBarriers[2] = {};
+        preBarriers[0].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        preBarriers[0].Transition.pResource = m_swapchain->GetTexture();
+        preBarriers[0].Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
+        preBarriers[0].Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        preBarriers[0].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        preBarriers[1].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        preBarriers[1].Transition.pResource = m_depthSwapchain->GetTexture();
+        preBarriers[1].Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
+        preBarriers[1].Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+        preBarriers[1].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        context->GetRecordList()->ResourceBarrier(2, preBarriers);
 
-        // no transition needed here as OpenXR requires the swapchain to be returned in RENDER_TARGET/DEPTH_WRITE too
+        // Bind all 4 textures for stereo rendering (left color, right color, left depth, right depth)
+        m_presentPipeline->BindAttachment(0, leftTexture->d3d12GetTexture());
+        m_presentPipeline->BindAttachment(1, rightTexture->d3d12GetTexture());
+        m_presentPipeline->BindAttachment(2, leftDepthTexture->d3d12GetTexture(), DXGI_FORMAT_R32_FLOAT);
+        m_presentPipeline->BindAttachment(3, rightDepthTexture->d3d12GetTexture(), DXGI_FORMAT_R32_FLOAT);
+        m_presentPipeline->BindTarget(0, m_swapchain->GetTexture(), m_swapchain->GetFormat());
+        m_presentPipeline->BindDepthTarget(m_depthSwapchain->GetTexture(), m_depthSwapchain->GetFormat());
+        m_presentPipeline->Render(context->GetRecordList(), m_swapchain->GetTexture());
 
-        context->Signal(texture.get(), texture->GetD3D12SignalValue());
-        context->Signal(depthTexture.get(), depthTexture->GetD3D12SignalValue());
+        // Transition OpenXR swapchain images back to COMMON for OpenXR
+        D3D12_RESOURCE_BARRIER postBarriers[2] = {};
+        postBarriers[0].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        postBarriers[0].Transition.pResource = m_swapchain->GetTexture();
+        postBarriers[0].Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        postBarriers[0].Transition.StateAfter = D3D12_RESOURCE_STATE_COMMON;
+        postBarriers[0].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        postBarriers[1].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        postBarriers[1].Transition.pResource = m_depthSwapchain->GetTexture();
+        postBarriers[1].Transition.StateBefore = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+        postBarriers[1].Transition.StateAfter = D3D12_RESOURCE_STATE_COMMON;
+        postBarriers[1].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        context->GetRecordList()->ResourceBarrier(2, postBarriers);
+
+        // Transition input textures back to COMMON for Vulkan interop
+        leftTexture->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_COMMON);
+        rightTexture->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_COMMON);
+        leftDepthTexture->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_COMMON);
+        rightDepthTexture->d3d12TransitionLayout(context->GetRecordList(), D3D12_RESOURCE_STATE_COMMON);
+
+        // AMD GPU FIX: Use monotonically increasing fence values
+        context->Signal(leftTexture.get(), leftTexture->GetD3D12SignalValue());
+        context->Signal(rightTexture.get(), rightTexture->GetD3D12SignalValue());
+        context->Signal(leftDepthTexture.get(), leftDepthTexture->GetD3D12SignalValue());
+        context->Signal(rightDepthTexture.get(), rightDepthTexture->GetD3D12SignalValue());
     });
     // Log::print("[D3D12 - 3D Layer] Rendering finished");
 }
 
 const std::array<XrCompositionLayerProjectionView, 2>& RND_Renderer::Layer3D::FinishRendering(long frameIdx) {
-    this->m_swapchains[OpenXR::EyeSide::LEFT]->FinishRendering();
-    this->m_depthSwapchains[OpenXR::EyeSide::LEFT]->FinishRendering();
-    this->m_swapchains[OpenXR::EyeSide::RIGHT]->FinishRendering();
-    this->m_depthSwapchains[OpenXR::EyeSide::RIGHT]->FinishRendering();
+    this->m_swapchain->FinishRendering();
+    this->m_depthSwapchain->FinishRendering();
 
     // clang-format off
     m_projectionViews[OpenXR::EyeSide::LEFT] = {
@@ -318,27 +354,29 @@ const std::array<XrCompositionLayerProjectionView, 2>& RND_Renderer::Layer3D::Fi
         .pose = VRManager::instance().XR->GetRenderer()->GetPose(OpenXR::EyeSide::LEFT, frameIdx).value(),
         .fov = VRManager::instance().XR->GetRenderer()->GetFOV(OpenXR::EyeSide::LEFT, frameIdx).value(),
         .subImage = {
-            .swapchain = this->m_swapchains[OpenXR::EyeSide::LEFT]->GetHandle(),
+            .swapchain = this->m_swapchain->GetHandle(),
             .imageRect = {
                 .offset = { 0, 0 },
                 .extent = {
-                    .width = (int32_t)this->m_swapchains[OpenXR::EyeSide::LEFT]->GetWidth(),
-                    .height = (int32_t)this->m_swapchains[OpenXR::EyeSide::LEFT]->GetHeight()
+                    .width = (int32_t)this->m_swapchain->GetWidth(),
+                    .height = (int32_t)this->m_swapchain->GetHeight()
                 }
-            }
+            },
+            .imageArrayIndex = 0
         }
     };
     m_projectionViewsDepthInfo[OpenXR::EyeSide::LEFT] = {
         .type = XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR,
         .subImage = {
-            .swapchain = this->m_depthSwapchains[OpenXR::EyeSide::LEFT]->GetHandle(),
+            .swapchain = this->m_depthSwapchain->GetHandle(),
             .imageRect = {
                 .offset = { 0, 0 },
                 .extent = {
-                    .width = (int32_t)this->m_depthSwapchains[OpenXR::EyeSide::LEFT]->GetWidth(),
-                    .height = (int32_t)this->m_depthSwapchains[OpenXR::EyeSide::LEFT]->GetHeight()
+                    .width = (int32_t)this->m_depthSwapchain->GetWidth(),
+                    .height = (int32_t)this->m_depthSwapchain->GetHeight()
                 }
             },
+            .imageArrayIndex = 0
         },
         .minDepth = 0.0f,
         .maxDepth = 1.0f,
@@ -351,27 +389,29 @@ const std::array<XrCompositionLayerProjectionView, 2>& RND_Renderer::Layer3D::Fi
         .pose = VRManager::instance().XR->GetRenderer()->GetPose(OpenXR::EyeSide::RIGHT, frameIdx).value(),
         .fov = VRManager::instance().XR->GetRenderer()->GetFOV(OpenXR::EyeSide::RIGHT, frameIdx).value(),
         .subImage = {
-            .swapchain = this->m_swapchains[OpenXR::EyeSide::RIGHT]->GetHandle(),
+            .swapchain = this->m_swapchain->GetHandle(),
             .imageRect = {
                 .offset = { 0, 0 },
                 .extent = {
-                    .width = (int32_t)this->m_swapchains[OpenXR::EyeSide::RIGHT]->GetWidth(),
-                    .height = (int32_t)this->m_swapchains[OpenXR::EyeSide::RIGHT]->GetHeight()
+                    .width = (int32_t)this->m_swapchain->GetWidth(),
+                    .height = (int32_t)this->m_swapchain->GetHeight()
                 }
-            }
+            },
+            .imageArrayIndex = 1
         }
     };
     m_projectionViewsDepthInfo[OpenXR::EyeSide::RIGHT] = {
         .type = XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR,
         .subImage = {
-            .swapchain = this->m_depthSwapchains[OpenXR::EyeSide::RIGHT]->GetHandle(),
+            .swapchain = this->m_depthSwapchain->GetHandle(),
             .imageRect = {
                 .offset = { 0, 0 },
                 .extent = {
-                    .width = (int32_t)this->m_depthSwapchains[OpenXR::EyeSide::RIGHT]->GetWidth(),
-                    .height = (int32_t)this->m_depthSwapchains[OpenXR::EyeSide::RIGHT]->GetHeight()
+                    .width = (int32_t)this->m_depthSwapchain->GetWidth(),
+                    .height = (int32_t)this->m_depthSwapchain->GetHeight()
                 }
             },
+            .imageArrayIndex = 1
         },
         .minDepth = 0.0f,
         .maxDepth = 1.0f,

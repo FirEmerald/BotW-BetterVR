@@ -33,7 +33,7 @@ public:
     ID3D12CommandAllocator* GetFrameAllocator() { return m_allocator.Get(); };
 
     // todo: extract most to a base pipeline class if other pipelines are needed
-    template <bool depth>
+    template <bool depth, bool stereo = false>
     class PresentPipeline {
         friend class Texture;
 
@@ -50,6 +50,8 @@ public:
     private:
         void RecreatePipeline();
 
+        static constexpr size_t kAttachmentCount = stereo ? (depth ? 4 : 2) : (depth ? 2 : 1);
+
         ComPtr<ID3DBlob> m_vertexShader;
         ComPtr<ID3DBlob> m_pixelShader;
 
@@ -61,7 +63,7 @@ public:
         ComPtr<ID3D12RootSignature> m_signature;
         ComPtr<ID3D12PipelineState> m_pipelineState;
 
-        std::array<D3D12_CPU_DESCRIPTOR_HANDLE, depth ? 2 : 1> m_attachmentHandles = {};
+        std::array<D3D12_CPU_DESCRIPTOR_HANDLE, kAttachmentCount> m_attachmentHandles = {};
         std::array<D3D12_CPU_DESCRIPTOR_HANDLE, 1> m_targetHandles = {};
         std::array<D3D12_CPU_DESCRIPTOR_HANDLE, depth ? 1 : 0> m_depthTargetHandles = {};
         ComPtr<ID3D12DescriptorHeap> m_attachmentHeap;

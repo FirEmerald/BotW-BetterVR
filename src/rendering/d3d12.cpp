@@ -71,11 +71,17 @@ RND_D3D12::RND_D3D12() {
 RND_D3D12::~RND_D3D12() {
 }
 
-template <bool depth>
-RND_D3D12::PresentPipeline<depth>::PresentPipeline(RND_Renderer* pRenderer) {
+template <bool depth, bool stereo>
+RND_D3D12::PresentPipeline<depth, stereo>::PresentPipeline(RND_Renderer* pRenderer) {
     // This needs to know the format of the swapchain images, thus needs to wait until the swapchain images are created
-    m_vertexShader = D3D12Utils::CompileShader(depth ? presentDepthHLSL : presentHLSL, "VSMain", "vs_5_1");
-    m_pixelShader = D3D12Utils::CompileShader(depth ? presentDepthHLSL : presentHLSL, "PSMain", "ps_5_1");
+    const char* shaderSource = nullptr;
+    if constexpr (stereo) {
+        shaderSource = depth ? presentStereoDepthHLSL : presentStereoHLSL;
+    } else {
+        shaderSource = depth ? presentDepthHLSL : presentHLSL;
+    }
+    m_vertexShader = D3D12Utils::CompileShader(shaderSource, "VSMain", "vs_5_1");
+    m_pixelShader = D3D12Utils::CompileShader(shaderSource, "PSMain", "ps_5_1");
 
     auto createSignature = [this]() {
         // clang-format off
@@ -176,16 +182,36 @@ RND_D3D12::PresentPipeline<depth>::PresentPipeline(RND_Renderer* pRenderer) {
         ID3D12CommandQueue* queue = VRManager::instance().D3D12->GetCommandQueue();
         device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&uploadBufferAllocator));
         RND_D3D12::CommandContext<true> uploadBufferContext(device, queue, uploadBufferAllocator.Get(), [this, device, &screenIndicesStaging](RND_D3D12::CommandContext<true>* context) {
-            m_screenIndicesBuffer = D3D12Utils::CreateConstantBuffer(device, D3D12_HEAP_TYPE_DEFAULT, sizeof(screenIndices));
+            // Use CreateBuffer for index buffer (doesn't need CBV alignment)
+            m_screenIndicesBuffer = D3D12Utils::CreateBuffer(device, D3D12_HEAP_TYPE_DEFAULT, sizeof(screenIndices));
 
-            screenIndicesStaging = D3D12Utils::CreateConstantBuffer(device, D3D12_HEAP_TYPE_UPLOAD, sizeof(screenIndices));
+            screenIndicesStaging = D3D12Utils::CreateBuffer(device, D3D12_HEAP_TYPE_UPLOAD, sizeof(screenIndices));
             void* data;
             const D3D12_RANGE readRange = { .Begin = 0, .End = 0 };
             checkHResult(screenIndicesStaging->Map(0, &readRange, &data), "Failed to map memory for screen indices buffer!");
             memcpy(data, screenIndices, sizeof(screenIndices));
             screenIndicesStaging->Unmap(0, nullptr);
 
+            // Transition to COPY_DEST before copy (from COMMON which is the initial state)
+            D3D12_RESOURCE_BARRIER preCopyBarrier = {};
+            preCopyBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            preCopyBarrier.Transition.pResource = m_screenIndicesBuffer.Get();
+            preCopyBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
+            preCopyBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
+            preCopyBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            context->GetRecordList()->ResourceBarrier(1, &preCopyBarrier);
+
             context->GetRecordList()->CopyBufferRegion(m_screenIndicesBuffer.Get(), 0, screenIndicesStaging.Get(), 0, sizeof(screenIndices));
+
+            // Transition index buffer from COPY_DEST to INDEX_BUFFER state
+            D3D12_RESOURCE_BARRIER postCopyBarrier = {};
+            postCopyBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            postCopyBarrier.Transition.pResource = m_screenIndicesBuffer.Get();
+            postCopyBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+            postCopyBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_INDEX_BUFFER;
+            postCopyBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            context->GetRecordList()->ResourceBarrier(1, &postCopyBarrier);
+
             m_screenIndicesView = {
                 .BufferLocation = m_screenIndicesBuffer->GetGPUVirtualAddress(),
                 .SizeInBytes = sizeof(screenIndices),
@@ -197,8 +223,8 @@ RND_D3D12::PresentPipeline<depth>::PresentPipeline(RND_Renderer* pRenderer) {
 
 
 // These change the CPU handles that'll later be used for binding the actual assets
-template <bool depth>
-void RND_D3D12::PresentPipeline<depth>::BindAttachment(uint32_t attachmentIdx, ID3D12Resource* srcTexture, DXGI_FORMAT overwriteFormat) {
+template <bool depth, bool stereo>
+void RND_D3D12::PresentPipeline<depth, stereo>::BindAttachment(uint32_t attachmentIdx, ID3D12Resource* srcTexture, DXGI_FORMAT overwriteFormat) {
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     srvDesc.Format = overwriteFormat != DXGI_FORMAT_UNKNOWN ? overwriteFormat : srcTexture->GetDesc().Format;
@@ -207,11 +233,19 @@ void RND_D3D12::PresentPipeline<depth>::BindAttachment(uint32_t attachmentIdx, I
     VRManager::instance().D3D12->GetDevice()->CreateShaderResourceView(srcTexture, &srvDesc, m_attachmentHandles[attachmentIdx]);
 }
 
-template <bool depth>
-void RND_D3D12::PresentPipeline<depth>::BindTarget(uint32_t targetIdx, ID3D12Resource* dstTexture, DXGI_FORMAT overwriteFormat) {
+template <bool depth, bool stereo>
+void RND_D3D12::PresentPipeline<depth, stereo>::BindTarget(uint32_t targetIdx, ID3D12Resource* dstTexture, DXGI_FORMAT overwriteFormat) {
     D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
     rtvDesc.Format = overwriteFormat != DXGI_FORMAT_UNKNOWN ? overwriteFormat : dstTexture->GetDesc().Format;
-    rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+    if constexpr (stereo) {
+        rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
+        rtvDesc.Texture2DArray.MipSlice = 0;
+        rtvDesc.Texture2DArray.FirstArraySlice = 0;
+        rtvDesc.Texture2DArray.ArraySize = dstTexture->GetDesc().DepthOrArraySize;
+        rtvDesc.Texture2DArray.PlaneSlice = 0;
+    } else {
+        rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+    }
     VRManager::instance().D3D12->GetDevice()->CreateRenderTargetView(dstTexture, &rtvDesc, m_targetHandles[targetIdx]);
 
     if (rtvDesc.Format != m_targetFormats[targetIdx]) {
@@ -220,11 +254,18 @@ void RND_D3D12::PresentPipeline<depth>::BindTarget(uint32_t targetIdx, ID3D12Res
     }
 }
 
-template <bool depth>
-void RND_D3D12::PresentPipeline<depth>::BindDepthTarget(ID3D12Resource* dstTexture, DXGI_FORMAT overwriteFormat) {
+template <bool depth, bool stereo>
+void RND_D3D12::PresentPipeline<depth, stereo>::BindDepthTarget(ID3D12Resource* dstTexture, DXGI_FORMAT overwriteFormat) {
     D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
     dsvDesc.Format = overwriteFormat != DXGI_FORMAT_UNKNOWN ? overwriteFormat : dstTexture->GetDesc().Format;
-    dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+    if constexpr (stereo) {
+        dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
+        dsvDesc.Texture2DArray.MipSlice = 0;
+        dsvDesc.Texture2DArray.FirstArraySlice = 0;
+        dsvDesc.Texture2DArray.ArraySize = dstTexture->GetDesc().DepthOrArraySize;
+    } else {
+        dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+    }
     dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
     VRManager::instance().D3D12->GetDevice()->CreateDepthStencilView(dstTexture, &dsvDesc, m_depthTargetHandles[0]);
 
@@ -234,8 +275,8 @@ void RND_D3D12::PresentPipeline<depth>::BindDepthTarget(ID3D12Resource* dstTextu
     }
 }
 
-template <bool depth>
-void RND_D3D12::PresentPipeline<depth>::BindSettings(float screenWidth, float screenHeight) {
+template <bool depth, bool stereo>
+void RND_D3D12::PresentPipeline<depth, stereo>::BindSettings(float screenWidth, float screenHeight) {
     ComPtr<ID3D12Resource> newSettingsStaging;
     ComPtr<ID3D12CommandAllocator> newSettingsAllocator;
     {
@@ -258,13 +299,31 @@ void RND_D3D12::PresentPipeline<depth>::BindSettings(float screenWidth, float sc
             memcpy(data, &settings, sizeof(presentSettings));
             newSettingsStaging->Unmap(0, nullptr);
 
+            // Transition settings buffer to COPY_DEST before copy
+            D3D12_RESOURCE_BARRIER preCopyBarrier = {};
+            preCopyBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            preCopyBarrier.Transition.pResource = m_settingsBuffer.Get();
+            preCopyBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            preCopyBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
+            preCopyBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
+            context->GetRecordList()->ResourceBarrier(1, &preCopyBarrier);
+
             context->GetRecordList()->CopyBufferRegion(m_settingsBuffer.Get(), 0, newSettingsStaging.Get(), 0, sizeof(presentSettings));
+
+            // Transition settings buffer to VERTEX_AND_CONSTANT_BUFFER after copy
+            D3D12_RESOURCE_BARRIER postCopyBarrier = {};
+            postCopyBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            postCopyBarrier.Transition.pResource = m_settingsBuffer.Get();
+            postCopyBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            postCopyBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+            postCopyBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+            context->GetRecordList()->ResourceBarrier(1, &postCopyBarrier);
         });
     }
 }
 
-template <bool depth>
-void RND_D3D12::PresentPipeline<depth>::RecreatePipeline() {
+template <bool depth, bool stereo>
+void RND_D3D12::PresentPipeline<depth, stereo>::RecreatePipeline() {
     // AMD GPU FIX: Don't declare SV_InstanceID/SV_VertexID in the input layout.
     // These are system-generated values, not vertex buffer inputs.
     // AMD strictly enforces this - it will try to read from an unbound vertex buffer.
@@ -340,8 +399,8 @@ void RND_D3D12::PresentPipeline<depth>::RecreatePipeline() {
     checkHResult(VRManager::instance().D3D12->GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)), "Failed to create graphics pipeline state!");
 }
 
-template <bool depth>
-void RND_D3D12::PresentPipeline<depth>::Render(ID3D12GraphicsCommandList* cmdList, ID3D12Resource* swapchain) {
+template <bool depth, bool stereo>
+void RND_D3D12::PresentPipeline<depth, stereo>::Render(ID3D12GraphicsCommandList* cmdList, ID3D12Resource* swapchain) {
     cmdList->SetPipelineState(m_pipelineState.Get());
     cmdList->SetGraphicsRootSignature(m_signature.Get());
 
@@ -371,8 +430,10 @@ void RND_D3D12::PresentPipeline<depth>::Render(ID3D12GraphicsCommandList* cmdLis
 
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     cmdList->IASetIndexBuffer(&m_screenIndicesView);
-    cmdList->DrawIndexedInstanced((UINT)std::size(screenIndices), 1, 0, 0, 0);
+    cmdList->DrawIndexedInstanced((UINT)std::size(screenIndices), stereo ? 2 : 1, 0, 0, 0);
 }
 
-template class RND_D3D12::PresentPipeline<false>;
-template class RND_D3D12::PresentPipeline<true>;
+template class RND_D3D12::PresentPipeline<false, false>;
+template class RND_D3D12::PresentPipeline<true, false>;
+template class RND_D3D12::PresentPipeline<false, true>;
+template class RND_D3D12::PresentPipeline<true, true>;

@@ -115,21 +115,20 @@ public:
 
         SharedTexture* CopyColorToLayer(OpenXR::EyeSide side, VkCommandBuffer copyCmdBuffer, VkImage image, long frameIdx);
         SharedTexture* CopyDepthToLayer(OpenXR::EyeSide side, VkCommandBuffer copyCmdBuffer, VkImage image, long frameIdx);
-        void PrepareRendering(OpenXR::EyeSide side);
+        void PrepareRendering();
         void StartRendering();
-        void Render(OpenXR::EyeSide side, long frameIdx);
+        void Render(long frameIdx);
         const std::array<XrCompositionLayerProjectionView, 2>& FinishRendering(long frameIdx);
 
-        float GetAspectRatio(OpenXR::EyeSide side) const { return m_recommendedAspectRatios[side]; }
+        float GetAspectRatio(OpenXR::EyeSide side) const { return m_swapchain->GetWidth() / (float)m_swapchain->GetHeight(); }
         long GetCurrentFrameIdx() const { return m_currentFrameIdx; }
 
     private:
-        std::array<std::unique_ptr<Swapchain<DXGI_FORMAT_R8G8B8A8_UNORM_SRGB>>, 2> m_swapchains;
-        std::array<std::unique_ptr<Swapchain<DXGI_FORMAT_D32_FLOAT>>, 2> m_depthSwapchains;
-        std::array<std::unique_ptr<RND_D3D12::PresentPipeline<true>>, 2> m_presentPipelines;
+        std::unique_ptr<Swapchain<DXGI_FORMAT_R8G8B8A8_UNORM_SRGB>> m_swapchain;
+        std::unique_ptr<Swapchain<DXGI_FORMAT_D32_FLOAT>> m_depthSwapchain;
+        std::unique_ptr<RND_D3D12::PresentPipeline<true, true>> m_presentPipeline;
         std::array<std::array<std::unique_ptr<SharedTexture>, 2>, 2> m_textures;
         std::array<std::array<std::unique_ptr<SharedTexture>, 2>, 2> m_depthTextures;
-        std::array<float, 2> m_recommendedAspectRatios = { 1.0f, 1.0f };
 
         std::array<XrCompositionLayerProjectionView, 2> m_projectionViews = {};
         std::array<XrCompositionLayerDepthInfoKHR, 2> m_projectionViewsDepthInfo = {};

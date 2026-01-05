@@ -3,7 +3,7 @@
 #include "instance.h"
 
 template <DXGI_FORMAT T>
-Swapchain<T>::Swapchain(uint32_t width, uint32_t height, uint32_t sampleCount): m_width(width), m_height(height) {
+Swapchain<T>::Swapchain(uint32_t width, uint32_t height, uint32_t sampleCount, uint32_t arraySize): m_width(width), m_height(height), m_arraySize(arraySize) {
     auto getBestSwapchainFormat = [](const std::vector<DXGI_FORMAT>& applicationSupportedFormats) -> DXGI_FORMAT {
         // Finds the first matching DXGI_FORMAT (int) that matches the int64 from OpenXR
         uint32_t swapchainCount = 0;
@@ -27,7 +27,7 @@ Swapchain<T>::Swapchain(uint32_t width, uint32_t height, uint32_t sampleCount): 
     XrSwapchainCreateInfo swapchainCreateInfo = { XR_TYPE_SWAPCHAIN_CREATE_INFO };
     swapchainCreateInfo.width = width;
     swapchainCreateInfo.height = height;
-    swapchainCreateInfo.arraySize = 1;
+    swapchainCreateInfo.arraySize = arraySize;
     swapchainCreateInfo.sampleCount = sampleCount;
     swapchainCreateInfo.format = m_format;
     swapchainCreateInfo.mipCount = 1;

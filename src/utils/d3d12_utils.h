@@ -34,11 +34,47 @@ namespace D3D12Utils {
             .MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN
         };
 
+        // CBVs require 256-byte alignment for both size and offset
+        const UINT alignedSize = findAlignedSize(size);
+
         // clang-format off
         D3D12_RESOURCE_DESC buffDesc = {
             .Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
             .Alignment = 0,
-            .Width = (heapType == D3D12_HEAP_TYPE_UPLOAD) ? findAlignedSize(size) : size,
+            .Width = alignedSize,
+            .Height = 1,
+            .DepthOrArraySize = 1,
+            .MipLevels = 1,
+            .Format = DXGI_FORMAT_UNKNOWN,
+            .SampleDesc = {
+                .Count = 1,
+                .Quality = 0
+            },
+            .Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
+            .Flags = D3D12_RESOURCE_FLAG_NONE
+        };
+        // clang-format on
+
+        ComPtr<ID3D12Resource> buffer;
+        checkHResult(device->CreateCommittedResource(&heapProp, D3D12_HEAP_FLAG_NONE, &buffDesc, bufferType, nullptr, IID_PPV_ARGS(&buffer)), "Failed to create buffer!");
+        return buffer;
+    }
+
+    // Create a buffer for non-CBV use (index buffers, vertex buffers, etc.) without CBV alignment requirement
+    static ComPtr<ID3D12Resource> CreateBuffer(ID3D12Device* device, D3D12_HEAP_TYPE heapType, uint32_t size) {
+        D3D12_RESOURCE_STATES bufferType = (heapType == D3D12_HEAP_TYPE_UPLOAD) ? D3D12_RESOURCE_STATE_GENERIC_READ : D3D12_RESOURCE_STATE_COMMON;
+
+        D3D12_HEAP_PROPERTIES heapProp = {
+            .Type = heapType,
+            .CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
+            .MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN
+        };
+
+        // clang-format off
+        D3D12_RESOURCE_DESC buffDesc = {
+            .Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
+            .Alignment = 0,
+            .Width = size,
             .Height = 1,
             .DepthOrArraySize = 1,
             .MipLevels = 1,
