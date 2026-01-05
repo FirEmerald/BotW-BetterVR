@@ -1,7 +1,6 @@
 #pragma once
 #include "entity_debugger.h"
 
-
 class CemuHooks {
 public:
     CemuHooks() {
@@ -65,6 +64,7 @@ public:
         osLib_registerHLEFunction("coreinit", "hook_CreateNewScreen", &hook_CreateNewScreen);
         osLib_registerHLEFunction("coreinit", "hook_RouteActorJob", &hook_RouteActorJob);
         osLib_registerHLEFunction("coreinit", "hook_FixLadder", &hook_FixLadder);
+        osLib_registerHLEFunction("coreinit", "hook_DetectPlayerGlide", &hook_DetectPlayerGlide);
     };
     ~CemuHooks() {
         FreeLibrary(m_cemuHandle);
@@ -227,6 +227,7 @@ private:
     static void hook_InjectXRInput(PPCInterpreter_t* hCPU);
     static void hook_XRRumble_VPADControlMotor(PPCInterpreter_t* hCPU);
     static void hook_XRRumble_VPADStopMotor(PPCInterpreter_t* hCPU);
+    static void hook_DetectPlayerGlide(PPCInterpreter_t* hCPU);
 
     // Logging/Debugging Hooks
     static void hook_OSReportToConsole(PPCInterpreter_t* hCPU);

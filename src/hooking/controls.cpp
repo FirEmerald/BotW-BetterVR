@@ -97,12 +97,23 @@ JoyDir GetJoystickDirection(const XrVector2f& stick)
     return JoyDir::None;
 }
 
+uint32_t s_isPlayerGliding = 0;
+
 void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
 
     auto mapXRButtonToVpad = [](XrActionStateBoolean& state, VPADButtons mapping) -> uint32_t {
         return state.currentState ? mapping : 0;
     };
+
+    // decrease gliding counter
+    if (s_isPlayerGliding > 0) {
+        s_isPlayerGliding--;
+    }
+
+    if (s_isPlayerGliding != 0) {
+        // do stuff here!
+    }
 
     // read existing vpad as to not overwrite it
     uint32_t vpadStatusOffset = hCPU->gpr[4];
@@ -412,6 +423,12 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     VRManager::instance().XR->m_input.store(inputs);
 }
 
+void CemuHooks::hook_DetectPlayerGlide(PPCInterpreter_t* hCPU) {
+    hCPU->instructionPointer = hCPU->sprNew.LR;
+    hCPU->gpr[31] = hCPU->gpr[3];
+
+    s_isPlayerGliding = 2;
+}
 
 // some ideas:
 // - quickly pressing the grip button without a weapon while there's a nearby weapon and there's enough slots = pick up weapon
