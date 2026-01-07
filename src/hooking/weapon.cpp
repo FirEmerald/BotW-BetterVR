@@ -210,13 +210,33 @@ void CemuHooks::hook_ChangeWeaponMtx(PPCInterpreter_t* hCPU) {
 
         //Fetch data for inputs handling
         auto gameState = VRManager::instance().XR->m_gameState.load();
-        gameState.is_weapon_or_object_held = true;
-        gameState.is_throwable_object_held = ObjectCanBeThrown(targetActor.flags2.getLE());  
+        gameState.has_something_in_hand = true;
+        gameState.is_throwable_object_held = ObjectCanBeThrown(targetActor.flags2.getLE());
+        auto equipType = EquipType::None;
+        switch (targetActor.type.getLE()) {
+            case WeaponType::SmallSword:
+            case WeaponType::LargeSword:
+            case WeaponType::Spear:
+                equipType = EquipType::Melee;
+                break;
+            case WeaponType::Bow:
+                equipType = EquipType::Bow;
+                break;
+            case WeaponType::Shield:
+                equipType = EquipType::Shield;
+                break;
+            default:
+                equipType = EquipType::None;
+                break;
+        }
+        if (targetActor.name.getLE() == "Item_Conductor")
+            equipType = EquipType::Rune;
+
         if (isRightHandWeapon) {
-            gameState.right_weapon_type = targetActor.type.getLE();          
+            gameState.right_equip_type = equipType;          
         }
         else {
-            gameState.left_weapon_type = targetActor.type.getLE();
+            gameState.left_equip_type = equipType;
         }
         VRManager::instance().XR->m_gameState.store(gameState);
 
@@ -411,7 +431,8 @@ void CemuHooks::hook_EnableWeaponAttackSensor(PPCInterpreter_t* hCPU) {
         if (rumbleVelocity <= 0.0f) {
             rumbleVelocity = 0.0f;
         }
-        VRManager::instance().XR->GetRumbleManager()->startSimpleRumble(!heldIndex, 0.1f, 0.5f * rumbleVelocity, 0.7f * rumbleVelocity);
+
+        VRManager::instance().XR->GetRumbleManager()->openXRApplyHapticFeedback(!heldIndex, 0.1f, 0.5f * rumbleVelocity, 0.7f * rumbleVelocity);
     }
 }
 

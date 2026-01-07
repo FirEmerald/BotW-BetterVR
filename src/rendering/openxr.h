@@ -119,14 +119,22 @@ public:
         std::chrono::steady_clock::time_point prevent_menu_time;
         bool prevent_grab_inputs = false;
         std::chrono::steady_clock::time_point prevent_grab_time;
-        WeaponType right_weapon_type = WeaponType::SmallSword;
-        WeaponType left_weapon_type = WeaponType::SmallSword;
-        bool last_weapon_held_hand = 0; // 0 = left, 1 = right
-        bool is_weapon_or_object_held = false; // true if either a weapon or a throwable object is held
+        EquipType right_equip_type = EquipType::None;
+        EquipType left_equip_type = EquipType::None;
+        EquipType last_item_held = EquipType::None;
+        bool has_something_in_hand = false; // true if either a weapon or a throwable object is held
         bool is_throwable_object_held = false; // true if a throwable object is held
     } gameState ;
-
     std::atomic<GameState> m_gameState{};
+
+    // We'll manage the rumble commands priority inside controls.cpp
+    struct RumbleParameters {
+        bool leftHand = false;
+        double duration = 0;
+        float frequency = 0.0f;
+        float amplitude = 0.0f;
+    } rumbleParameters ;
+    std::atomic<RumbleParameters> m_rumbleParameters{};
 
     void CreateSession(const XrGraphicsBindingD3D12KHR& d3d12Binding);
     void CreateActions();

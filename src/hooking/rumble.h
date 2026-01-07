@@ -44,7 +44,7 @@ public:
         stop_haptic();
     }
 
-    void startSimpleRumble(bool leftHand, double duration, float frequency, float amplitude) {
+    void openXRApplyHapticFeedback(bool leftHand, double duration, float frequency, float amplitude) {
 
 
         // duration is in seconds
