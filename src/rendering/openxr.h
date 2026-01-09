@@ -56,7 +56,7 @@ public:
                     None,
                     ShortPress,
                     LongPress,
-                    DoublePress
+                    //DoublePress
                 };
 
                 bool wasDownLastFrame = false;
@@ -115,6 +115,8 @@ public:
         bool in_game = false;
         bool was_in_game = false;
         bool map_open = false;
+        bool dpad_menu_open = false;
+        Direction last_dpad_menu_open = Direction::None;
         bool prevent_menu_inputs = false;
         std::chrono::steady_clock::time_point prevent_menu_time;
         bool prevent_grab_inputs = false;

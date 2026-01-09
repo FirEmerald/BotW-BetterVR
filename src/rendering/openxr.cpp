@@ -407,58 +407,37 @@ void OpenXR::CreateActions() {
 }
 
 void CheckButtonState(bool buttonPressed, ButtonState& buttonState) {
-    // Button state logic
     buttonState.resetFrameFlags();
-
-    // detect long, short and double presses
+    
     constexpr std::chrono::milliseconds longPressThreshold{ 250 };
-    constexpr std::chrono::milliseconds doublePressWindow{ 150 };
-
     const bool down = buttonPressed;
     const auto now = std::chrono::steady_clock::now();
-
-    // rising edge
+    
+    // Rising edge - button just pressed
     if (down && !buttonState.wasDownLastFrame) {
         buttonState.pressStartTime = now;
         buttonState.longFired = false;
-
-        if (buttonState.waitingForSecond) // second press started in time to double
-        {
-            buttonState.waitingForSecond = false;
-            buttonState.longFired = true;
-            buttonState.lastEvent = ButtonState::Event::DoublePress;
-        }
     }
-
-    // pressed state
-    if (down) {
-        //will need to check if that cause issues elsewhere. Allows to keep LongPress event while button is pressed.
-        if (/*!buttonState.longFired &&*/ (now - buttonState.pressStartTime) >= longPressThreshold) {
-            //buttonState.longFired = true;
+    
+    // Pressed state - check for long press threshold
+    if (down && !buttonState.longFired) {
+        auto pressDuration = now - buttonState.pressStartTime;
+        
+        if (pressDuration >= longPressThreshold) {
+            buttonState.longFired = true;
             buttonState.lastEvent = ButtonState::Event::LongPress;
         }
     }
-
-    // falling edge
+    
+    // Falling edge - button just released
     if (!down && buttonState.wasDownLastFrame) {
-        if (!buttonState.longFired) // ignore if we already counted a long press
-        {
-            buttonState.waitingForSecond = true; // open double-press timing window
-            buttonState.lastReleaseTime = now;
-        }
-        else {
-            // long press path finished
-            buttonState.longFired = false;
+        // Only register short press if long press didn't fire
+        if (!buttonState.longFired) {
+            buttonState.lastEvent = ButtonState::Event::ShortPress;
         }
     }
-
-    // register short press since the double press timing window has expired nor was a long press registered
-    if (buttonState.waitingForSecond && !down && (now - buttonState.lastReleaseTime) > doublePressWindow) {
-        buttonState.waitingForSecond = false;
-        buttonState.lastEvent = ButtonState::Event::ShortPress;
-    }
-
-    // store current down state for the next frame
+    
+    // Store current state for next frame
     buttonState.wasDownLastFrame = down;
 }
 

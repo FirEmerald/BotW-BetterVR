@@ -76,25 +76,17 @@ struct VPADStatus {
 };
 static_assert(sizeof(VPADStatus) == 0xAC);
 
-enum JoyDir {
-    Up,
-    Right,
-    Down,
-    Left,
-    None
-};
-
 constexpr float AXIS_THRESHOLD = 0.5f;
 constexpr float HOLD_THRESHOLD = 0.1f;
 
-JoyDir getJoystickDirection(const XrVector2f& stick)
+Direction getJoystickDirection(const XrVector2f& stick)
 {
-    if (stick.y >= AXIS_THRESHOLD)       return JoyDir::Up;
-    if (stick.y <= -AXIS_THRESHOLD)      return JoyDir::Down;
-    if (stick.x <= -AXIS_THRESHOLD)      return JoyDir::Left;
-    if (stick.x >= AXIS_THRESHOLD)       return JoyDir::Right;
+    if (stick.y >= AXIS_THRESHOLD)       return Direction::Up;
+    if (stick.y <= -AXIS_THRESHOLD)      return Direction::Down;
+    if (stick.x <= -AXIS_THRESHOLD)      return Direction::Left;
+    if (stick.x >= AXIS_THRESHOLD)       return Direction::Right;
 
-    return JoyDir::None;
+    return Direction::None;
 }
 
 
@@ -162,6 +154,35 @@ bool isHandOverWaistSlot(const HandGestureState& gesture) {
     return gesture.isBehindHeadWithWaistOffset && gesture.isCloseToWaist && gesture.isOnLeftSide;
 }
 
+// Handle dpad menu
+bool handleDpadMenu(ButtonState::Event lastEvent, HandGestureState handGesture, uint32_t& buttonHold, OpenXR::GameState& gameState ) {
+    // Handle dpad menu
+    if (lastEvent == ButtonState::Event::LongPress) {
+        //Inverse the menu side for bows, so the menu corresponds to the hand side holding the weapon
+        //eg : left hands hold bow, open bow menu with left shoulder, arrow menu with right shoulder
+        bool isBowEquipped = gameState.last_item_held == EquipType::Bow;
+        // Force a bow equip so the correct menu spawns even when the bow broke.
+        bool doesBowJustBroke = isBowEquipped && gameState.left_equip_type != EquipType::Bow;
+        if (doesBowJustBroke)
+            buttonHold |= VPAD_BUTTON_ZR;
+        if (isHandOverRightShoulderSlot(handGesture)) {
+            buttonHold |= isBowEquipped ? VPAD_BUTTON_LEFT : VPAD_BUTTON_RIGHT;
+            gameState.last_dpad_menu_open = isBowEquipped ? Direction::Left : Direction::Right;
+        }
+        else if (isHandOverLeftShoulderSlot(handGesture)) {
+            buttonHold |= isBowEquipped ? VPAD_BUTTON_RIGHT : VPAD_BUTTON_LEFT;
+            gameState.last_dpad_menu_open = isBowEquipped ? Direction::Right : Direction::Left;
+        }
+        // if not over shoulders slots, then it's over waist
+        else {
+            buttonHold |= VPAD_BUTTON_UP;
+            gameState.last_dpad_menu_open = Direction::Up;
+        }
+        gameState.dpad_menu_open = true;
+        return true;
+    }
+    return false;
+}
 
 // Input handling functions
 void handleLeftHandInGameInput(
@@ -169,7 +190,7 @@ void handleLeftHandInGameInput(
     OpenXR::InputState& inputs,
     OpenXR::GameState& gameState,
     const HandGestureState& leftGesture,
-    JoyDir leftStickDir,
+    Direction leftStickDir,
     XrActionStateVector2f& leftStickSource,
     const std::chrono::steady_clock::time_point& now
 ) {
@@ -179,7 +200,7 @@ void handleLeftHandInGameInput(
     RumbleParameters grabSlotRumble = { true, 0, 0.5f, false, 0.25, 0.3f, 0.3f };
     
     auto* rumbleMgr = VRManager::instance().XR->GetRumbleManager();
-    bool isGrabPressed = inputs.inGame.grabState[0].wasDownLastFrame;
+    bool isGrabPressed = inputs.inGame.grabState[0].lastEvent == ButtonState::Event::ShortPress;
     
     // Handle shoulder slot interactions
     if (isHandOverLeftShoulderSlot(leftGesture) || isHandOverRightShoulderSlot(leftGesture)) {
@@ -191,6 +212,11 @@ void handleLeftHandInGameInput(
             rumbleMgr->enqueueInputsRumbleCommand(overSlotRumble);
         }
         
+        // Handle dpad menu
+        if (handleDpadMenu(inputs.inGame.grabState[0].lastEvent, leftGesture, buttonHold, gameState))
+            // Don't process normal input when opening dpad menu
+            return;
+
         // Handle equip/unequip
         if (!gameState.prevent_grab_inputs && isGrabPressed) {
             rumbleMgr->enqueueInputsRumbleCommand(grabSlotRumble);
@@ -226,6 +252,11 @@ void handleLeftHandInGameInput(
             rumbleMgr->enqueueInputsRumbleCommand(overSlotRumble);
         }
         
+        // Handle dpad menu
+        if (handleDpadMenu(inputs.inGame.grabState[0].lastEvent, leftGesture, buttonHold, gameState))
+            // Don't process normal input when opening dpad menu
+            return;
+
         if (!gameState.prevent_grab_inputs && isGrabPressed) {
             rumbleMgr->enqueueInputsRumbleCommand(grabSlotRumble);
             
@@ -251,23 +282,6 @@ void handleLeftHandInGameInput(
             buttonHold |= VPAD_BUTTON_A;
         }
     }
-    
-    // Handle D-pad menu with left stick while grabbing
-    if (!gameState.prevent_menu_inputs && isGrabPressed) {
-        switch (leftStickDir) {
-            case JoyDir::Up:    buttonHold |= VPAD_BUTTON_UP; break;
-            case JoyDir::Right: buttonHold |= VPAD_BUTTON_RIGHT; break;
-            case JoyDir::Down:  buttonHold |= VPAD_BUTTON_DOWN; break;
-            case JoyDir::Left:  buttonHold |= VPAD_BUTTON_LEFT; break;
-            case JoyDir::None:  break;
-        }
-        
-        if (leftStickDir != JoyDir::None) {
-            gameState.prevent_grab_inputs = true;
-            gameState.prevent_grab_time = now;
-            leftStickSource.currentState = { 0.0f, 0.0f };  // Prevent movement
-        }
-    }
 }
 
 void handleRightHandInGameInput(
@@ -275,7 +289,7 @@ void handleRightHandInGameInput(
     OpenXR::InputState& inputs,
     OpenXR::GameState& gameState,
     const HandGestureState& rightGesture,
-    JoyDir rightStickDir,
+    Direction rightStickDir,
     const std::chrono::steady_clock::time_point& now
 ) {
     constexpr std::chrono::milliseconds INPUT_DELAY(400);
@@ -284,7 +298,7 @@ void handleRightHandInGameInput(
     RumbleParameters grabSlotRumble = { true, 1, 0.5f, false, 0.25, 0.3f, 0.3f };
     
     auto* rumbleMgr = VRManager::instance().XR->GetRumbleManager();
-    bool isGrabPressed = inputs.inGame.grabState[1].wasDownLastFrame;
+    bool isGrabPressed = inputs.inGame.grabState[1].lastEvent == ButtonState::Event::ShortPress;
     bool isTriggerPressed = inputs.inGame.rightTrigger.currentState;
     
     // Handle shoulder slot interactions
@@ -296,7 +310,12 @@ void handleRightHandInGameInput(
         else if (isHandOverLeftShoulderSlot(rightGesture) && gameState.left_equip_type == EquipType::Bow) {
             rumbleMgr->enqueueInputsRumbleCommand(overSlotRumble);
         }
-        
+
+        // Handle dpad menu
+        if (handleDpadMenu(inputs.inGame.grabState[1].lastEvent, rightGesture, buttonHold, gameState))
+            // Don't process normal input when opening dpad menu
+            return;
+
         // Handle equip/unequip
         if (!gameState.prevent_grab_inputs && isGrabPressed) {
             rumbleMgr->enqueueInputsRumbleCommand(grabSlotRumble);
@@ -332,13 +351,40 @@ void handleRightHandInGameInput(
         
         return;  // Don't process normal input when over slots
     }
+
+    // Handle waist slot interaction (Rune)
+    if (isHandOverWaistSlot(rightGesture)) {
+        if (gameState.left_equip_type == EquipType::Rune) {
+            rumbleMgr->enqueueInputsRumbleCommand(overSlotRumble);
+        }
+        
+        // Handle dpad menu
+        if (handleDpadMenu(inputs.inGame.grabState[1].lastEvent, rightGesture, buttonHold, gameState))
+            // Don't process normal input when opening dpad menu
+            return;
+
+        if (!gameState.prevent_grab_inputs && isGrabPressed) {
+            rumbleMgr->enqueueInputsRumbleCommand(grabSlotRumble);
+            
+            if (gameState.left_equip_type != EquipType::Rune) {
+                buttonHold |= VPAD_BUTTON_L;
+                gameState.last_item_held = EquipType::Rune;
+            } else {
+                buttonHold |= VPAD_BUTTON_B;  // Unequip
+            }
+            
+            gameState.prevent_grab_inputs = true;
+            gameState.prevent_grab_time = now;
+        }
+        return;
+    }
     
     // Normal hand input (not over slots)
     rumbleMgr->stopInputsRumble(1);
     
     if (isGrabPressed) {
         // Handle drop action
-        if (rightStickDir == JoyDir::Down) {
+        if (rightStickDir == Direction::Down) {
             inputs.inGame.drop_weapon[1] = true;
             gameState.prevent_grab_inputs = true;
             gameState.prevent_grab_time = now;
@@ -396,7 +442,7 @@ void handleMenuInput(
     uint32_t& buttonHold,
     OpenXR::InputState& inputs,
     OpenXR::GameState& gameState,
-    JoyDir leftStickDir
+    Direction leftStickDir
 ) {
     auto mapButton = [](XrActionStateBoolean& state, VPADButtons btn) -> uint32_t {
         return state.currentState ? btn : 0;
@@ -416,17 +462,6 @@ void handleMenuInput(
     buttonHold |= mapButton(inputs.inMenu.hold, VPAD_BUTTON_X);
     buttonHold |= mapButton(inputs.inMenu.leftTrigger, VPAD_BUTTON_L);
     buttonHold |= mapButton(inputs.inMenu.rightTrigger, VPAD_BUTTON_R);
-    
-    // D-pad navigation with left grip
-    if (inputs.inMenu.leftGrip.currentState) {
-        switch (leftStickDir) {
-            case JoyDir::Up:    buttonHold |= VPAD_BUTTON_UP; break;
-            case JoyDir::Right: buttonHold |= VPAD_BUTTON_RIGHT; break;
-            case JoyDir::Down:  buttonHold |= VPAD_BUTTON_DOWN; break;
-            case JoyDir::Left:  buttonHold |= VPAD_BUTTON_LEFT; break;
-            case JoyDir::None:  break;
-        }
-    }
 }
 
 void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
@@ -462,8 +497,8 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     XrActionStateVector2f& leftStickSource = gameState.in_game ? inputs.inGame.move : inputs.inMenu.navigate;
     XrActionStateVector2f& rightStickSource = gameState.in_game ? inputs.inGame.camera : inputs.inMenu.scroll;
 
-    JoyDir leftJoystickDir = getJoystickDirection(leftStickSource.currentState);
-    JoyDir rightJoystickDir = getJoystickDirection(rightStickSource.currentState);
+    Direction leftJoystickDir = getJoystickDirection(leftStickSource.currentState);
+    Direction rightJoystickDir = getJoystickDirection(rightStickSource.currentState);
 
     //Delay to wait before allowing specific inputs again
     constexpr std::chrono::milliseconds delay{ 400 };
@@ -502,6 +537,25 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         rightGesture = calculateHandGesture(rightHandPos, headsetMtx, headsetPos);
     }
     
+    //dpad menu toggle
+    if (gameState.dpad_menu_open)
+    {
+        switch (gameState.last_dpad_menu_open) {
+            case Direction::Left:  newXRBtnHold |= VPAD_BUTTON_LEFT; break;
+            case Direction::Right: newXRBtnHold |= VPAD_BUTTON_RIGHT; break;
+            case Direction::Up: newXRBtnHold |= VPAD_BUTTON_UP; break;
+            default: break;
+        }
+
+        if (inputs.inMenu.select.currentState || inputs.inMenu.back.currentState)
+        {
+            gameState.dpad_menu_open = false;
+            gameState.last_dpad_menu_open = Direction::None;
+            //// prevents the arrow shoot on menu quit from the force equip bow input (see handleDpadMenu())
+            //newXRBtnHold |= VPAD_BUTTON_B;
+        }
+    }
+
     // Process input
     if (gameState.in_game) {
         // Handle menu toggle

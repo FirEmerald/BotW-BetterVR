@@ -428,6 +428,14 @@ enum WeaponType : uint32_t {
      float amplitude = 0.0f;
  };
 
+ enum class Direction {
+    Up,
+    Right,
+    Down,
+    Left,
+    None
+};
+
 struct Weapon : WeaponBase {
     PADDED_BYTES(0x72C, 0x870);
     AttackSensorInitArg setupAttackSensor;
