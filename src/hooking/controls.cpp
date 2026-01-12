@@ -124,7 +124,7 @@ HandGestureState calculateHandGesture(
     glm::vec3 flatForward = glm::normalize(glm::vec3(headsetForward.x, 0.0f, headsetForward.z));
     glm::vec3 flatHandOffset = glm::vec3(headToHand.x, 0.0f, headToHand.z);
     
-    constexpr float WAIST_BEHIND_OFFSET = 0.15f;
+    constexpr float WAIST_BEHIND_OFFSET = 0.0f; //0.15f
     float flatForwardDot = glm::dot(flatForward, flatHandOffset) + WAIST_BEHIND_OFFSET;
     gesture.isBehindHeadWithWaistOffset = (flatForwardDot < 0.0f);
     
@@ -207,6 +207,7 @@ void handleLeftHandInGameInput(
     const HandGestureState& leftGesture,
     Direction leftStickDir,
     XrActionStateVector2f& leftStickSource,
+    XrActionStateVector2f& rightStickSource,
     const std::chrono::steady_clock::time_point& now
 ) {
     constexpr std::chrono::milliseconds INPUT_DELAY(400);
@@ -220,6 +221,7 @@ void handleLeftHandInGameInput(
     // Handle shield
     if (gameState.left_equip_type == EquipType::Shield && (inputs.inGame.leftTrigger.currentState || leftGesture.isNearChestHeight)) {
         buttonHold |= VPAD_BUTTON_ZL;
+        rightStickSource.currentState.y = 0.2f; // Force disable the lock on view when holding shield
     }
     // Handle Parry gesture
     auto handVelocity = glm::length(ToGLM(inputs.inGame.poseVelocity[0].linearVelocity));
@@ -660,7 +662,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         
         // Hand-specific input
         handleLeftHandInGameInput(newXRBtnHold, inputs, gameState, leftGesture, 
-                                   leftJoystickDir, leftStickSource, now);
+                                   leftJoystickDir, leftStickSource, rightStickSource, now);
         handleRightHandInGameInput(newXRBtnHold, inputs, gameState, rightGesture, 
                                     rightJoystickDir, now);
         
