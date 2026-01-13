@@ -20,6 +20,10 @@ moduleMatches = 0x6267BFD0
 0x02E199B4 = li r5, 0 ; always set 0
 
 
+; disable inversed button controls
+0x02E199AC = li r3, 0
+0x02E199B0 = blr
+
 ; forces the player to always be guarding when the shield is drawn
 ; uses player rotation to determine the guard direction, not shield direction
 ;0x02D79F50 = li r3, 1
