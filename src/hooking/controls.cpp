@@ -181,7 +181,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
                 newXRBtnHold |= VPAD_BUTTON_MINUS;
                 gameState.map_open = true;
             }
-            if (inputs.inGame.mapAndInventoryState.lastEvent == ButtonState::Event::ShortPress) {
+            else if (inputs.inGame.mapAndInventoryState.lastEvent == ButtonState::Event::ShortPress) {
                 newXRBtnHold |= VPAD_BUTTON_PLUS;
                 gameState.map_open = false;
             }
@@ -189,6 +189,9 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         else if (now >= gameState.prevent_menu_time + delay)
             gameState.prevent_menu_inputs = false;
 
+        if (inputs.inGame.mapAndInventoryState.lastEvent == ButtonState::Event::DoublePress) {
+            newXRBtnHold |= VPAD_BUTTON_STICK_R;
+        }
         newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.jump, VPAD_BUTTON_X);
         newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.crouch, VPAD_BUTTON_STICK_L);
         //newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run, VPAD_BUTTON_B);

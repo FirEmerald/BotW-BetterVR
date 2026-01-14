@@ -253,10 +253,19 @@ static glm::vec3 s_manualBodyOffset = glm::vec3(0.0f, 0.0f, -0.125f);
 static glm::mat4 s_handCorrectionRotationLeft = glm::mat4(1.0f);
 static glm::mat4 s_handCorrectionRotationRight = glm::mat4(1.0f);
 
+const uint32_t noAdjustFlags = std::to_underlying(PlayerMoveBitFlags::IS_LADDER_016) | std::to_underlying(PlayerMoveBitFlags::IS_WALL_CLIMBING_MAYBE_128) | std::to_underlying(PlayerMoveBitFlags::SWIMMING_1024);
+
 void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
 
     if (IsThirdPerson()) return;
+
+    // do not adjust bones if player is swimming or climbing
+    Player actor;
+    readMemory(s_playerAddress, &actor);
+    PlayerMoveBitFlags moveBits = actor.moveBitFlags.getLE();
+    if ((std::to_underlying(moveBits) & noAdjustFlags) != 0) return;
+
 
     const uint32_t gsysModelPtr = hCPU->gpr[3];
     const uint32_t matrixPtr = hCPU->gpr[4];
@@ -328,6 +337,7 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
         s_handCorrectionRotationRight = glm::mat4_cast(wristRotationHardcodedRight);
     }
 
+    /*
     // reset face bones so they don't react to vr-driven poses
     if (isFaceBone(boneName)) {
         BEMatrix34 finalMtx;
@@ -340,6 +350,7 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
         writeMemory(scalePtr, &finalScale);
         return;
     }
+    */
 
     int boneIndex = s_skeleton.GetBoneIndex(boneName);
     if (boneIndex == -1) {
@@ -407,6 +418,9 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
 
         // apply manual offset
         targetPos += yawRot * s_manualBodyOffset;
+
+        // restore original game Y position
+        targetPos.y = bonePos.y;
 
         // update s_skeleton so that children bones (hands) are calculated correctly relative to the new root
         if (Bone* rootBone = s_skeleton.GetBone("Skl_Root")) {
