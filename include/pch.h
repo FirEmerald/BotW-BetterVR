@@ -430,6 +430,8 @@ enum class EventMode {
 
 struct data_VRSettingsIn {
     BEType<int32_t> cameraModeSetting;
+    BEType<float> modelOffsetSmoothingFactorSetting;
+    BEType<int32_t> hideModelHeadSetting;
     BEType<int32_t> leftHandedSetting;
     BEType<int32_t> guiFollowSetting;
     BEType<float> playerHeightSetting;
@@ -445,11 +447,23 @@ struct data_VRSettingsIn {
     }
 
     bool IsFirstPersonMode() const {
-        return cameraModeSetting == 1;
+        return cameraModeSetting == 1 || cameraModeSetting == 2;
+    }
+
+    bool FollowModelHead() const {
+        return cameraModeSetting == 2;
     }
 
     bool IsThirdPersonMode() const {
         return cameraModeSetting == 0;
+    }
+
+    float ModelOffsetSmoothingFactor() const {
+        return modelOffsetSmoothingFactorSetting.getLE();
+    }
+
+    bool HideModelHead() const {
+        return hideModelHeadSetting == 1;
     }
 
     EventMode GetCutsceneCameraMode() const {
@@ -501,7 +515,9 @@ struct data_VRSettingsIn {
 
     std::string ToString() const {
         std::string buffer = "";
-        std::format_to(std::back_inserter(buffer), " - Camera Mode: {}\n", IsFirstPersonMode() ? "First Person" : "Third Person");
+        std::format_to(std::back_inserter(buffer), " - Camera Mode: {}\n", FollowModelHead() ? "First Person (Follow Model)" : IsFirstPersonMode() ? "First Person" : "Third Person");
+        std::format_to(std::back_inserter(buffer), " - Model Offset Smoothing Factor: {}\n", modelOffsetSmoothingFactorSetting.getLE());
+        std::format_to(std::back_inserter(buffer), " - Hide Model Head: {}\n", HideModelHead() ? "Yes" : "NO");
         std::format_to(std::back_inserter(buffer), " - Left Handed: {}\n", IsLeftHanded() ? "Yes" : "No");
         std::format_to(std::back_inserter(buffer), " - GUI Follow Setting: {}\n", UIFollowsLookingDirection() ? "Follow Looking Direction" : "Fixed");
         std::format_to(std::back_inserter(buffer), " - Player Height: {} meters\n", playerHeightSetting.getLE());

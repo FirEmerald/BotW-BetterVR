@@ -30,6 +30,13 @@ glm::fquat s_wsCameraRotation = glm::identity<glm::fquat>();
 bool s_isSwimming = false;
 uint32_t s_isLadderClimbing = 0;
 
+float playerEyeHeight = 0;
+boolean gotEyeHeight = false;
+
+float CemuHooks::getPlayerEyeHeight() {
+    return gotEyeHeight ? playerEyeHeight : 1.73;
+}
+
 void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
 
@@ -80,7 +87,9 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
         BEMatrix34& mtx = actor.mtx;
         glm::fvec3 playerPos = actor.mtx.getPos().getLE();
 
-        playerPos.y += s_isSwimming ? hardcodedSwimOffset : 0.0f;
+        if (!FollowModelHead()) {
+            playerPos.y += s_isSwimming ? hardcodedSwimOffset : 0.0f;
+        }
 
         if (auto settings = GetFirstPersonSettingsForActiveEvent()) {
             if (settings->ignoreCameraRotation) {
@@ -108,7 +117,23 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
         Log::print<ERROR>("hook_UpdateCameraForGameplay: No views available for the middle pose.");
         return;
     }
-    auto& views = viewsOpt.value();
+    glm::fmat4& views = viewsOpt.value();
+
+    if (!gotEyeHeight) {
+        playerEyeHeight = views[3][1];
+        gotEyeHeight = true;
+        Log::print<INFO>("Player eye height = {}", playerEyeHeight);
+    }
+    if (FollowModelHead() || IsForcedThirdPerson()) {
+        views[3][1] -= playerEyeHeight; //player height
+        /*
+        if (IsFirstPerson()) {
+            views[3][0] += CemuHooks::getRenderOffset().x;
+            views[3][1] += CemuHooks::getRenderOffset().y;
+            views[3][2] += CemuHooks::getRenderOffset().z;
+        }
+        */
+    }
 
     // calculate final camera matrix
     glm::mat4 finalPose = glm::inverse(existingGameMtx) * views;
@@ -117,6 +142,10 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
     glm::fvec3 camPos = glm::fvec3(finalPose[3]);
     glm::fvec3 forward = -glm::normalize(glm::fvec3(finalPose[2]));
     glm::fvec3 up = glm::normalize(glm::fvec3(finalPose[1]));
+
+    if (FollowModelHead() && IsFirstPerson()) {
+        camPos += CemuHooks::getRenderOffset();
+    }
 
     float oldCameraDistance = glm::distance(oldCameraPosition, oldCameraTarget);
     glm::fvec3 target = camPos + forward * oldCameraDistance;
@@ -169,7 +198,9 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
         readMemory(s_playerMtxAddress, &mtx);
         glm::fvec3 playerPos = mtx.getPos().getLE();
 
-        playerPos.y += s_isSwimming ? hardcodedSwimOffset : 0.0f;
+        if (!FollowModelHead()) {
+            playerPos.y += s_isSwimming ? hardcodedSwimOffset : 0.0f;
+        }
 
         basePos = playerPos;
         if (auto settings = GetFirstPersonSettingsForActiveEvent()) {
@@ -193,6 +224,16 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
     if (!currPoseOpt.has_value())
         return;
     glm::fvec3 eyePos = ToGLM(currPoseOpt.value().position);
+
+    if (gotEyeHeight) {
+        if (FollowModelHead() || IsForcedThirdPerson()) {
+            eyePos.y -= playerEyeHeight;
+            if (IsFirstPerson()) {
+                eyePos += CemuHooks::getRenderOffset();
+            }
+        }
+    }
+
     glm::fquat eyeRot = ToGLM(currPoseOpt.value().orientation);
 
     glm::vec3 newPos = basePos + (baseYaw * eyePos);

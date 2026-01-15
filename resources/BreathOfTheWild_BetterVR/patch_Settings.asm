@@ -7,6 +7,12 @@ data_settingsOffset:
 CameraModeSetting:
 .int $cameraMode
 
+ModelOffsetSmoothingFactorSetting:
+.float $modelOffsetSmoothingFactor
+
+HideModelHeadSetting:
+.int $hideModelHead
+
 LeftHandModeSetting:
 .int $leftHanded
 

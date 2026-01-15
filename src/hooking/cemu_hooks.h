@@ -172,6 +172,19 @@ public:
         return !IsFirstPerson();
     }
 
+    static bool IsForcedThirdPerson() {
+        if (GetSettings().IsFirstPersonMode()) {
+            if (auto settings = GetFirstPersonSettingsForActiveEvent(); settings.has_value()) {
+                // there's an active event
+                auto mode = GetEventModeWithOverride();
+                if (mode == EventMode::FOLLOW_DEFAULT_EVENT_SETTINGS && !settings->firstPerson) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     static bool UseBlackBarsDuringEvents() {
         if (!HasActiveCutscene() || IsFirstPerson()) {
             return false;
@@ -181,6 +194,18 @@ public:
     }
 
     static void DrawDebugOverlays();
+
+    static bool FollowModelHead() {
+        return GetSettings().FollowModelHead();
+    }
+
+    static bool HideModelHead() {
+        return GetSettings().HideModelHead();
+    }
+
+    static float ModelOffsetSmoothingFactor() {
+        return GetSettings().ModelOffsetSmoothingFactor();
+    }
 
 private:
     HMODULE m_cemuHandle;
@@ -194,6 +219,9 @@ private:
     static bool IsScreenOpen(ScreenId screen);
     static void InitWindowHandles();
     static void hook_UpdateSettings(PPCInterpreter_t* hCPU);
+
+    static float getPlayerEyeHeight();
+    static glm::vec3 getRenderOffset();
 
     // Actor Hooks
     static void hook_UpdateActorList(PPCInterpreter_t* hCPU);

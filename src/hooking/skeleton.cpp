@@ -253,19 +253,31 @@ static glm::vec3 s_manualBodyOffset = glm::vec3(0.0f, 0.0f, -0.125f);
 static glm::mat4 s_handCorrectionRotationLeft = glm::mat4(1.0f);
 static glm::mat4 s_handCorrectionRotationRight = glm::mat4(1.0f);
 
-const uint32_t noAdjustFlags = std::to_underlying(PlayerMoveBitFlags::IS_LADDER_016) | std::to_underlying(PlayerMoveBitFlags::IS_WALL_CLIMBING_MAYBE_128) | std::to_underlying(PlayerMoveBitFlags::SWIMMING_1024);
+//const uint32_t noAdjustFlags = std::to_underlying(PlayerMoveBitFlags::IS_LADDER_016) | std::to_underlying(PlayerMoveBitFlags::IS_WALL_CLIMBING_MAYBE_128) | std::to_underlying(PlayerMoveBitFlags::SWIMMING_1024);
+
+static glm::vec3 smoothedRenderOffset = glm::vec3(0, 1.73, 0);
+static boolean hasSmoothedRenderOffset = false;
+
+glm::vec3 CemuHooks::getRenderOffset() {
+    return smoothedRenderOffset;
+}
 
 void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
 
     if (IsThirdPerson()) return;
 
+    /*
     // do not adjust bones if player is swimming or climbing
     Player actor;
     readMemory(s_playerAddress, &actor);
     PlayerMoveBitFlags moveBits = actor.moveBitFlags.getLE();
-    if ((std::to_underlying(moveBits) & noAdjustFlags) != 0) return;
-
+    if ((std::to_underlying(moveBits) & noAdjustFlags) != 0) {
+        hasSmoothedRenderOffset = true;
+        smoothedRenderOffset = gml::vec3(0, 1.73, 0); //Model height
+        return;
+    }
+    */
 
     const uint32_t gsysModelPtr = hCPU->gpr[3];
     const uint32_t matrixPtr = hCPU->gpr[4];
@@ -337,9 +349,8 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
         s_handCorrectionRotationRight = glm::mat4_cast(wristRotationHardcodedRight);
     }
 
-    /*
     // reset face bones so they don't react to vr-driven poses
-    if (isFaceBone(boneName)) {
+    if (HideModelHead() && isFaceBone(boneName)) {
         BEMatrix34 finalMtx;
         finalMtx.setPos(glm::fvec3());
         finalMtx.setRotLE(glm::identity<glm::fquat>());
@@ -350,7 +361,6 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
         writeMemory(scalePtr, &finalScale);
         return;
     }
-    */
 
     int boneIndex = s_skeleton.GetBoneIndex(boneName);
     if (boneIndex == -1) {
@@ -368,16 +378,29 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
         // calculate eye offset from eyeball bones
         static glm::vec3 eyeOffset = glm::vec3(0.0f);
         static bool offsetCalculated = false;
-        if (!offsetCalculated) {
+        if (!offsetCalculated || FollowModelHead()) {
             Bone* eyeL = s_skeleton.GetBone("Eyeball_L");
             Bone* eyeR = s_skeleton.GetBone("Eyeball_R");
-            Bone* sklRoot = s_skeleton.GetBone("Skl_Root");
 
-            if (eyeL && eyeR && sklRoot) {
+            if (eyeL && eyeR) {
                 glm::vec3 eyePos = (glm::vec3(eyeL->worldMatrix[3]) + glm::vec3(eyeR->worldMatrix[3])) * 0.5f;
-                glm::vec3 rootPos = glm::vec3(sklRoot->worldMatrix[3]);
-                eyeOffset = eyePos - rootPos;
-                offsetCalculated = true;
+                if (!offsetCalculated) {
+                    Bone* sklRoot = s_skeleton.GetBone("Skl_Root");
+                    if (sklRoot) {
+                        glm::vec3 rootPos = glm::vec3(sklRoot->worldMatrix[3]);
+                        eyeOffset = eyePos - rootPos;
+                        offsetCalculated = true;
+                    }
+                }
+                if (FollowModelHead()) {
+                    if (hasSmoothedRenderOffset) {
+                        smoothedRenderOffset.y += (eyePos.y - smoothedRenderOffset.y) * ModelOffsetSmoothingFactor();
+                    }
+                    else {
+                        smoothedRenderOffset.y = eyePos.y;
+                        hasSmoothedRenderOffset = true;
+                    }
+                }
             }
         }
 
@@ -419,8 +442,10 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
         // apply manual offset
         targetPos += yawRot * s_manualBodyOffset;
 
-        // restore original game Y position
-        targetPos.y = bonePos.y;
+        if (FollowModelHead()) {
+            // restore original game Y position
+            targetPos.y = bonePos.y;
+        }
 
         // update s_skeleton so that children bones (hands) are calculated correctly relative to the new root
         if (Bone* rootBone = s_skeleton.GetBone("Skl_Root")) {
@@ -481,6 +506,11 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
 
             float forwardSign = isLeft ? 1.0f : -1.0f;
 
+            if (FollowModelHead()) {
+                targetPos += smoothedRenderOffset;
+                targetPos.y -= CemuHooks::getPlayerEyeHeight();
+            }
+
             s_skeleton.SolveTwoBoneIK(arm1Index, arm2Index, wristIndex, targetPos, poleDir, forwardSign);
 
             calculatedLocalMat = s_skeleton.GetBone(boneIndex)->localMatrix;
@@ -497,6 +527,12 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
         // transform to world space
         // we treat the camera as the origin of the tracking space
         glm::mat4 targetWorld = cameraMtx * controllerMat;
+
+        if (FollowModelHead()) {
+            targetWorld[3][0] += smoothedRenderOffset.x;
+            targetWorld[3][1] += smoothedRenderOffset.y - CemuHooks::getPlayerEyeHeight();
+            targetWorld[3][2] += smoothedRenderOffset.z;
+        }
 
         std::string weaponName = (boneName == "Wrist_L") ? "Weapon_L" : "Weapon_R";
         if (Bone* weaponBone = s_skeleton.GetBone(weaponName)) {

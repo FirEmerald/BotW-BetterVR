@@ -8,6 +8,8 @@ default = 1
 
 [Default]
 $cameraMode:int = 1
+$modelOffsetSmoothingFactor = 0.1
+$hideModelHead:int = 1
 $allowGamepadInput:int = 1
 $enable2DView:int = 1
 $cropFlatTo16_9:int = 1
@@ -31,11 +33,59 @@ $cameraMode = 0
 $cameraHeight = 0
 
 [Preset]
-name = First-Person Camera (Most Immersive, Standing Recommended)
+name = First-Person Camera (Medium Immersive, Standing Recommended)
 category = Camera Mode
 default = 1
 # TODO: use Player->mode_slippingOrTreeClimbing to maybe zoom out when a wall is climbed
 $cameraMode = 1
+
+[Preset]
+name = First-Person Camera - Follow Model Head (Most Immersive, Works for any play mode)
+category = Camera Mode
+# TODO: use Player->mode_slippingOrTreeClimbing to maybe zoom out when a wall is climbed
+$cameraMode = 2
+$cameraHeight = 0
+
+
+#Hide Model Head
+[Preset]
+name = Hide Model Head (recommended)
+category = Model Head
+default = 1
+$hideModelHead = 1
+
+[Preset]
+name = Do Not Hide Model Head
+category = Model Head
+$hideModelHead = 0
+
+
+#Model Offset Smoothing
+[Preset]
+name = No Smoothing
+category = Follow Model Head Smoothing
+$modelOffsetSmoothingFactor = 1.0
+
+[Preset]
+name = Low Smoothing
+category = Follow Model Head Smoothing
+$modelOffsetSmoothingFactor = 0.8
+
+[Preset]
+name = Medium Smoothing
+category = Follow Model Head Smoothing
+$modelOffsetSmoothingFactor = 0.5
+
+[Preset]
+name = High Smoothing (recommended)
+category = Follow Model Head Smoothing
+default = 1
+$modelOffsetSmoothingFactor = 0.1
+
+[Preset]
+name = Very High Smoothing
+category = Follow Model Head Smoothing
+$modelOffsetSmoothingFactor = 0.01
 
 
 # Motion & Gamepad Controls
