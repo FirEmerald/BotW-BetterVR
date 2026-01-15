@@ -30,16 +30,6 @@ public:
             XrTime inputTime;
             std::optional<EyeSide> lastPickupSide = std::nullopt;
 
-            std::array<XrActionStatePose, 2> pose;
-            std::array<XrSpaceLocation, 2> poseLocation;
-            std::array<XrSpaceVelocity, 2> poseVelocity;
-
-            std::array<XrActionStatePose, 2> aimPose;
-            std::array<XrSpaceLocation, 2> aimPoseLocation;
-            std::array<XrSpaceVelocity, 2> aimPoseVelocity;
-
-            std::array<XrSpaceLocation, 2> hmdRelativePoseLocation;
-
             // shared
             XrActionStateBoolean mapAndInventory;
 
@@ -98,15 +88,6 @@ public:
             XrTime inputTime;
             std::optional<EyeSide> lastPickupSide = std::nullopt;
 
-            std::array<XrActionStatePose, 2> pose;
-            std::array<XrSpaceLocation, 2> poseLocation;
-            std::array<XrSpaceVelocity, 2> poseVelocity;
-
-            std::array<XrActionStatePose, 2> aimPose;
-            std::array<XrSpaceLocation, 2> aimPoseLocation;
-            std::array<XrSpaceVelocity, 2> aimPoseVelocity;
-
-            std::array<XrSpaceLocation, 2> hmdRelativePoseLocation;
             // shared
             XrActionStateBoolean mapAndInventory;
 
