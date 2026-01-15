@@ -409,6 +409,34 @@ enum WeaponType : uint32_t {
     UnknownWeapon = 0x5,
 };
 
+ enum class EquipType {
+    None = 0,
+    Melee = 1,
+    Shield = 2,
+    Bow = 3,
+    Arrow = 4,
+    Rune = 5,
+    ThrowableObject = 6
+};
+
+ struct RumbleParameters {
+     bool prioritizeThisRumble = false;
+     int hand = 0;
+     float oscillationFrequency = 0.0f;
+     bool smoothOscillation = false;
+     double duration = 0;
+     float frequency = 0.0f;
+     float amplitude = 0.0f;
+ };
+
+ enum class Direction {
+    Up,
+    Right,
+    Down,
+    Left,
+    None
+};
+
 struct Weapon : WeaponBase {
     PADDED_BYTES(0x72C, 0x870);
     AttackSensorInitArg setupAttackSensor;

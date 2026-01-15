@@ -633,6 +633,17 @@ void CemuHooks::hook_FixLadder(PPCInterpreter_t* hCPU) {
     }
 }
 
+void CemuHooks::hook_PlayerIsRiding(PPCInterpreter_t* hCPU) {
+    hCPU->instructionPointer = hCPU->sprNew.LR;
+
+    // not tested yet
+    auto gameState = VRManager::instance().XR->m_gameState.load();
+    gameState.is_riding_horse = hCPU->gpr[3] == 1 ? true : false;
+    // todo: remove this once hooked up to input system. Also, move to a better function, maybe controls.cpp?
+    //Log::print<VERBOSE>("Player is riding hook called: {}", gameState.is_riding_horse);
+    VRManager::instance().XR->m_gameState.store(gameState);
+}
+
 void CemuHooks::hook_PlayerLadderFix(PPCInterpreter_t* hCPU) {
     hCPU->gpr[0] = hCPU->sprNew.LR;
     hCPU->instructionPointer = 0x02D07CEC;

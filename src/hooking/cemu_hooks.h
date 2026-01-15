@@ -27,7 +27,7 @@ public:
         osLib_registerHLEFunction("coreinit", "hook_UpdateActorList", &hook_UpdateActorList);
         osLib_registerHLEFunction("coreinit", "hook_CreateNewActor", &hook_CreateNewActor);
 
-        // Camera Hooks
+        // Stereo Rendering/Camera Hooks
         osLib_registerHLEFunction("coreinit", "hook_BeginCameraSide", &hook_BeginCameraSide);
         osLib_registerHLEFunction("coreinit", "hook_ModifyLightPrePassProjectionMatrix", &hook_ModifyLightPrePassProjectionMatrix);
         osLib_registerHLEFunction("coreinit", "hook_UpdateCameraForGameplay", &hook_UpdateCameraForGameplay);
@@ -41,6 +41,7 @@ public:
         osLib_registerHLEFunction("coreinit", "hook_GetEventName", &hook_GetEventName);
         osLib_registerHLEFunction("coreinit", "hook_OverwriteCameraParam", &hook_OverwriteCameraParam);
         osLib_registerHLEFunction("coreinit", "hook_PlayerLadderFix", &hook_PlayerLadderFix);
+        osLib_registerHLEFunction("coreinit", "hook_PlayerIsRiding", &hook_PlayerIsRiding);
 
         // First-Person Model Hooks
         osLib_registerHLEFunction("coreinit", "hook_SetActorOpacity", &hook_SetActorOpacity);
@@ -215,6 +216,7 @@ private:
     static void hook_OverwriteCameraParam(PPCInterpreter_t* hCPU);
     static void hook_PlayerLadderFix(PPCInterpreter_t* hCPU);
     static void hook_FixLadder(PPCInterpreter_t* hCPU);
+    static void hook_PlayerIsRiding(PPCInterpreter_t* hCPU);
 
     // First-Person Model Hooks
     static void hook_SetActorOpacity(PPCInterpreter_t* hCPU);
