@@ -250,12 +250,6 @@ std::optional<std::array<XrView, 2>> RND_Renderer::UpdateViews(XrTime predictedD
     checkXRResult(xrLocateViews(VRManager::instance().XR->m_session, &viewLocateInfo, &viewState, viewCount, &viewCount, newViews.data()), "Failed to get view information!");
     if ((viewState.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT) == 0)
         return std::nullopt; // what should occur when the orientation is invalid? keep rendering using old values?
-
-    const float playerHeightOffsetMeters = CemuHooks::GetSettings().playerHeightSetting.getLE();
-    for (auto& view : newViews) {
-        view.pose.position.y += playerHeightOffsetMeters;
-    }
-
     m_currViews = newViews;
     return m_currViews;
 }

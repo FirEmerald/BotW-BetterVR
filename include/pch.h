@@ -466,6 +466,10 @@ struct data_VRSettingsIn {
         return hideModelHeadSetting == 1;
     }
 
+    float getPlayerHeight() const {
+        return playerHeightSetting.getLE();
+    }
+
     EventMode GetCutsceneCameraMode() const {
         // if in third-person mode, always use third-person cutscene camera
         if (IsThirdPersonMode()) {
@@ -520,6 +524,9 @@ struct data_VRSettingsIn {
         std::format_to(std::back_inserter(buffer), " - Hide Model Head: {}\n", HideModelHead() ? "Yes" : "NO");
         std::format_to(std::back_inserter(buffer), " - Left Handed: {}\n", IsLeftHanded() ? "Yes" : "No");
         std::format_to(std::back_inserter(buffer), " - GUI Follow Setting: {}\n", UIFollowsLookingDirection() ? "Follow Looking Direction" : "Fixed");
+        if (playerHeightSetting.getLE() <= 0.0)
+        std::format_to(std::back_inserter(buffer), " - Player Height: Automatic\n");
+        else
         std::format_to(std::back_inserter(buffer), " - Player Height: {} meters\n", playerHeightSetting.getLE());
         std::format_to(std::back_inserter(buffer), " - 2D VR View Enabled: {}\n", Is2DVRViewEnabled() ? "Yes" : "No");
         std::format_to(std::back_inserter(buffer), " - Crop Flat to 16:9: {}\n", ShouldFlatPreviewBeCroppedTo16x9() ? "Yes" : "No");

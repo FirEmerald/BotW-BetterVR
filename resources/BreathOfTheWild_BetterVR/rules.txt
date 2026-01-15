@@ -16,7 +16,7 @@ $cropFlatTo16_9:int = 1
 $guiFollowMode:int = 1
 
 $cameraDistance = 0.5
-$cameraHeight = 0.0
+$cameraHeight = 0
 $enableDebugOverlay:int = 0
 $leftHanded:int = 0
 $buggyAngularVelocity:int = 0 # Whether the angular velocity is wrongly provided in local space. Possible Values: 0 is auto; 1 is forced on; 2 is forced off
@@ -44,19 +44,20 @@ name = First-Person Camera - Follow Model Head (Most Immersive, Works for any pl
 category = Camera Mode
 # TODO: use Player->mode_slippingOrTreeClimbing to maybe zoom out when a wall is climbed
 $cameraMode = 2
-$cameraHeight = 0
 
 
 #Hide Model Head
 [Preset]
 name = Hide Model Head (recommended)
 category = Model Head
+condition = $cameraMode != 0
 default = 1
 $hideModelHead = 1
 
 [Preset]
 name = Do Not Hide Model Head
 category = Model Head
+condition = $cameraMode != 0
 $hideModelHead = 0
 
 
@@ -64,27 +65,32 @@ $hideModelHead = 0
 [Preset]
 name = No Smoothing
 category = Follow Model Head Smoothing
+condition = $cameraMode == 2
 $modelOffsetSmoothingFactor = 1.0
 
 [Preset]
 name = Low Smoothing
 category = Follow Model Head Smoothing
+condition = $cameraMode == 2
 $modelOffsetSmoothingFactor = 0.8
 
 [Preset]
 name = Medium Smoothing
 category = Follow Model Head Smoothing
+condition = $cameraMode == 2
 $modelOffsetSmoothingFactor = 0.5
 
 [Preset]
 name = High Smoothing (recommended)
 category = Follow Model Head Smoothing
+condition = $cameraMode == 2
 default = 1
 $modelOffsetSmoothingFactor = 0.1
 
 [Preset]
 name = Very High Smoothing
 category = Follow Model Head Smoothing
+condition = $cameraMode == 2
 $modelOffsetSmoothingFactor = 0.01
 
 
@@ -92,14 +98,14 @@ $modelOffsetSmoothingFactor = 0.01
 [Preset]
 name = Use VR Motion Controls & Wii U Gamepad Input (Recommended)
 category = Motion & Gamepad Controls
-condition = $cameraMode == 1
+condition = $cameraMode != 0
 default = 1
 $allowGamepadInput:int = 1
 
 [Preset]
 name = Only Use VR Controllers (some inputs might require the gamepad)
 category = Motion & Gamepad Controls
-condition = $cameraMode == 1
+condition = $cameraMode != 0
 $allowGamepadInput:int = 0
 
 
@@ -107,13 +113,13 @@ $allowGamepadInput:int = 0
 [Preset]
 name = Left-Handed Weapon (Shield On Right Hand)
 category = Left Or Right Handed (Not Working Yet)
-condition = $cameraMode == 1
+condition = $cameraMode != 0
 $leftHanded:int = 1
 
 [Preset]
 name = Right-Handed Weapon (Default)
 category = Left Or Right Handed (Not Working Yet)
-condition = $cameraMode == 1
+condition = $cameraMode != 0
 default = 1
 $leftHanded:int = 0
 
@@ -122,20 +128,20 @@ $leftHanded:int = 0
 [Preset]
 name = Watch All Cutscenes From Link's Perspective (For Testing, Not Recommended)
 category = Cutscene Camera Mode
-condition = $cameraMode == 1
+condition = $cameraMode != 0
 $cutsceneCameraMode:int = 1
 
 [Preset]
 name = Use Optimal Cutscene Settings, Mix Of Both (Recommended)
 category = Cutscene Camera Mode
-condition = $cameraMode == 1
+condition = $cameraMode != 0
 default = 1
 $cutsceneCameraMode:int = 2
 
 [Preset]
 name = Watch All Cutscenes In Third Person Like Original Game (Less Immersive, Most Stable)
 category = Cutscene Camera Mode
-condition = $cameraMode == 1
+condition = $cameraMode != 0
 $cutsceneCameraMode:int = 3
 
 
@@ -186,77 +192,137 @@ $guiFollowMode:int = 0
 # First Person - Camera Height / Eye Level
 
 [Preset]
-name = Short (-0.20m)
-category = Player Height Offset (for seated play)
-condition = $cameraMode == 1
-$cameraHeight = -0.20
-
-[Preset]
-name = -0.15m
-category = Player Height Offset (for seated play)
-condition = $cameraMode == 1
-$cameraHeight = -0.15
-
-[Preset]
-name = Slightly Short (-0.10m)
-category = Player Height Offset (for seated play)
-condition = $cameraMode == 1
-$cameraHeight = -0.10
-
-[Preset]
-name = -0.05m
-category = Player Height Offset (for seated play)
-condition = $cameraMode == 1
-$cameraHeight = -0.05
-
-[Preset]
-name = Default (0.00m)
-category = Player Height Offset (for seated play)
-condition = $cameraMode == 1
+name = Automatic (calibrated when loading a save for the first time)
+category = Player Eye Height
+condition = $cameraMode != 0
 default = 1
-$cameraHeight = 0.00
+$cameraHeight = 0.0
 
 [Preset]
-name = +0.05m
-category = Player Height Offset (for seated play)
-condition = $cameraMode == 1
-$cameraHeight = 0.05
+name = 1m/3ft 3in
+category = Player Eye Height
+condition = $cameraMode != 0
+$cameraHeight = 1
 
 [Preset]
-name = Slightly Taller (+0.10m)
-category = Player Height Offset (for seated play)
-condition = $cameraMode == 1
-$cameraHeight = 0.10
+name = 1.05m/3ft 5in
+category = Player Eye Height
+condition = $cameraMode != 0
+$cameraHeight = 1.05
 
 [Preset]
-name = +0.15m
-category = Player Height Offset (for seated play)
-condition = $cameraMode == 1
-$cameraHeight = 0.15
+name = 1.1m/3ft 7in
+category = Player Eye Height
+condition = $cameraMode != 0
+$cameraHeight = 1.1
 
 [Preset]
-name = Tall (+0.20m)
-category = Player Height Offset (for seated play)
-condition = $cameraMode == 1
-$cameraHeight = 0.20
+name = 1.15m/3ft 9in
+category = Player Eye Height
+condition = $cameraMode != 0
+$cameraHeight = 1.15
 
 [Preset]
-name = +0.25m
-category = Player Height Offset (for seated play)
-condition = $cameraMode == 1
-$cameraHeight = 0.25
+name = 1.2m/3ft 11in
+category = Player Eye Height
+condition = $cameraMode != 0
+$cameraHeight = 1.2
 
 [Preset]
-name = +0.30m
-category = Player Height Offset (for seated play)
-condition = $cameraMode == 1
-$cameraHeight = 0.30
+name = 1.25m/4ft 1in
+category = Player Eye Height
+condition = $cameraMode != 0
+$cameraHeight = 1.25
 
 [Preset]
-name = Very Tall (+0.35m)
-category = Player Height Offset (for seated play)
-condition = $cameraMode == 1
-$cameraHeight = 0.35
+name = 1.3m/4ft 3in
+category = Player Eye Height
+condition = $cameraMode != 0
+$cameraHeight = 1.3
+
+[Preset]
+name = 1.35m/4ft 5in
+category = Player Eye Height
+condition = $cameraMode != 0
+$cameraHeight = 1.35
+
+[Preset]
+name = 1.4m/4ft 7in
+category = Player Eye Height
+condition = $cameraMode != 0
+$cameraHeight = 1.4
+
+[Preset]
+name = 1.45m/4ft 9in
+category = Player Eye Height
+condition = $cameraMode != 0
+$cameraHeight = 1.45
+
+[Preset]
+name = 1.5m/4ft 11in
+category = Player Eye Height
+condition = $cameraMode != 0
+$cameraHeight = 1.5
+
+[Preset]
+name = 1.55m/5ft 1in
+category = Player Eye Height
+condition = $cameraMode != 0
+$cameraHeight = 1.55
+
+[Preset]
+name = 1.6m/5ft 3in (roughly link's default eye height)
+category = Player Eye Height
+condition = $cameraMode != 0
+$cameraHeight = 1.6
+
+[Preset]
+name = 1.65m/5ft 5in
+category = Player Eye Height
+condition = $cameraMode != 0
+$cameraHeight = 1.65
+
+[Preset]
+name = 1.7m/5ft 7in
+category = Player Eye Height
+condition = $cameraMode != 0
+$cameraHeight = 1.7
+
+[Preset]
+name = 1.75m/5ft 9in
+category = Player Eye Height
+condition = $cameraMode != 0
+$cameraHeight = 1.75
+
+[Preset]
+name = 1.8m/5ft 11in
+category = Player Eye Height
+condition = $cameraMode != 0
+$cameraHeight = 1.8
+
+[Preset]
+name = 1.85m/6ft 1in
+category = Player Eye Height
+condition = $cameraMode != 0
+$cameraHeight = 1.85
+
+[Preset]
+name = 1.9m/6ft 3in
+category = Player Eye Height
+condition = $cameraMode != 0
+$cameraHeight = 1.9
+
+[Preset]
+name = 1.95m/6ft 5in
+category = Player Eye Height
+condition = $cameraMode != 0
+$cameraHeight = 1.95
+
+[Preset]
+name = 2m/6ft 7in
+category = Player Eye Height
+condition = $cameraMode != 0
+$cameraHeight = 2
 
 
 # Third Person - Camera Distance

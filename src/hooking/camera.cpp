@@ -34,7 +34,9 @@ float playerEyeHeight = 0;
 boolean gotEyeHeight = false;
 
 float CemuHooks::getPlayerEyeHeight() {
-    return gotEyeHeight ? playerEyeHeight : 1.73;
+    float heightFromSettings = GetSettings().getPlayerHeight();
+    if (heightFromSettings > 0.0) return heightFromSettings;
+    else return gotEyeHeight ? playerEyeHeight : 1.6;
 }
 
 void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
@@ -122,18 +124,9 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
     if (!gotEyeHeight) {
         playerEyeHeight = views[3][1];
         gotEyeHeight = true;
-        Log::print<INFO>("Player eye height = {}", playerEyeHeight);
+        Log::print<INFO>("Automatic player eye height = {}", playerEyeHeight);
     }
-    if (FollowModelHead() || IsForcedThirdPerson()) {
-        views[3][1] -= playerEyeHeight; //player height
-        /*
-        if (IsFirstPerson()) {
-            views[3][0] += CemuHooks::getRenderOffset().x;
-            views[3][1] += CemuHooks::getRenderOffset().y;
-            views[3][2] += CemuHooks::getRenderOffset().z;
-        }
-        */
-    }
+    views[3][1] -= getPlayerEyeHeight(); //player eye height
 
     // calculate final camera matrix
     glm::mat4 finalPose = glm::inverse(existingGameMtx) * views;
@@ -143,8 +136,8 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
     glm::fvec3 forward = -glm::normalize(glm::fvec3(finalPose[2]));
     glm::fvec3 up = glm::normalize(glm::fvec3(finalPose[1]));
 
-    if (FollowModelHead() && IsFirstPerson()) {
-        camPos += CemuHooks::getRenderOffset();
+    if (IsFirstPerson()) {
+        camPos += getRenderOffset(); //render eye height
     }
 
     float oldCameraDistance = glm::distance(oldCameraPosition, oldCameraTarget);
@@ -225,13 +218,9 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
         return;
     glm::fvec3 eyePos = ToGLM(currPoseOpt.value().position);
 
-    if (gotEyeHeight) {
-        if (FollowModelHead() || IsForcedThirdPerson()) {
-            eyePos.y -= playerEyeHeight;
-            if (IsFirstPerson()) {
-                eyePos += CemuHooks::getRenderOffset();
-            }
-        }
+    eyePos.y -= getPlayerEyeHeight(); //player eye height
+    if (IsFirstPerson()) {
+        eyePos += getRenderOffset(); //render eye height
     }
 
     glm::fquat eyeRot = ToGLM(currPoseOpt.value().orientation);
