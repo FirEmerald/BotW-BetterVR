@@ -24,11 +24,13 @@ static std::pair<glm::quat, glm::quat> swingTwistY(const glm::quat& q) {
 }
 
 constexpr float hardcodedSwimOffset = 1.73f/* model height*/ - 0.3f /*head height*/;
+constexpr float hardcodedRidingOffset = 0.65;
 
 glm::fvec3 s_wsCameraPosition = glm::fvec3();
 glm::fquat s_wsCameraRotation = glm::identity<glm::fquat>();
 bool s_isSwimming = false;
 uint32_t s_isLadderClimbing = 0;
+uint32_t s_isRiding = 0;
 
 void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
@@ -81,6 +83,8 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
         glm::fvec3 playerPos = actor.mtx.getPos().getLE();
 
         playerPos.y += s_isSwimming ? hardcodedSwimOffset : 0.0f;
+        playerPos.y -= s_isRiding ? hardcodedRidingOffset + GetSettings().playerHeightSetting.getLE() : 0.0f;
+
 
         if (auto settings = GetFirstPersonSettingsForActiveEvent()) {
             if (settings->ignoreCameraRotation) {
@@ -92,6 +96,9 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
 
         if (s_isLadderClimbing > 0) {
             s_isLadderClimbing--;
+        }
+        if (s_isRiding > 0) {
+            s_isRiding--;
         }
 
         //if (s_isLadderClimbing) {
@@ -170,6 +177,7 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
         glm::fvec3 playerPos = mtx.getPos().getLE();
 
         playerPos.y += s_isSwimming ? hardcodedSwimOffset : 0.0f;
+        playerPos.y -= s_isRiding ? hardcodedRidingOffset + GetSettings().playerHeightSetting.getLE() : 0.0f;
 
         basePos = playerPos;
         if (auto settings = GetFirstPersonSettingsForActiveEvent()) {
@@ -640,4 +648,17 @@ void CemuHooks::hook_PlayerLadderFix(PPCInterpreter_t* hCPU) {
     if (IsFirstPerson()) {
         s_isLadderClimbing = 2;
     }
+}
+
+
+void CemuHooks::hook_PlayerIsRiding(PPCInterpreter_t* hCPU) {
+    hCPU->instructionPointer = hCPU->sprNew.LR;
+
+    bool isRiding = hCPU->gpr[3] == 1;
+    if (isRiding && IsFirstPerson()) {
+        s_isRiding = 2;
+    }
+
+    // todo: remove this once hooked up to input system. Also, move to a better function, maybe controls.cpp?
+    //Log::print<VERBOSE>("Player is riding hook called: {}", hCPU->gpr[3]);
 }
