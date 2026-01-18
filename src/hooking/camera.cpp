@@ -33,7 +33,7 @@ uint32_t s_isLadderClimbing = 0;
 uint32_t s_isRiding = 0;
 
 float playerEyeHeight = 0;
-boolean gotEyeHeight = false;
+bool gotEyeHeight = false;
 
 float CemuHooks::getPlayerEyeHeight() {
     float heightFromSettings = GetSettings().getPlayerHeight();
@@ -242,7 +242,6 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
     if (!currPoseOpt.has_value())
         return;
     glm::fvec3 eyePos = ToGLM(currPoseOpt.value().position);
-
     glm::fquat eyeRot = ToGLM(currPoseOpt.value().orientation);
 
     glm::vec3 newPos = basePos + (baseYaw * eyePos);

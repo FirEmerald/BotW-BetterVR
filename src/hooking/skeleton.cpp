@@ -254,7 +254,7 @@ static glm::mat4 s_handCorrectionRotationLeft = glm::mat4(1.0f);
 static glm::mat4 s_handCorrectionRotationRight = glm::mat4(1.0f);
 
 static glm::vec3 renderOffset = glm::vec3(0, 1.6, 0);
-static boolean hasRenderOffset = false;
+static bool hasRenderOffset = false;
 
 glm::vec3 CemuHooks::getRenderOffset() {
     return renderOffset;
