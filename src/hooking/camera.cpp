@@ -569,13 +569,16 @@ void CemuHooks::hook_GetEventName(PPCInterpreter_t* hCPU) {
 
     uint32_t isEventActive = hCPU->gpr[3];
     uint32_t eventNamePtr = hCPU->gpr[4];
+    uint32_t entryPointNamePtr = hCPU->gpr[5];
 
     if (isEventActive) {
         std::string eventName = std::string((char*)s_memoryBaseAddress + eventNamePtr);
+        std::string entryPointName = std::string((char*)s_memoryBaseAddress + entryPointNamePtr);
+
         if (s_currentEvent == eventName) {
             return;
         }
-        Log::print<INFO>("Event '{}' is now active.", eventName);
+        Log::print<INFO>("Event '{}' is now active (using entry point '{}').", eventName, entryPointName);
         s_currentEvent = eventName;
 
         auto it = s_eventSettings.find(eventName);
