@@ -437,10 +437,6 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
             // restore original game Y position
             targetPos.y = bonePos.y;
         }
-        else {
-            //apply player height offsets
-            targetPos.y += getRenderOffset().y - getPlayerEyeHeight();
-        }
 
         // update s_skeleton so that children bones (hands) are calculated correctly relative to the new root
         if (Bone* rootBone = s_skeleton.GetBone("Skl_Root")) {
@@ -501,9 +497,6 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
 
             float forwardSign = isLeft ? 1.0f : -1.0f;
 
-            targetPos += getRenderOffset();
-            targetPos.y -= getPlayerEyeHeight();
-
             s_skeleton.SolveTwoBoneIK(arm1Index, arm2Index, wristIndex, targetPos, poleDir, forwardSign);
 
             calculatedLocalMat = s_skeleton.GetBone(boneIndex)->localMatrix;
@@ -520,10 +513,6 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
         // transform to world space
         // we treat the camera as the origin of the tracking space
         glm::mat4 targetWorld = cameraMtx * controllerMat;
-
-        targetWorld[3][0] += getRenderOffset().x;
-        targetWorld[3][1] += getRenderOffset().y - CemuHooks::getPlayerEyeHeight();
-        targetWorld[3][2] += getRenderOffset().z;
 
         std::string weaponName = (boneName == "Wrist_L") ? "Weapon_L" : "Weapon_R";
         if (Bone* weaponBone = s_skeleton.GetBone(weaponName)) {

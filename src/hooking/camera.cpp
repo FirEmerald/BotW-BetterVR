@@ -23,8 +23,8 @@ static std::pair<glm::quat, glm::quat> swingTwistY(const glm::quat& q) {
     return { swing, twist };
 }
 
-float hardcodedSwimOffset = 0.0f;
-float hardcodedRidingOffset = 0.65;
+const float hardcodedSwimOffset = 0;
+const float hardcodedRidingOffset = 0.95;
 
 glm::fvec3 s_wsCameraPosition = glm::fvec3();
 glm::fquat s_wsCameraRotation = glm::identity<glm::fquat>();
@@ -89,18 +89,31 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
         BEMatrix34& mtx = actor.mtx;
         glm::fvec3 playerPos = actor.mtx.getPos().getLE();
 
-        if (!FollowModelHead()) {
+        if (!gotEyeHeight) {
+            playerEyeHeight = VRManager::instance().XR->GetRenderer()->GetMiddlePose().value()[3].y;
+            gotEyeHeight = true;
+            Log::print<INFO>("Automatic player eye height = {}", playerEyeHeight);
+        }
+
+        //move camera so that player eye height is origin.
+        playerPos.y -= CemuHooks::getPlayerEyeHeight();
+        if (FollowModelHead()) {
+            //move camera by render offset
+            playerPos += CemuHooks::getRenderOffset();
+        }
+        else {
             if (s_isRiding) {
-                playerPos.y -= hardcodedRidingOffset;
+                //move camera by hardcodedRidingOffset
+                playerPos.y += hardcodedRidingOffset;
             }
             else if (s_isSwimming) {
-                float playerHeight = VRManager::instance().XR->GetRenderer()->GetMiddlePose().value()[3].y;
-                playerPos.y += 1.73f - playerHeight;
+                //move camera by hardcodedSwimOffset
+                playerPos.y += hardcodedSwimOffset;
             }
             else {
-                playerPos.y += GetSettings().playerHeightSetting.getLE();
+                //move camera by render offset
+                playerPos += CemuHooks::getRenderOffset();
             }
-
         }
 
         if (auto settings = GetFirstPersonSettingsForActiveEvent()) {
@@ -128,14 +141,7 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
         Log::print<ERROR>("hook_UpdateCameraForGameplay: No views available for the middle pose.");
         return;
     }
-    glm::fmat4& views = viewsOpt.value();
-
-    if (!gotEyeHeight) {
-        playerEyeHeight = views[3][1];
-        gotEyeHeight = true;
-        Log::print<INFO>("Automatic player eye height = {}", playerEyeHeight);
-    }
-    views[3][1] -= getPlayerEyeHeight(); //player eye height
+    auto& views = viewsOpt.value();
 
     // calculate final camera matrix
     glm::mat4 finalPose = glm::inverse(existingGameMtx) * views;
@@ -144,10 +150,6 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
     glm::fvec3 camPos = glm::fvec3(finalPose[3]);
     glm::fvec3 forward = -glm::normalize(glm::fvec3(finalPose[2]));
     glm::fvec3 up = glm::normalize(glm::fvec3(finalPose[1]));
-
-    if (IsFirstPerson()) {
-        camPos += getRenderOffset(); //render eye height
-    }
 
     float oldCameraDistance = glm::distance(oldCameraPosition, oldCameraTarget);
     glm::fvec3 target = camPos + forward * oldCameraDistance;
@@ -200,15 +202,24 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
         readMemory(s_playerMtxAddress, &mtx);
         glm::fvec3 playerPos = mtx.getPos().getLE();
 
-        if (!FollowModelHead()) {
+        //move camera so that player eye height is origin.
+        playerPos.y -= CemuHooks::getPlayerEyeHeight();
+        if (FollowModelHead()) {
+            //move camera by render offset
+            playerPos += CemuHooks::getRenderOffset();
+        }
+        else {
             if (s_isRiding) {
-                playerPos.y -= hardcodedRidingOffset;
+                //move camera by hardcodedRidingOffset
+                playerPos.y += hardcodedRidingOffset;
             }
             else if (s_isSwimming) {
+                //move camera by hardcodedSwimOffset
                 playerPos.y += hardcodedSwimOffset;
             }
             else {
-                playerPos.y += GetSettings().playerHeightSetting.getLE();
+                //move camera by render offset
+                playerPos += CemuHooks::getRenderOffset();
             }
         }
 
@@ -231,11 +242,6 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
     if (!currPoseOpt.has_value())
         return;
     glm::fvec3 eyePos = ToGLM(currPoseOpt.value().position);
-
-    eyePos.y -= getPlayerEyeHeight(); //player eye height
-    if (IsFirstPerson()) {
-        eyePos += getRenderOffset(); //render eye height
-    }
 
     glm::fquat eyeRot = ToGLM(currPoseOpt.value().orientation);
 
