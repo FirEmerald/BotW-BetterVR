@@ -196,6 +196,17 @@ public:
         return GetSettings().ModelOffsetSmoothingFactor();
     }
 
+    static float WorldScaleInverse() {
+        float worldScale = GetSettings().getWorldScale();
+        if (worldScale <= 0.0) {
+            //this is automatic, sets players eye height to link's eye height
+            return getModelEyeHeight() / getPlayerEyeHeight();
+        }
+        else {
+            return 1.0 / worldScale;
+        }
+    }
+
 private:
     HMODULE m_cemuHandle;
 
@@ -210,6 +221,7 @@ private:
     static void hook_UpdateSettings(PPCInterpreter_t* hCPU);
 
     static float getPlayerEyeHeight();
+    static float getModelEyeHeight();
     static glm::vec3 getRenderOffset();
 
     // Actor Hooks

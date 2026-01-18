@@ -96,10 +96,10 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
         }
 
         //move camera so that player eye height is origin.
-        playerPos.y -= CemuHooks::getPlayerEyeHeight();
+        playerPos.y -= CemuHooks::getPlayerEyeHeight() * WorldScaleInverse();
         if (FollowModelHead()) {
             //move camera by render offset, which in this case is the current eye position
-            playerPos += CemuHooks::getRenderOffset();
+            playerPos += getRenderOffset();
         }
         else {
             if (s_isRiding) {
@@ -112,7 +112,7 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
             }
             else {
                 //move camera by render offset, which in this case is the original eye offset
-                playerPos += CemuHooks::getRenderOffset();
+                playerPos += getRenderOffset();
             }
         }
 
@@ -131,7 +131,7 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
             s_isRiding--;
         }
 
-        glm::mat4 playerMtx4 = glm::inverse(glm::translate(glm::identity<glm::mat4>(), playerPos) * glm::mat4(s_wsCameraRotation));
+        glm::mat4 playerMtx4 = glm::inverse(glm::scale(glm::translate(glm::identity<glm::mat4>(), playerPos), glm::vec3(WorldScaleInverse())) * glm::mat4(s_wsCameraRotation));
         existingGameMtx = playerMtx4;
     }
 
@@ -188,6 +188,7 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
     glm::mat4x3 viewMatrix = camera.mtx.getLEMatrix();
     glm::mat4 worldGame = glm::inverse(glm::mat4(viewMatrix));
     glm::vec3 basePos = glm::vec3(worldGame[3]);
+    glm::vec3 headsetOffset = glm::vec3(0);
     glm::quat baseRot = glm::quat_cast(worldGame);
 
     // overwrite with our stored camera pos/rot
@@ -203,10 +204,10 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
         glm::fvec3 playerPos = mtx.getPos().getLE();
 
         //move camera so that player eye height is origin.
-        playerPos.y -= CemuHooks::getPlayerEyeHeight();
+        playerPos.y -= CemuHooks::getPlayerEyeHeight() * WorldScaleInverse();
         if (FollowModelHead()) {
             //move camera by render offset, which in this case is the current eye position
-            playerPos += CemuHooks::getRenderOffset();
+            playerPos += getRenderOffset();
         }
         else {
             if (s_isRiding) {
@@ -219,7 +220,7 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
             }
             else {
                 //move camera by render offset, which in this case is the original eye offset
-                playerPos += CemuHooks::getRenderOffset();
+                playerPos += getRenderOffset();
             }
         }
 
@@ -235,13 +236,14 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
         }
     }
 
-    s_lastCameraMtx = glm::fmat4x3(glm::translate(glm::identity<glm::fmat4>(), basePos) * glm::mat4(baseYawWithoutClimbingFix));
+    s_lastCameraMtx = glm::fmat4x3(glm::scale(glm::translate(glm::identity<glm::fmat4>(), basePos), glm::vec3(WorldScaleInverse())) * glm::mat4(baseYawWithoutClimbingFix));
+    //s_lastCameraMtx = glm::fmat4x3(glm::translate(glm::identity<glm::fmat4>(), basePos) * glm::mat4(baseYawWithoutClimbingFix));
 
     // vr camera
     std::optional<XrPosef> currPoseOpt = VRManager::instance().XR->GetRenderer()->GetPose(side);
     if (!currPoseOpt.has_value())
         return;
-    glm::fvec3 eyePos = ToGLM(currPoseOpt.value().position);
+    glm::fvec3 eyePos = ToGLM(currPoseOpt.value().position) * WorldScaleInverse();
     glm::fquat eyeRot = ToGLM(currPoseOpt.value().orientation);
 
     glm::vec3 newPos = basePos + (baseYaw * eyePos);

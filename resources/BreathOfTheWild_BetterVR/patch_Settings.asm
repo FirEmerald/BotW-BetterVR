@@ -22,6 +22,9 @@ GUIFollowModeSetting:
 PlayerHeightSetting:
 .float $cameraHeight
 
+WorldScaleSetting:
+.float $worldScale
+
 Enable2DViewSetting:
 .int $enable2DView
 

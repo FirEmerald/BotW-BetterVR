@@ -17,6 +17,7 @@ $guiFollowMode:int = 1
 
 $cameraDistance = 0.5
 $cameraHeight = 0.0
+$worldScale = 0.0
 $enableDebugOverlay:int = 0
 $leftHanded:int = 0
 $buggyAngularVelocity:int = 0 # Whether the angular velocity is wrongly provided in local space. Possible Values: 0 is auto; 1 is forced on; 2 is forced off
@@ -354,6 +355,95 @@ name = Extreme
 category = Camera Distance
 condition = $cameraMode == 0
 $cameraDistance = 0.9
+
+
+# World Scale
+
+[Preset]
+name = Automatic (scales to player height, not suitable for seated play)
+category = World Scale
+default = 1
+$worldScale = 0.0
+
+[Preset]
+name = 0.5
+category = World Scale
+$worldScale = 0.5
+
+[Preset]
+name = 0.6
+category = World Scale
+$worldScale = 0.6
+
+[Preset]
+name = 0.7
+category = World Scale
+$worldScale = 0.7
+
+[Preset]
+name = 0.8
+category = World Scale
+$worldScale = 0.8
+
+[Preset]
+name = 0.9
+category = World Scale
+$worldScale = 0.9
+
+[Preset]
+name = 1
+category = World Scale
+$worldScale = 1.0
+
+[Preset]
+name = 1.1
+category = World Scale
+$worldScale = 1.1
+
+[Preset]
+name = 1.2
+category = World Scale
+$worldScale = 1.2
+
+[Preset]
+name = 1.3
+category = World Scale
+$worldScale = 1.3
+
+[Preset]
+name = 1.4
+category = World Scale
+$worldScale = 1.4
+
+[Preset]
+name = 1.5
+category = World Scale
+$worldScale = 1.5
+
+[Preset]
+name = 1.6
+category = World Scale
+$worldScale = 1.6
+
+[Preset]
+name = 1.7
+category = World Scale
+$worldScale = 1.7
+
+[Preset]
+name = 1.8
+category = World Scale
+$worldScale = 1.8
+
+[Preset]
+name = 1.9
+category = World Scale
+$worldScale = 1.9
+
+[Preset]
+name = 2
+category = World Scale
+$worldScale = 2.0
 
 
 # Accessibility UI Color

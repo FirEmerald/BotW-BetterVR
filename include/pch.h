@@ -435,6 +435,7 @@ struct data_VRSettingsIn {
     BEType<int32_t> leftHandedSetting;
     BEType<int32_t> guiFollowSetting;
     BEType<float> playerHeightSetting;
+    BEType<float> worldScaleSetting;
     BEType<int32_t> enable2DVRView;
     BEType<int32_t> cropFlatTo16x9Setting;
     BEType<int32_t> enableDebugOverlay;
@@ -468,6 +469,10 @@ struct data_VRSettingsIn {
 
     float getPlayerHeight() const {
         return playerHeightSetting.getLE();
+    }
+
+    float getWorldScale() const {
+        return worldScaleSetting.getLE();
     }
 
     EventMode GetCutsceneCameraMode() const {
@@ -528,6 +533,10 @@ struct data_VRSettingsIn {
         std::format_to(std::back_inserter(buffer), " - Player Height: Automatic\n");
         else
         std::format_to(std::back_inserter(buffer), " - Player Height: {} meters\n", playerHeightSetting.getLE());
+        if (worldScaleSetting.getLE() <= 0.0)
+        std::format_to(std::back_inserter(buffer), " - World Scale: Automatic\n");
+        else
+        std::format_to(std::back_inserter(buffer), " - World Scale: {}\n", worldScaleSetting.getLE());
         std::format_to(std::back_inserter(buffer), " - 2D VR View Enabled: {}\n", Is2DVRViewEnabled() ? "Yes" : "No");
         std::format_to(std::back_inserter(buffer), " - Crop Flat to 16:9: {}\n", ShouldFlatPreviewBeCroppedTo16x9() ? "Yes" : "No");
         std::format_to(std::back_inserter(buffer), " - Debug Overlay: {}\n", ShowDebugOverlay() ? "Enabled" : "Disabled");
