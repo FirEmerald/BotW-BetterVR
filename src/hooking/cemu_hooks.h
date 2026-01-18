@@ -174,19 +174,6 @@ public:
         return !IsFirstPerson();
     }
 
-    static bool IsForcedThirdPerson() {
-        if (GetSettings().IsFirstPersonMode()) {
-            if (auto settings = GetFirstPersonSettingsForActiveEvent(); settings.has_value()) {
-                // there's an active event
-                auto mode = GetEventModeWithOverride();
-                if (mode == EventMode::FOLLOW_DEFAULT_EVENT_SETTINGS && !settings->firstPerson) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
     static bool UseBlackBarsDuringEvents() {
         if (!HasActiveCutscene() || IsFirstPerson()) {
             return false;

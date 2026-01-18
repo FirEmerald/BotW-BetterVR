@@ -253,31 +253,17 @@ static glm::vec3 s_manualBodyOffset = glm::vec3(0.0f, 0.0f, -0.125f);
 static glm::mat4 s_handCorrectionRotationLeft = glm::mat4(1.0f);
 static glm::mat4 s_handCorrectionRotationRight = glm::mat4(1.0f);
 
-//const uint32_t noAdjustFlags = std::to_underlying(PlayerMoveBitFlags::IS_LADDER_016) | std::to_underlying(PlayerMoveBitFlags::IS_WALL_CLIMBING_MAYBE_128) | std::to_underlying(PlayerMoveBitFlags::SWIMMING_1024);
-
-static glm::vec3 smoothedRenderOffset = glm::vec3(0, 1.6, 0);
-static boolean hasSmoothedRenderOffset = false;
+static glm::vec3 renderOffset = glm::vec3(0, 1.6, 0);
+static boolean hasRenderOffset = false;
 
 glm::vec3 CemuHooks::getRenderOffset() {
-    return smoothedRenderOffset;
+    return renderOffset;
 }
 
 void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
 
     if (IsThirdPerson()) return;
-
-    /*
-    // do not adjust bones if player is swimming or climbing
-    Player actor;
-    readMemory(s_playerAddress, &actor);
-    PlayerMoveBitFlags moveBits = actor.moveBitFlags.getLE();
-    if ((std::to_underlying(moveBits) & noAdjustFlags) != 0) {
-        hasSmoothedRenderOffset = true;
-        smoothedRenderOffset = gml::vec3(0, 1.73, 0); //Model height
-        return;
-    }
-    */
 
     const uint32_t gsysModelPtr = hCPU->gpr[3];
     const uint32_t matrixPtr = hCPU->gpr[4];
@@ -390,21 +376,21 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
                         glm::vec3 rootPos = glm::vec3(sklRoot->worldMatrix[3]);
                         eyeOffset = eyePos - rootPos;
                         offsetCalculated = true;
-                        if (!FollowModelHead()) {
-                            smoothedRenderOffset = glm::vec3(0, eyePos.y, 0);
-                            Log::print<INFO>("Default model eye height = {}", eyePos.y);
-                            hasSmoothedRenderOffset = true;
-                        }
+                        Log::print<INFO>("Default model eye height = {}", eyePos.y);
                     }
                 }
                 if (FollowModelHead()) {
-                    if (hasSmoothedRenderOffset) {
-                        smoothedRenderOffset.y += (eyePos.y - smoothedRenderOffset.y) * ModelOffsetSmoothingFactor();
+                    if (hasRenderOffset) {
+                        renderOffset.y += (eyePos.y - renderOffset.y) * ModelOffsetSmoothingFactor();
                     }
                     else {
-                        smoothedRenderOffset.y = eyePos.y;
-                        hasSmoothedRenderOffset = true;
+                        renderOffset.y = eyePos.y;
+                        hasRenderOffset = true;
                     }
+                }
+                else {
+                    renderOffset = glm::vec3(0, eyePos.y, 0);
+                    hasRenderOffset = true;
                 }
             }
         }
