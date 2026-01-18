@@ -98,7 +98,7 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
         //move camera so that player eye height is origin.
         playerPos.y -= CemuHooks::getPlayerEyeHeight();
         if (FollowModelHead()) {
-            //move camera by render offset
+            //move camera by render offset, which in this case is the current eye position
             playerPos += CemuHooks::getRenderOffset();
         }
         else {
@@ -111,7 +111,7 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
                 playerPos.y += hardcodedSwimOffset;
             }
             else {
-                //move camera by render offset
+                //move camera by render offset, which in this case is the original eye offset
                 playerPos += CemuHooks::getRenderOffset();
             }
         }
@@ -205,7 +205,7 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
         //move camera so that player eye height is origin.
         playerPos.y -= CemuHooks::getPlayerEyeHeight();
         if (FollowModelHead()) {
-            //move camera by render offset
+            //move camera by render offset, which in this case is the current eye position
             playerPos += CemuHooks::getRenderOffset();
         }
         else {
@@ -218,7 +218,7 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
                 playerPos.y += hardcodedSwimOffset;
             }
             else {
-                //move camera by render offset
+                //move camera by render offset, which in this case is the original eye offset
                 playerPos += CemuHooks::getRenderOffset();
             }
         }
