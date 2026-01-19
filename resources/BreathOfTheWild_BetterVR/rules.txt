@@ -40,16 +40,15 @@ $cameraMode = 0
 $cameraHeight = 0
 
 [Preset]
-name = First-Person Camera (Medium Immersive, Standing Recommended)
+name = First-Person Camera (Most Immersive for Roomscale, Standing Recommended)
 category = Camera Mode
 default = 1
 # TODO: use Player->mode_slippingOrTreeClimbing to maybe zoom out when a wall is climbed
 $cameraMode = 1
 
 [Preset]
-name = First-Person Camera - Follow Model Head (Most Immersive, Works for any play mode)
+name = First-Person Camera - Dynamic Offset (Most Immersive for Seated, Suitalble for Any Play Style)
 category = Camera Mode
-# TODO: use Player->mode_slippingOrTreeClimbing to maybe zoom out when a wall is climbed
 $cameraMode = 2
 
 
