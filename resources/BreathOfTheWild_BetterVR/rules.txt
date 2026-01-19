@@ -38,6 +38,7 @@ name = Third-Person Camera (Most Stable & Casual, Seated Recommended)
 category = Camera Mode
 $cameraMode = 0
 $cameraHeight = 0
+$hideModelHead = 0
 
 [Preset]
 name = First-Person Camera (Most Immersive for Roomscale, Standing Recommended)
@@ -45,6 +46,7 @@ category = Camera Mode
 default = 1
 # TODO: use Player->mode_slippingOrTreeClimbing to maybe zoom out when a wall is climbed
 $cameraMode = 1
+$hideModelHead = 1
 
 [Preset]
 name = First-Person Camera - Dynamic Offset (Most Immersive for Seated, Suitalble for Any Play Style)
