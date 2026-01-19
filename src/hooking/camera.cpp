@@ -32,13 +32,17 @@ bool s_isSwimming = false;
 uint32_t s_isLadderClimbing = 0;
 uint32_t s_isRiding = 0;
 
-float playerEyeHeight = 0;
+float playerEyeHeight = 1.6;
 bool gotEyeHeight = false;
 
 float CemuHooks::getPlayerEyeHeight() {
     float heightFromSettings = GetSettings().getPlayerHeight();
     if (heightFromSettings > 0.0) return heightFromSettings;
-    else return gotEyeHeight ? playerEyeHeight : 1.6;
+    else return playerEyeHeight;
+}
+
+void CemuHooks::MarkNeedsAutoEyeHeight() {
+    gotEyeHeight = false;
 }
 
 void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {

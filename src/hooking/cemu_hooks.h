@@ -207,6 +207,15 @@ public:
         }
     }
 
+    static float getPlayerEyeHeight();
+    static float getModelEyeHeight();
+    static glm::vec3 getRenderOffset();
+
+    static void OnPlayspaceRecenter() {
+        //mark that we need the player's automatic eye height again
+        MarkNeedsAutoEyeHeight();
+    }
+
 private:
     HMODULE m_cemuHandle;
 
@@ -219,10 +228,8 @@ private:
     static bool IsScreenOpen(ScreenId screen);
     static void InitWindowHandles();
     static void hook_UpdateSettings(PPCInterpreter_t* hCPU);
-
-    static float getPlayerEyeHeight();
-    static float getModelEyeHeight();
-    static glm::vec3 getRenderOffset();
+    
+    static void MarkNeedsAutoEyeHeight();
 
     // Actor Hooks
     static void hook_UpdateActorList(PPCInterpreter_t* hCPU);

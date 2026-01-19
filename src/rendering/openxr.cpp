@@ -860,6 +860,7 @@ void OpenXR::ProcessEvents() {
                 break;
             case XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING:
                 Log::print<WARNING>("OpenXR has indicated that the reference space has changed!");
+                CemuHooks::OnPlayspaceRecenter();
                 break;
             default:
                 Log::print<WARNING>("OpenXR has indicated that an unknown event with type {} has occurred!", std::to_underlying(eventData.type));
