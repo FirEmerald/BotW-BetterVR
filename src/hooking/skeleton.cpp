@@ -254,14 +254,14 @@ static glm::mat4 s_handCorrectionRotationLeft = glm::mat4(1.0f);
 static glm::mat4 s_handCorrectionRotationRight = glm::mat4(1.0f);
 
 static float modelEyeHeight = 1.6;
-static glm::vec3 renderOffset = glm::vec3(0, 1.6, 0);
+static float renderOffset = 1.6;
 static bool hasModelOffsets = false;
 
 float CemuHooks::getModelEyeHeight() {
     return modelEyeHeight;
 }
 
-glm::vec3 CemuHooks::getRenderOffset() {
+float CemuHooks::getRenderOffset() {
     return renderOffset;
 }
 
@@ -385,15 +385,15 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
                 }
                 if (hasModelOffsets) {
                     if (FollowModelHead()) {
-                        renderOffset.y += (eyePos.y - renderOffset.y) * ModelOffsetSmoothingFactor();
+                        renderOffset += (eyePos.y - renderOffset) * ModelOffsetSmoothingFactor();
                     }
                     else {
-                        renderOffset = glm::vec3(0, eyePos.y, 0);
+                        renderOffset = eyePos.y;
                     }
                 }
                 else {
                     modelEyeHeight = eyePos.y;
-                    renderOffset = glm::vec3(0, eyePos.y, 0);
+                    renderOffset = eyePos.y;
                     hasModelOffsets = true;
                 }
             }

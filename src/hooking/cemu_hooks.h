@@ -209,12 +209,14 @@ public:
 
     static float getPlayerEyeHeight();
     static float getModelEyeHeight();
-    static glm::vec3 getRenderOffset();
+    static float getRenderOffset();
 
     static void OnPlayspaceRecenter() {
         //mark that we need the player's automatic eye height again
         MarkNeedsAutoEyeHeight();
     }
+
+    static void applyCameraOffsets(glm::fvec3* playerPos);
 
 private:
     HMODULE m_cemuHandle;
