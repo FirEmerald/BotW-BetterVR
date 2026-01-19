@@ -35,19 +35,6 @@ CutsceneBlackBars:
 .int $cutsceneBlackBars
 
 
-
-eventName:
-.int 0
-.int 0
-.int 0
-.int 0
-
-entryPointName:
-.int 0
-.int 0
-.int 0
-.int 0
-
 0x1046D3AC = EventMgr__sInstance:
 
 0x031CA1C0 = EventMgr__getActiveEventName:

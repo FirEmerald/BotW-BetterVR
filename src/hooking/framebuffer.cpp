@@ -89,21 +89,15 @@ void VkDeviceOverrides::CmdClearColorImage(const vkroots::VkCommandBufferDispatc
                     layer2D = std::make_unique<RND_Renderer::Layer2D>(it->second.first, swapchainRes);
                     for (auto& textures : layer3D->GetSharedTextures()) {
                         for (auto& texture : textures) {
-                            ID3D12CommandQueue& queue = *VRManager::instance().D3D12->GetCommandQueue();
-                            ID3D12Device& device = *VRManager::instance().D3D12->GetDevice();
                             texture->Init(commandBuffer);
                         }
                     }
                     for (auto& textures : layer3D->GetDepthSharedTextures()) {
                         for (auto& texture : textures) {
-                            ID3D12CommandQueue& queue = *VRManager::instance().D3D12->GetCommandQueue();
-                            ID3D12Device& device = *VRManager::instance().D3D12->GetDevice();
                             texture->Init(commandBuffer);
                         }
                     }
                     for (auto& texture : layer2D->GetSharedTextures()) {
-                        ID3D12CommandQueue& queue = *VRManager::instance().D3D12->GetCommandQueue();
-                        ID3D12Device& device = *VRManager::instance().D3D12->GetDevice();
                         texture->Init(commandBuffer);
                     }
 
@@ -150,6 +144,7 @@ void VkDeviceOverrides::CmdClearColorImage(const vkroots::VkCommandBufferDispatc
 
             // don't clear the image if we're in the faux 2D mode
             if (CemuHooks::UseBlackBarsDuringEvents()) {
+                returnToLayout();
                 return;
             }
 
@@ -331,8 +326,6 @@ void VkDeviceOverrides::CmdClearDepthStencilImage(const vkroots::VkCommandBuffer
             // }
             //
             // checkAssert(layer3D.GetStatus() == Status3D::LEFT_BINDING_COLOR || layer3D.GetStatus() == Status3D::RIGHT_BINDING_COLOR, "3D layer is not in the correct state for capturing depth images!");
-
-
 
             SharedTexture* texture = layer3D->CopyDepthToLayer(side, commandBuffer, image, frameCounter);
             VRManager::instance().XR->GetRenderer()->On3DDepthCopied(side, frameCounter);
