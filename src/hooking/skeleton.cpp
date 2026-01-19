@@ -315,7 +315,6 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
         controllerRot = ToGLM(pose.pose.orientation);
     }
 
-
     // initialize skeleton and hand correction rotations
     if (!s_skeletonParsed) {
         s_skeleton.Parse(SKELETON_DATA);

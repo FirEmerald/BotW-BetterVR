@@ -143,6 +143,8 @@ RND_Renderer::ImGuiOverlay::ImGuiOverlay(VkCommandBuffer cb, uint32_t width, uin
         frame.hudWithoutAlphaFramebuffer->vkTransitionLayout(cb, VK_IMAGE_LAYOUT_GENERAL);
         frame.hudWithoutAlphaFramebuffer->vkClear(cb, { 0.0f, 0.0f, 0.0f, 0.0f });
     }
+    
+    VulkanUtils::DebugPipelineBarrier(cb);
 
     // create sampler
     VkSamplerCreateInfo samplerInfo = { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
@@ -422,26 +424,6 @@ void RND_Renderer::ImGuiOverlay::BeginFrame(long frameIdx, bool renderBackground
             ImGui::PopStyleVar();
             ImGui::PopStyleVar();
         }
-    }
-
-    {
-        //// calculate width minus the retina scaling
-        //ImVec2 windowSize = ImGui::GetIO().DisplaySize;
-        //windowSize.x = windowSize.x / ImGui::GetIO().DisplayFramebufferScale.x;
-        //windowSize.y = windowSize.y / ImGui::GetIO().DisplayFramebufferScale.y;
-
-        //{
-        //    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-        //    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-        //    ImGui::SetNextWindowPos(ImVec2(0, 0));
-        //    ImGui::SetNextWindowSize(ImGui::GetMainViewport()->WorkSize);
-
-        //    ImGui::Begin("Weapon Selector", nullptr, FULLSCREEN_WINDOW_FLAGS);
-        //    ImGui::Text("Hello World!");
-        //    ImGui::End();
-        //    ImGui::PopStyleVar();
-        //    ImGui::PopStyleVar();
-        //}
     }
 
     if (VRManager::instance().Hooks->m_entityDebugger) {
