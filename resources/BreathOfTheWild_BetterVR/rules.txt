@@ -14,95 +14,95 @@ $allowGamepadInput:int = 1
 $enable2DView:int = 1
 $cropFlatTo16_9:int = 1
 $guiFollowMode:int = 1
-
 $cameraDistance = 0.5
-$cameraHeight = 0.0
+$cameraHeight = 1.6
 $worldScale = 0.0
 $enableDebugOverlay:int = 0
 $leftHanded:int = 0
-$buggyAngularVelocity:int = 0 # Whether the angular velocity is wrongly provided in local space. Possible Values: 0 is auto; 1 is forced on; 2 is forced off
-
+# Whether the angular velocity is wrongly provided in local space. Possible Values: 0 is auto; 1 is forced on; 2 is forced off
+$buggyAngularVelocity:int = 0
 $cutsceneCameraMode:int = 1
 $cutsceneBlackBars:int = 1
-
 $accessibilityUIColor:int = 0
-$accessibilityUIColor_x = 0.000
+$accessibilityUIColor_x = 0.0
 $accessibilityUIColor_y = 0.804
-$accessibilityUIColor_z = 1.000
-$accessibilityUIColor_w = 1.000
-
-
+$accessibilityUIColor_z = 1.0
+$accessibilityUIColor_w = 1.0
 # Camera Mode
+
 [Preset]
 name = Third-Person Camera (Most Stable & Casual, Seated Recommended)
 category = Camera Mode
-$cameraMode = 0
-$cameraHeight = 0
-$hideModelHead = 0
+$cameraMode:int = 0
+$cameraHeight = 1.6
+$hideModelHead:int = 0
 
 [Preset]
+# TODO: use Player->mode_slippingOrTreeClimbing to maybe zoom out when a wall is climbed
 name = First-Person Camera (Most Immersive for Roomscale, Standing Recommended)
 category = Camera Mode
 default = 1
-# TODO: use Player->mode_slippingOrTreeClimbing to maybe zoom out when a wall is climbed
-$cameraMode = 1
-$hideModelHead = 1
+$cameraMode:int = 1
+$hideModelHead:int = 1
 
 [Preset]
 name = First-Person Camera - Dynamic Offset (Most Immersive for Seated, Suitalble for Any Play Style)
 category = Camera Mode
-$cameraMode = 2
+$cameraMode:int = 2
 
 
-#Hide Model Head
+# Hide Model Head
+
 [Preset]
-name = Hide Model Head (recommended)
+name = Hide Model Head
 category = Model Head
 condition = $cameraMode == 2
 default = 1
-$hideModelHead = 1
+$hideModelHead:int = 1
 
 [Preset]
-name = Do Not Hide Model Head
+name = Don't Hide Model Head
 category = Model Head
 condition = $cameraMode == 2
-$hideModelHead = 0
+$hideModelHead:int = 0
 
 
-#Model Offset Smoothing
+# Dynamic Offset Smoothing
+
 [Preset]
 name = No Smoothing
-category = Follow Model Head Smoothing
+category = Model Offset Smoothing
 condition = $cameraMode == 2
 $modelOffsetSmoothingFactor = 1.0
 
 [Preset]
 name = Low Smoothing
-category = Follow Model Head Smoothing
+category = Model Offset Smoothing
 condition = $cameraMode == 2
 $modelOffsetSmoothingFactor = 0.8
 
 [Preset]
 name = Medium Smoothing
-category = Follow Model Head Smoothing
+category = Model Offset Smoothing
 condition = $cameraMode == 2
 $modelOffsetSmoothingFactor = 0.5
 
 [Preset]
 name = High Smoothing (recommended)
-category = Follow Model Head Smoothing
+category = Model Offset Smoothing
 condition = $cameraMode == 2
 default = 1
 $modelOffsetSmoothingFactor = 0.1
 
 [Preset]
 name = Very High Smoothing
-category = Follow Model Head Smoothing
+category = Model Offset Smoothing
 condition = $cameraMode == 2
 $modelOffsetSmoothingFactor = 0.01
 
 
 # Motion & Gamepad Controls
+
 [Preset]
 name = Use VR Motion Controls & Wii U Gamepad Input (Recommended)
 category = Motion & Gamepad Controls
@@ -118,6 +118,7 @@ $allowGamepadInput:int = 0
 
 
 # Left Or Right Handed
+
 [Preset]
 name = Left-Handed Weapon (Shield On Right Hand)
 category = Left Or Right Handed (Not Working Yet)
@@ -133,6 +134,7 @@ $leftHanded:int = 0
 
 
 # Cutscene Settings
+
 [Preset]
 name = Watch All Cutscenes From Link's Perspective (For Testing, Not Recommended)
 category = Cutscene Camera Mode
@@ -155,6 +157,7 @@ $cutsceneCameraMode:int = 3
 
 # Cutscene Black Bars
 # This is a user-configurable setting to add black boxes around a third-person cutscene, since those can be disorientating with floating, animated and non-FPS perspectives.
+
 [Preset]
 name = Use Black Bars During Third-Person Cutscenes (Recommended For Comfort)
 category = Cutscene Black Bars
@@ -175,17 +178,16 @@ category = GUI Follow Mode
 default = 1
 $guiFollowMode:int = 1
 
-
 [Preset]
 name = HUD & Menus Stays In Front
 category = GUI Follow Mode
 $guiFollowMode:int = 0
 
 
-# First Person - Camera Height / Eye Level
+# First Person - Eye Height
 
 [Preset]
-name = Automatic (calibrated when loading a save for the first time)
+name = Automatic (calibrated when loading a save for the first time or recentering)
 category = Player Eye Height
 condition = $cameraMode != 0
 default = 1
@@ -195,7 +197,7 @@ $cameraHeight = 0.0
 name = 1m/3ft 3in
 category = Player Eye Height
 condition = $cameraMode != 0
-$cameraHeight = 1
+$cameraHeight = 1.0
 
 [Preset]
 name = 1.05m/3ft 5in
@@ -315,7 +317,7 @@ $cameraHeight = 1.95
 name = 2m/6ft 7in
 category = Player Eye Height
 condition = $cameraMode != 0
-$cameraHeight = 2
+$cameraHeight = 2.0
 
 
 # Third Person - Camera Distance
@@ -393,12 +395,14 @@ category = World Scale
 $worldScale = 0.9
 
 [Preset]
+# Not default for first person
 name = 1
 category = World Scale
 condition = $cameraMode != 0
 $worldScale = 1.0
 
 [Preset]
+# Default for third person
 name = 1
 category = World Scale
 condition = $cameraMode == 0
@@ -468,10 +472,10 @@ $accessibilityUIColor:int = 0
 name = Thematic Cyan (Best Looking Preset)
 category = More Contrasty UI For Crosshair, Buttons etc.
 $accessibilityUIColor:int = 1
-$accessibilityUIColor_x = 0.000
+$accessibilityUIColor_x = 0.0
 $accessibilityUIColor_y = 0.804
-$accessibilityUIColor_z = 1.000
-$accessibilityUIColor_w = 1.000
+$accessibilityUIColor_z = 1.0
+$accessibilityUIColor_w = 1.0
 
 [Preset]
 name = Bright Purple (Most Visible Preset)
@@ -480,10 +484,11 @@ $accessibilityUIColor:int = 1
 $accessibilityUIColor_x = 0.6728
 $accessibilityUIColor_y = 0.0
 $accessibilityUIColor_z = 0.3272
-$accessibilityUIColor_w = 1.000
+$accessibilityUIColor_w = 1.0
 
 
 # 2D Viewer - Crop VR Image To 16:9
+
 [Preset]
 name = Crop 3D Game World To 16:9 (Recommended)
 category = Crop VR Image
@@ -512,3 +517,5 @@ category = Enable VR Debugging Overlay (Experimental)
 condition = $enable2DView == 1
 default = 1
 $enableDebugOverlay:int = 0
+
+
