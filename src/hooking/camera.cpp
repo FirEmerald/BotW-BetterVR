@@ -174,9 +174,9 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
 
     if (IsFirstPerson()) {
         // take link's direction, then rotate the headset position
-        BEMatrix34 mtx = {};
-        readMemory(s_playerMtxAddress, &mtx);
-        glm::fvec3 playerPos = mtx.getPos().getLE();
+        BEMatrix34 playerMtx = {};
+        readMemory(s_playerMtxAddress, &playerMtx);
+        glm::fvec3 playerPos = playerMtx.getPos().getLE();
         
         if (s_isRiding) {
             playerPos.y -= hardcodedRidingOffset;
@@ -192,7 +192,7 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
         if (auto settings = GetFirstPersonSettingsForActiveEvent()) {
 
             if (settings->ignoreCameraRotation) {
-                glm::fquat playerRot = mtx.getRotLE();
+                glm::fquat playerRot = playerMtx.getRotLE();
                 auto [swing, yaw] = swingTwistY(playerRot);
                 baseYaw = yaw * glm::angleAxis(glm::radians(180.0f), glm::fvec3(0.0f, 1.0f, 0.0f));
                 baseYawWithoutClimbingFix = yaw * glm::angleAxis(glm::radians(180.0f), glm::fvec3(0.0f, 1.0f, 0.0f));
@@ -417,15 +417,17 @@ void CemuHooks::hook_ModifyProjectionUsingCamera(PPCInterpreter_t* hCPU) {
     if (UseBlackBarsDuringEvents()) {
         return;
     }
-    
+
+    uint32_t projectionPtr = hCPU->gpr[4];
+    uint32_t cameraPtr = hCPU->gpr[7];
+    OpenXR::EyeSide side = hCPU->gpr[5] == 0 ? EyeSide::LEFT : EyeSide::RIGHT;
+
     // this is always true, since we currently only hook one caller
     if (hCPU->gpr[6] == 0x02C43454) {
-        uint32_t lookAtCameraPtr = hCPU->gpr[7];
-
         BESeadLookAtCamera camera = {};
-        readMemory(lookAtCameraPtr, &camera);
+        readMemory(cameraPtr, &camera);
 
-        Log::print<RENDERING>("{:08X} {}", lookAtCameraPtr, camera);
+        Log::print<RENDERING>("[{}] ModifyProjectionUsingCamera at {:08X}: {}", side, cameraPtr, camera);
 
         OpenXR::EyeSide side = hCPU->gpr[5] == 0 ? EyeSide::LEFT : EyeSide::RIGHT;
 
@@ -435,10 +437,24 @@ void CemuHooks::hook_ModifyProjectionUsingCamera(PPCInterpreter_t* hCPU) {
         glm::vec3 basePos = glm::vec3(worldGame[3]);
         glm::quat baseRot = glm::quat_cast(worldGame);
 
-        // overwrite with our stored camera pos/rot
-        basePos = camera.pos.getLE();
+        // ignore the current rotation since it is already changed by the gameplay camera hooking
         baseRot = s_wsCameraRotation;
         auto [swing, baseYaw] = swingTwistY(baseRot);
+
+        if (IsFirstPerson()) {
+            // take link's direction, then rotate the headset position
+            BEMatrix34 playerMtx = {};
+            readMemory(s_playerMtxAddress, &playerMtx);
+
+            if (auto settings = GetFirstPersonSettingsForActiveEvent()) {
+
+                if (settings->ignoreCameraRotation) {
+                    glm::fquat playerRot = playerMtx.getRotLE();
+                    auto [swing, yaw] = swingTwistY(playerRot);
+                    baseYaw = yaw * glm::angleAxis(glm::radians(180.0f), glm::fvec3(0.0f, 1.0f, 0.0f));
+                }
+            }
+        }
 
         // vr camera
         std::optional<XrPosef> currPoseOpt = VRManager::instance().XR->GetRenderer()->GetPose(side);
@@ -465,15 +481,11 @@ void CemuHooks::hook_ModifyProjectionUsingCamera(PPCInterpreter_t* hCPU) {
         glm::vec3 upDir = glm::vec3(newViewVR[1]); // Up direction is +Y in view space
         camera.up = upDir;
 
-        writeMemory(lookAtCameraPtr, &camera);
+        writeMemory(cameraPtr, &camera);
     }
 
-
-    uint32_t projectionIn = hCPU->gpr[4];
-    OpenXR::EyeSide side = hCPU->gpr[5] == 0 ? EyeSide::LEFT : EyeSide::RIGHT;
-
     BESeadPerspectiveProjection perspectiveProjection = {};
-    readMemory(projectionIn, &perspectiveProjection);
+    readMemory(projectionPtr, &perspectiveProjection);
 
     if (!VRManager::instance().XR->GetRenderer()->GetFOV(side).has_value()) {
         return;
@@ -512,7 +524,7 @@ void CemuHooks::hook_ModifyProjectionUsingCamera(PPCInterpreter_t* hCPU) {
     perspectiveProjection.dirty = false;
     perspectiveProjection.deviceDirty = false;
 
-    writeMemory(projectionIn, &perspectiveProjection);
+    writeMemory(projectionPtr, &perspectiveProjection);
 }
 
 void CemuHooks::hook_EndCameraSide(PPCInterpreter_t* hCPU) {
