@@ -433,8 +433,8 @@ enum WeaponType : uint32_t {
      int hand = 0;
      RumbleType rumbleType = RumbleType::Fixed;
      float oscillationFrequency = 0.0f;
-     bool smoothOscillation = false;
-     double duration = 0;
+     bool keepRumblingOnEffectEnd = false; // requires stopInputsRumble() to manually stop the rumble
+     double effectDuration = 0;
      float frequency = 0.0f;
      float amplitude = 0.0f;
  };

@@ -121,16 +121,16 @@ HandGestureState calculateHandGesture(
 
             gesture.magnesisForwardAmount = remapSigned(forwardAmount);
             gesture.magnesisVerticalAmount = remapSigned(verticalAmount);
-            Log::print<INFO>("magnesisForwardAmount frames skip : {}", gameState.magnesisForwardFramesInterval);
-            if (gameState.magnesisForwardFramesInterval > 0) {
+            Log::print<INFO>("magnesisForwardAmount frames skip : {}", gameState.magnesis_forward_frames_interval);
+            if (gameState.magnesis_forward_frames_interval > 0) {
                 gesture.magnesisForwardAmount = 0.0f;
             }
-            else if (gameState.magnesisForwardFramesInterval <= -1)
+            else if (gameState.magnesis_forward_frames_interval <= -1)
             {
-                gameState.magnesisForwardFramesInterval = GetMagnesisForwardFrameInterval(glm::abs(gesture.magnesisForwardAmount));
+                gameState.magnesis_forward_frames_interval = GetMagnesisForwardFrameInterval(glm::abs(gesture.magnesisForwardAmount));
             }
             
-            gameState.magnesisForwardFramesInterval--;
+            gameState.magnesis_forward_frames_interval--;
             Log::print<INFO>("gesture.magnesisForwardAmount  : {}", gesture.magnesisForwardAmount);
             //
             //Log::print<INFO>("gesture.magnesisVerticalAmount  : {}", gesture.magnesisVerticalAmount);
@@ -205,14 +205,19 @@ void handleLeftHandInGameInput(
 ) {
     constexpr std::chrono::milliseconds INPUT_DELAY(400);
     
-    RumbleParameters overSlotRumble = { true, 0, RumbleType::OscillationFallingSawtoothWave, 0.5f, true, 1.0, 0.25f, 0.25f };
-    RumbleParameters grabSlotRumble = { true, 0, RumbleType::OscillationRaisingSawtoothWave, 0.5f, false, 0.25, 0.3f, 0.3f };
+    static const RumbleParameters leftRumbleRaise = { true, 0, RumbleType::Raising, 0.5f, false, 0.2, 1.0f, 1.0f };
+    static const RumbleParameters leftRumbleFall = { true, 0, RumbleType::Falling, 0.5f, false, 0.3, 0.1f, 0.75f };
+    static const RumbleParameters RuneRumble = { true, 0, RumbleType::OscillationSmooth, 1.0f, false, 1.0, 0.25f, 0.25f };
     
     auto* rumbleMgr = VRManager::instance().XR->GetRumbleManager();
     bool isGrabPressed = inputs.inGame.grabState[0].lastEvent == ButtonState::Event::ShortPress;
     bool isGrabPressedLong = inputs.inGame.grabState[0].lastEvent == ButtonState::Event::LongPress;
     bool isCurrentGrabPressed = inputs.inGame.grabState[0].wasDownLastFrame;
     
+    // Rune rumbles
+    if (gameState.left_equip_type == EquipType::Rune)
+        rumbleMgr->enqueueInputsRumbleCommand(RuneRumble);
+
     // Handle shield
     // if shield with lock on isn't already being used with left trigger, use gesture to guard without lock on instead.
     // Gesture enabled only when both melee weapon and shield are in hands to prevent 2 handed weapons and quick drawing shield 
@@ -222,38 +227,30 @@ void handleLeftHandInGameInput(
         rightStickSource.currentState.y = 0.2f; // Force disable the lock on view when holding shield
         gameState.is_shield_guarding = true;
         if ((gameState.previous_button_hold & VPAD_BUTTON_ZL) == 0)
-            rumbleMgr->enqueueInputsRumbleCommand(grabSlotRumble);
+            rumbleMgr->enqueueInputsRumbleCommand(leftRumbleRaise);
     }
     else if (!inputs.inGame.useLeftItem.currentState)
         gameState.is_shield_guarding = false;
 
     if (!gameState.is_shield_guarding && gameState.previous_button_hold & VPAD_BUTTON_ZL)
-        rumbleMgr->enqueueInputsRumbleCommand(grabSlotRumble);
+        rumbleMgr->enqueueInputsRumbleCommand(leftRumbleFall);
 
     // Handle Parry gesture
     auto handVelocity = glm::length(ToGLM(inputs.inGame.poseVelocity[0].linearVelocity));
     if (handVelocity > 4.0f && gameState.left_equip_type == EquipType::Shield && leftGesture.isNearChestHeight) {
         buttonHold |= VPAD_BUTTON_A;
-        rumbleMgr->enqueueInputsRumbleCommand(grabSlotRumble);
+        rumbleMgr->enqueueInputsRumbleCommand(leftRumbleFall);
     }
 
     // Handle shoulder slot interactions
     if (isHandOverLeftShoulderSlot(leftGesture) || isHandOverRightShoulderSlot(leftGesture)) {
-        // Provide haptic feedback when hand is over equipped slot
-        if (isHandOverRightShoulderSlot(leftGesture) && gameState.right_equip_type == EquipType::Melee) {
-            rumbleMgr->enqueueInputsRumbleCommand(overSlotRumble);
-        }
-        else if (isHandOverLeftShoulderSlot(leftGesture) && gameState.left_equip_type == EquipType::Bow) {
-            rumbleMgr->enqueueInputsRumbleCommand(overSlotRumble);
-        }
         if (handleDpadMenu(inputs.inGame.grabState[0].lastEvent, leftGesture, buttonHold, gameState))
             // Don't process normal input when opening dpad menu
             return;
 
         // Handle equip/unequip
         if (!gameState.prevent_grab_inputs && isGrabPressed) {
-            rumbleMgr->enqueueInputsRumbleCommand(grabSlotRumble);
-            
+            rumbleMgr->enqueueInputsRumbleCommand(leftRumbleFall);
             if (isHandOverLeftShoulderSlot(leftGesture)) {
                 // Left shoulder = Bow
                 if (gameState.left_equip_type != EquipType::Bow) {
@@ -280,19 +277,14 @@ void handleLeftHandInGameInput(
     }
     
     // Handle waist slot interaction (Rune)
-    if (isHandOverLeftWaistSlot(leftGesture)) {
-        if (gameState.left_equip_type == EquipType::Rune) {
-            rumbleMgr->enqueueInputsRumbleCommand(overSlotRumble);
-        }
-        
+    if (isHandOverLeftWaistSlot(leftGesture)) {    
         // Handle dpad menu
         if (handleDpadMenu(inputs.inGame.grabState[0].lastEvent, leftGesture, buttonHold, gameState))
             // Don't process normal input when opening dpad menu
             return;
 
         if (!gameState.prevent_grab_inputs && isGrabPressed) {
-            rumbleMgr->enqueueInputsRumbleCommand(grabSlotRumble);
-            
+            rumbleMgr->enqueueInputsRumbleCommand(leftRumbleFall);
             if (gameState.left_equip_type != EquipType::Rune) {
                 buttonHold |= VPAD_BUTTON_L;
                 gameState.last_item_held = EquipType::Rune;
@@ -306,21 +298,20 @@ void handleLeftHandInGameInput(
         return;
     }
 
-    if (isHandOverRightWaistSlot(leftGesture))
-    {
-        if (isCurrentGrabPressed)
-            rumbleMgr->enqueueInputsRumbleCommand(grabSlotRumble);
-        //Handle drop action
-        if (isGrabPressedLong) {
-            inputs.inGame.drop_weapon[0] = true;
-            gameState.prevent_grab_inputs = true;
-            gameState.prevent_grab_time = now;
-        }
-        return;
-    }
-    
-    // Normal hand input (cancels over slots rumble)
-    rumbleMgr->stopInputsRumble(0, RumbleType::OscillationFallingSawtoothWave);
+    // Left hand item drop broken rn, makes the game thinks link is empty handed in right hand too.
+    // Waiting for a fix before uncommenting
+    //if (isHandOverRightWaistSlot(leftGesture))
+    //{
+    //    if (isCurrentGrabPressed)
+    //        rumbleMgr->enqueueInputsRumbleCommand(grabSlotRumble);
+    //    //Handle drop action
+    //    if (isGrabPressedLong) {
+    //        inputs.inGame.drop_weapon[0] = true;
+    //        gameState.prevent_grab_inputs = true;
+    //        gameState.prevent_grab_time = now;
+    //    }
+    //    return;
+    //}
     
     if (isGrabPressed) {
         // Handle grab action
@@ -341,9 +332,8 @@ void handleRightHandInGameInput(
 ) {
     constexpr std::chrono::milliseconds INPUT_DELAY(400);
     
-    const static RumbleParameters overSlotRumble = { true, 1, RumbleType::OscillationFallingSawtoothWave, 0.5f, true, 1.0, 0.25f, 0.25f };
-    const static RumbleParameters grabSlotRumble = { true, 1, RumbleType::OscillationRaisingSawtoothWave, 0.5f, false, 0.25, 0.3f, 0.3f };
-    const static RumbleParameters raiseRumble = { true, 1, RumbleType::Raising, 0.5f, false, 1.0, 0.1f, 0.1f };
+    static const RumbleParameters rightRumbleFall = { true, 1, RumbleType::Falling, 0.5f, false, 0.3, 0.1f, 0.75f };
+    static const RumbleParameters rightRumbleInfiniteRaise = { true, 1, RumbleType::Raising, 0.5f, true, 1.0, 0.25f, 0.25f };
 
     auto* rumbleMgr = VRManager::instance().XR->GetRumbleManager();
     bool isGrabPressedShort = inputs.inGame.grabState[1].lastEvent == ButtonState::Event::ShortPress;
@@ -353,14 +343,6 @@ void handleRightHandInGameInput(
     
     // Handle shoulder slot interactions
     if (isHandOverLeftShoulderSlot(rightGesture) || isHandOverRightShoulderSlot(rightGesture)) {
-        // Haptic feedback when over equipped slot
-        if (isHandOverRightShoulderSlot(rightGesture) && gameState.right_equip_type == EquipType::Melee) {
-            rumbleMgr->enqueueInputsRumbleCommand(overSlotRumble);
-        }
-        else if (isHandOverLeftShoulderSlot(rightGesture) && gameState.left_equip_type == EquipType::Bow) {
-            rumbleMgr->enqueueInputsRumbleCommand(overSlotRumble);
-        }
-
         // Handle dpad menu
         if (handleDpadMenu(inputs.inGame.grabState[1].lastEvent, rightGesture, buttonHold, gameState))
             // Don't process normal input when opening dpad menu
@@ -368,8 +350,7 @@ void handleRightHandInGameInput(
 
         // Handle equip/unequip
         if (!gameState.prevent_grab_inputs && isGrabPressedShort) {
-            rumbleMgr->enqueueInputsRumbleCommand(grabSlotRumble);
-            
+            rumbleMgr->enqueueInputsRumbleCommand(rightRumbleFall);
             if (isHandOverRightShoulderSlot(rightGesture)) {
                 // Right shoulder = Melee weapon
                 if (gameState.right_equip_type != EquipType::Melee) {
@@ -392,31 +373,34 @@ void handleRightHandInGameInput(
             gameState.prevent_grab_inputs = true;
             gameState.prevent_grab_time = now;
         }
-        
+
         // Handle weapon throw when over shoulder slot
         if (isTriggerPressed) {
-            rumbleMgr->stopInputsRumble(1, RumbleType::OscillationFallingSawtoothWave);
-            rumbleMgr->enqueueInputsRumbleCommand(raiseRumble);
+            rumbleMgr->enqueueInputsRumbleCommand(rightRumbleInfiniteRaise);
             buttonHold |= VPAD_BUTTON_R;
+            gameState.weapon_throwed = true;
         }
-        
+        else if (gameState.weapon_throwed) {
+            rumbleMgr->stopInputsRumble(1, RumbleType::Raising);
+            gameState.weapon_throwed = false;
+        }
         return;  // Don't process normal input when over slots
+    }
+    // if hand not on shoulder slot but trigger still pressed, stop throw rumbles
+    else if (gameState.weapon_throwed) {
+        rumbleMgr->stopInputsRumble(1, RumbleType::Raising);
+        gameState.weapon_throwed = false;
     }
 
     // Handle waist slot interaction (Rune)
-    if (isHandOverLeftWaistSlot(rightGesture)) {
-        if (gameState.left_equip_type == EquipType::Rune) {
-            rumbleMgr->enqueueInputsRumbleCommand(overSlotRumble);
-        }
-        
+    if (isHandOverLeftWaistSlot(rightGesture)) {   
         // Handle dpad menu
         if (handleDpadMenu(inputs.inGame.grabState[1].lastEvent, rightGesture, buttonHold, gameState))
             // Don't process normal input when opening dpad menu
             return;
 
         if (!gameState.prevent_grab_inputs && isGrabPressedShort) {
-            rumbleMgr->enqueueInputsRumbleCommand(grabSlotRumble);
-            
+            rumbleMgr->enqueueInputsRumbleCommand(rightRumbleFall);
             if (gameState.left_equip_type != EquipType::Rune) {
                 buttonHold |= VPAD_BUTTON_L;
                 gameState.last_item_held = EquipType::Rune;
@@ -432,19 +416,15 @@ void handleRightHandInGameInput(
 
     if (isHandOverRightWaistSlot(rightGesture))
     {
-        if (isCurrentGrabPressed)
-            rumbleMgr->enqueueInputsRumbleCommand(grabSlotRumble);
         //Handle drop action
         if (isGrabPressedLong) {
+            rumbleMgr->enqueueInputsRumbleCommand(rightRumbleFall);
             inputs.inGame.drop_weapon[1] = true;
             gameState.prevent_grab_inputs = true;
             gameState.prevent_grab_time = now;
         }
         return;
     }
-    
-    // Normal hand input (Cancel over slots rumbles)
-    rumbleMgr->stopInputsRumble(1, RumbleType::OscillationFallingSawtoothWave);
     
     if (isCurrentGrabPressed) {
         if (gameState.left_equip_type == EquipType::Rune) {
@@ -485,8 +465,8 @@ void handleLeftTriggerBindings(
         return;
     }
 
-    RumbleParameters raiseRumble = { true, 0, RumbleType::Raising, 0.5f, false, 0.25, 0.3f, 0.3f };
-    RumbleParameters fallRumble = { true, 0, RumbleType::Falling, 0.5f, false, 0.25, 0.3f, 0.3f };
+    static const RumbleParameters raiseRumble = { true, 0, RumbleType::Raising, 0.5f, false, 0.25, 0.3f, 0.3f };
+    static const RumbleParameters fallRumble = { true, 0, RumbleType::Falling, 0.5f, false, 0.25, 0.3f, 0.3f };
 
     auto* rumbleMgr = VRManager::instance().XR->GetRumbleManager();
 
@@ -502,7 +482,7 @@ void handleLeftTriggerBindings(
     }
 
     else {
-        if (!gameState.is_locking_on_target)
+        if (!gameState.is_shield_guarding)
             rumbleMgr->enqueueInputsRumbleCommand(raiseRumble);
         buttonHold |= VPAD_BUTTON_ZL;
         gameState.is_locking_on_target = true;
@@ -513,16 +493,25 @@ void handleLeftTriggerBindings(
 void handleRightTriggerBindings(
     uint32_t& buttonHold,
     OpenXR::InputState& inputs,
-    OpenXR::GameState& gameState
+    OpenXR::GameState& gameState,
+    HandGestureState rightGesture
 ) {
+    auto* rumbleMgr = VRManager::instance().XR->GetRumbleManager();
+
+    if (isHandOverRightShoulderSlot(rightGesture))
+        return;
+
     if (!inputs.inGame.useRightItem.currentState) {
+        rumbleMgr->stopInputsRumble(1, RumbleType::Raising);
         return;
     }
     
     const static RumbleParameters rightRumbleFixed = { true, 1, RumbleType::Fixed, 0.5f, false, 0.25, 0.3f, 0.3f };
-    RumbleParameters rightRumbleRaise = { true, 1, RumbleType::Raising, 0.5f, false, 2.0, 0.01f, 0.01f };
     const static RumbleParameters leftRumbleFixed = { true, 0, RumbleType::Fixed, 0.5f, false, 0.25, 0.3f, 0.3f };
-    auto* rumbleMgr = VRManager::instance().XR->GetRumbleManager();
+    static const RumbleParameters rightRumbleInfiniteRaiseBow = { true, 1, RumbleType::Raising, 0.5f, true, 1.0, 0.25f, 0.25f };
+    static const RumbleParameters rightRumbleInfiniteRaiseWeaponThrow = { true, 1, RumbleType::Raising, 0.5f, true, 1.0, 0.25f, 0.25f };
+    static const RumbleParameters rightRumbleFiniteRaise = { true, 1, RumbleType::Raising, 0.5f, false, 0.25, 1.0f, 1.0f };
+    
     
     if (gameState.has_something_in_hand) {
         if (gameState.is_throwable_object_held) {
@@ -530,7 +519,7 @@ void handleRightTriggerBindings(
             buttonHold |= VPAD_BUTTON_R;  // Throw object
         }
         else if (gameState.left_equip_type == EquipType::Bow) {
-            rumbleMgr->enqueueInputsRumbleCommand(rightRumbleRaise);
+            rumbleMgr->enqueueInputsRumbleCommand(rightRumbleInfiniteRaiseBow);
             buttonHold |= VPAD_BUTTON_ZR;  // Shoot bow
         }
         else if (gameState.left_equip_type == EquipType::Rune) {
@@ -538,7 +527,7 @@ void handleRightTriggerBindings(
             rumbleMgr->enqueueInputsRumbleCommand(leftRumbleFixed);
         }
         else {
-            rumbleMgr->enqueueInputsRumbleCommand(rightRumbleRaise);
+            rumbleMgr->enqueueInputsRumbleCommand(rightRumbleInfiniteRaiseWeaponThrow);
             buttonHold |= VPAD_BUTTON_Y;  // Melee attack
         }
     }
@@ -555,8 +544,8 @@ void handleRightTriggerBindings(
         else if (gameState.last_item_held == EquipType::Rune) {
             buttonHold |= VPAD_BUTTON_L;
             if ((gameState.previous_button_hold & VPAD_BUTTON_L) == 0) {
-                rumbleMgr->enqueueInputsRumbleCommand(leftRumbleFixed);
                 rumbleMgr->enqueueInputsRumbleCommand(rightRumbleFixed);
+                rumbleMgr->enqueueInputsRumbleCommand(leftRumbleFixed);
             }
         }
     }
@@ -742,7 +731,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         // Wistle gesture
         if (isHandOverMouthSlot(leftGesture) && isHandOverMouthSlot(rightGesture)) {
             if (inputs.inGame.grabState[0].wasDownLastFrame && inputs.inGame.grabState[1].wasDownLastFrame) {
-                RumbleParameters rumble = { true, 0, RumbleType::OscillationRaisingSawtoothWave, 1.0f, false, 0.25, 0.2f, 0.2f };
+                static const RumbleParameters rumble = { true, 0, RumbleType::OscillationRaisingSawtoothWave, 1.0f, false, 0.25, 0.2f, 0.2f };
                 VRManager::instance().XR->GetRumbleManager()->enqueueInputsRumbleCommand(rumble);
                 newXRBtnHold |= VPAD_BUTTON_DOWN;
             }
@@ -756,7 +745,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         
         // Trigger handling
         handleLeftTriggerBindings(newXRBtnHold, inputs, gameState, leftGesture);
-        handleRightTriggerBindings(newXRBtnHold, inputs, gameState);
+        handleRightTriggerBindings(newXRBtnHold, inputs, gameState, rightGesture);
         
         //// Rune cancel with left trigger
         //if (inputs.inGame.leftTrigger.currentState && 

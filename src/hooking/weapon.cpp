@@ -498,13 +498,13 @@ void CemuHooks::hook_EnableWeaponAttackSensor(PPCInterpreter_t* hCPU) {
             rumbleVelocity = 0.0f;
         }
 
-        RumbleParameters rumbleParams = {
+        static const RumbleParameters rumbleParams = {
             false,
             1,
             RumbleType::Fixed,
             0.0f,
             false,
-            0.025,
+            0.001,
             0.5f * rumbleVelocity,
             0.7f * rumbleVelocity
         };

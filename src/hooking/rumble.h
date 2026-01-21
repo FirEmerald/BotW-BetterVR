@@ -85,7 +85,7 @@ public:
             state.params = cmd;
             state.startTime = now;
             state.endTime = now + std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                      std::chrono::duration<double>(cmd.duration)
+                                      std::chrono::duration<double>(cmd.effectDuration)
                                   );
             state.inputRumble = cmd.prioritizeThisRumble;
 
@@ -114,21 +114,35 @@ public:
 
             switch (state.params.rumbleType) {
                 case RumbleType::Raising:
-                    progress = glm::clamp(elapsed / state.params.duration, 0.0, 1.0);
+                    progress = glm::clamp(elapsed / state.params.effectDuration, 0.0, 1.0);
                     envelope = progress * progress; //exponential optional. Need testing
                     currentAmplitude *= envelope;
                     currentFrequency *= envelope;
+
+                    // if rumble is still running at 95%, extend duration until the input is released
+                    // prevents the rumble from restarting from zero if the input is held longer than duration
+                    if (state.params.keepRumblingOnEffectEnd && progress > 0.95f)
+                    {
+                        state.params.effectDuration += 0.05;
+                        state.endTime += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(0.05));
+                    }
                     break;
                 case RumbleType::Falling:
-                    progress = glm::clamp(elapsed / state.params.duration, 0.0, 1.0);
+                    progress = glm::clamp(elapsed / state.params.effectDuration, 0.0, 1.0);
                     envelope = (1.0 - progress) * (1.0 - progress); //exponential optional. Need testing
                     currentAmplitude *= envelope;
                     currentFrequency *= envelope;
+
+                    if (state.params.keepRumblingOnEffectEnd && progress > 0.95f)
+                    {
+                        state.params.effectDuration += 0.05;
+                        state.endTime += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(0.05));
+                    }
                     break;
                 case RumbleType::OscillationSmooth:
-                    omega = 2.0 * glm::pi<double>() * 0.5;
-                    // This creates a wave that oscillates between 0 and state.params.amplitude
-                    wave = (std::sin(elapsed * omega)) / 2.0;
+                    omega = 2.0 * glm::pi<double>() * state.params.oscillationFrequency;
+                    // Normalized sine wave: 0 ? 1
+                    wave = (std::sin(elapsed * omega) + 1.0) * 0.5;
                     currentAmplitude *= wave;
                     currentFrequency *= wave;
                     break;
@@ -152,7 +166,7 @@ public:
             // Apply to OpenXR
             XrHapticVibration vibration = { XR_TYPE_HAPTIC_VIBRATION };
             vibration.next = nullptr;
-            // Pulse duration: Set slightly longer than the frame time (e.g., 20-30ms)
+            // Pulse duration: Set slightly longer than the frame time
             // to ensure continuous feel without gaps.
             vibration.duration = (XrDuration)(0.03 * 1e9);
             vibration.frequency = (float)currentFrequency;
