@@ -296,30 +296,46 @@ void handleLeftHandInGameInput(
         return;
     }
 
-    // Pull gesture
     if (isCurrentGrabPressed) {
+        // Magnesis motion controls
+        if (gameState.left_equip_type == EquipType::Rune) {
+            if (!gameState.left_hand_position_stored) {
+                gameState.stored_left_hand_position = ToGLM(inputs.inGame.poseLocation[0].pose.position);
+                gameState.left_hand_position_stored = true;
+                rumbleMgr->enqueueInputsRumbleCommand(leftRumbleFall);
+            }
+
+            if (gameState.left_hand_position_stored) {
+                rightStickSource.currentState.y = leftGesture.magnesisVerticalAmount;
+                if (leftGesture.magnesisForwardAmount > 0.0f)
+                    buttonHold |= VPAD_BUTTON_UP;
+                else if (leftGesture.magnesisForwardAmount < 0.0f)
+                    buttonHold |= VPAD_BUTTON_DOWN;
+            }
+        }
+
+        // Pull gesture
         if (gameState.left_hand_was_over_left_shoulder_slot) {
             if (gameState.left_equip_type != EquipType::Bow) {
                 buttonHold |= VPAD_BUTTON_ZR;
                 gameState.last_item_held = EquipType::Bow;
             }
         }
-        else if (gameState.left_hand_was_over_right_shoulder_slot)
-            {
+        else if (gameState.left_hand_was_over_right_shoulder_slot) {
             if (gameState.right_equip_type != EquipType::Melee) {
                 buttonHold |= VPAD_BUTTON_Y;
                 gameState.last_item_held = EquipType::Melee;
             }
         }
-        else if (gameState.left_hand_was_over_left_waist_slot)
-        {
+        else if (gameState.left_hand_was_over_left_waist_slot) {
             if (gameState.left_equip_type != EquipType::Rune) {
                 buttonHold |= VPAD_BUTTON_L;
                 gameState.last_item_held = EquipType::Rune;
             }
         }
     }
-    
+    else
+        gameState.left_hand_position_stored = false;
 
     // Left hand item drop broken rn, makes the game thinks link is empty handed in right hand too.
     // Waiting for a fix before uncommenting
@@ -450,6 +466,7 @@ void handleRightHandInGameInput(
     }
     
     if (isCurrentGrabPressed) {
+        // Magnesis motion controls
         if (gameState.left_equip_type == EquipType::Rune) {
             if (!gameState.right_hand_position_stored) {
                 gameState.stored_right_hand_position = ToGLM(inputs.inGame.poseLocation[1].pose.position);
