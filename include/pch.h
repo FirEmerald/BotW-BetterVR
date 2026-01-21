@@ -434,13 +434,49 @@ enum class EventMode {
     ALWAYS_THIRD_PERSON = 3,
 };
 
+enum CameraMode {
+    THIRD_PERSON = 0,
+    FIRST_PERSON = 1
+};
+
+enum PlayStyle {
+    SEATED = 0,
+    STANDING = 1
+};
+
+enum CameraAnchor {
+    GROUND = 0,
+    EYES = 1
+};
+
+enum GuiMode {
+    IN_FRONT = 0,
+    FOLLOW_HEAD = 1
+};
+
+enum AngularVelocityMode {
+    AUTO = 0,
+    FORCED_ON = 1,
+    FORCED_OFF = 2
+};
+
+enum CutsceneCameraMode {
+    FIRST_PERSON_ONLY = 1,
+    MIXED = 2,
+    THIRD_PERSON_ONLY = 3
+};
+
 struct data_VRSettingsIn {
     BEType<int32_t> cameraModeSetting;
-    BEType<float> modelOffsetSmoothingFactorSetting;
+    BEType<int32_t> playStyleSetting;
+    BEType<int32_t> cameraAnchorSetting;
+    BEType<int32_t> dynamicEyeOffsetSetting;
+    BEType<float> cameraOffsetSmoothingFactorSetting;
     BEType<int32_t> hideModelHeadSetting;
     BEType<int32_t> leftHandedSetting;
     BEType<int32_t> guiFollowSetting;
-    BEType<float> playerHeightSetting;
+    BEType<float> cameraHeightSetting;
+    BEType<float> eyeHeightSetting;
     BEType<float> worldScaleSetting;
     BEType<int32_t> enable2DVRView;
     BEType<int32_t> cropFlatTo16x9Setting;
@@ -454,30 +490,50 @@ struct data_VRSettingsIn {
     }
 
     bool IsFirstPersonMode() const {
-        return cameraModeSetting == 1 || cameraModeSetting == 2;
-    }
-
-    bool FollowModelHead() const {
-        return cameraModeSetting == 2;
+        return cameraModeSetting.getLE() != CameraMode::THIRD_PERSON;
     }
 
     bool IsThirdPersonMode() const {
-        return cameraModeSetting == 0;
+        return cameraModeSetting.getLE() == CameraMode::THIRD_PERSON;
     }
 
-    float ModelOffsetSmoothingFactor() const {
-        return modelOffsetSmoothingFactorSetting.getLE();
+    bool IsStandingMode() const {
+        return playStyleSetting.getLE() != PlayStyle::SEATED;
+    }
+
+    bool IsSeatedMode() const {
+        return playStyleSetting.getLE() == PlayStyle::SEATED;
+    }
+
+    bool IsEyesAnchor() const {
+        return cameraAnchorSetting.getLE() != CameraAnchor::GROUND;
+    }
+
+    bool IsGroundAnchor() const {
+        return cameraAnchorSetting.getLE() == CameraAnchor::GROUND;
+    }
+
+    bool FollowModelHead() const {
+        return dynamicEyeOffsetSetting == 1;
+    }
+
+    float CameraOffsetSmoothingFactorSetting() const {
+        return cameraOffsetSmoothingFactorSetting.getLE();
     }
 
     bool HideModelHead() const {
         return hideModelHeadSetting == 1;
     }
 
-    float getPlayerHeight() const {
-        return playerHeightSetting.getLE();
+    float GetCameraOffset() const {
+        return cameraHeightSetting.getLE();
     }
 
-    float getWorldScale() const {
+    float GetEyeHeight() const {
+        return eyeHeightSetting.getLE();
+    }
+
+    float GetWorldScale() const {
         return worldScaleSetting.getLE();
     }
 
@@ -530,15 +586,18 @@ struct data_VRSettingsIn {
 
     std::string ToString() const {
         std::string buffer = "";
-        std::format_to(std::back_inserter(buffer), " - Camera Mode: {}\n", FollowModelHead() ? "First Person (Follow Model)" : IsFirstPersonMode() ? "First Person" : "Third Person");
-        std::format_to(std::back_inserter(buffer), " - Model Offset Smoothing Factor: {}\n", modelOffsetSmoothingFactorSetting.getLE());
+        std::format_to(std::back_inserter(buffer), " - Camera Mode: {}\n", IsFirstPersonMode() ? "First Person" : "Third Person");
+        std::format_to(std::back_inserter(buffer), " - Play Style: {}\n", IsStandingMode() ? "Standing" : "Sitting");
+        std::format_to(std::back_inserter(buffer), " - Camera Anchor: {}\n", IsEyesAnchor() ? "Eye Height" : "Ground Level");
+        std::format_to(std::back_inserter(buffer), " - Camera Offset Smoothing Factor: {}\n", cameraOffsetSmoothingFactorSetting.getLE());
         std::format_to(std::back_inserter(buffer), " - Hide Model Head: {}\n", HideModelHead() ? "Yes" : "NO");
         std::format_to(std::back_inserter(buffer), " - Left Handed: {}\n", IsLeftHanded() ? "Yes" : "No");
         std::format_to(std::back_inserter(buffer), " - GUI Follow Setting: {}\n", UIFollowsLookingDirection() ? "Follow Looking Direction" : "Fixed");
-        if (playerHeightSetting.getLE() <= 0.0)
-        std::format_to(std::back_inserter(buffer), " - Player Height: Automatic\n");
+        std::format_to(std::back_inserter(buffer), " - Camera Offset: {} meters\n", cameraHeightSetting.getLE());
+        if (eyeHeightSetting.getLE() <= 0.0)
+        std::format_to(std::back_inserter(buffer), " - Eye Height: Automatic\n");
         else
-        std::format_to(std::back_inserter(buffer), " - Player Height: {} meters\n", playerHeightSetting.getLE());
+        std::format_to(std::back_inserter(buffer), " - Eye Height: {} meters\n", eyeHeightSetting.getLE());
         if (worldScaleSetting.getLE() <= 0.0)
         std::format_to(std::back_inserter(buffer), " - World Scale: Automatic\n");
         else

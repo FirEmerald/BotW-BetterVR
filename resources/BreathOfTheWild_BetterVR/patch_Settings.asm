@@ -7,8 +7,17 @@ data_settingsOffset:
 CameraModeSetting:
 .int $cameraMode
 
-ModelOffsetSmoothingFactorSetting:
-.float $modelOffsetSmoothingFactor
+PlayStyleSetting:
+.int $playStyle
+
+CameraAnchorSetting:
+.int $cameraAnchor
+
+DynamicEyeOffsetSetting:
+.int $dynamicEyeOffset
+
+CameraOffsetSmoothingFactorSetting:
+.float $cameraOffsetSmoothingFactor
 
 HideModelHeadSetting:
 .int $hideModelHead
@@ -19,8 +28,11 @@ LeftHandModeSetting:
 GUIFollowModeSetting:
 .int $guiFollowMode
 
-PlayerHeightSetting:
+CameraHeightSetting:
 .float $cameraHeight
+
+EyeHeightSetting:
+.float $eyeHeight
 
 WorldScaleSetting:
 .float $worldScale

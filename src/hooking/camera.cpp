@@ -23,8 +23,10 @@ static std::pair<glm::quat, glm::quat> swingTwistY(const glm::quat& q) {
     return { swing, twist };
 }
 
-const float hardcodedSwimOffset = 0;
-const float hardcodedRidingOffset = 0.95;
+const float hardcodedSwimGroundOffset = 1.73;
+const float hardcodedSwimEyesOffset = 0;
+const float hardcodedRidingGroundOffset = -0.65;
+const float hardcodedRidingEyesOffset = 0.95;
 
 glm::fvec3 s_wsCameraPosition = glm::fvec3();
 glm::fquat s_wsCameraRotation = glm::identity<glm::fquat>();
@@ -35,8 +37,8 @@ uint32_t s_isRiding = 0;
 float playerEyeHeight = 1.6;
 bool gotEyeHeight = false;
 
-float CemuHooks::getPlayerEyeHeight() {
-    float heightFromSettings = GetSettings().getPlayerHeight();
+float CemuHooks::GetPlayerEyeHeight() {
+    float heightFromSettings = GetSettings().GetEyeHeight();
     if (heightFromSettings > 0.0) return heightFromSettings;
     else return playerEyeHeight;
 }
@@ -45,25 +47,42 @@ void CemuHooks::MarkNeedsAutoEyeHeight() {
     gotEyeHeight = false;
 }
 
-void CemuHooks::applyCameraOffsets(glm::fvec3* playerPos) {
-    //move camera so that player eye height is origin.
-    playerPos->y -= getPlayerEyeHeight() * WorldScaleInverse();
-    if (FollowModelHead()) {
-        //move camera by render offset, which in this case is the current eye position
-        playerPos->y += getRenderOffset();
-    }
-    else {
-        if (s_isRiding) {
-            //move camera by hardcodedRidingOffset
-            playerPos->y += hardcodedRidingOffset;
-        }
-        else if (s_isSwimming) {
-            //move camera by hardcodedSwimOffset
-            playerPos->y += hardcodedSwimOffset;
+void CemuHooks::ApplyCameraOffsets(glm::fvec3* playerPos) {
+    if (IsGroundAnchor()) {
+        if (s_isRiding || !s_isSwimming) {
+            //perform camera offset
+            playerPos->y += (GetSettings().GetCameraOffset() * WorldScaleInverse());
+            if (s_isRiding) {
+                //move camera by hardcodedRidingGroundOffset
+                playerPos->y += hardcodedRidingGroundOffset;
+            }
         }
         else {
-            //move camera by render offset, which in this case is the original eye offset
-            playerPos->y += getRenderOffset();
+            //move camera to 1.73 meters above the water
+            float playerHeight = VRManager::instance().XR->GetRenderer()->GetMiddlePose().value()[3].y;
+            playerPos->y += hardcodedSwimGroundOffset - playerHeight * WorldScaleInverse();
+        }
+    }
+    else {
+        //move camera so that player eye height is origin.
+        playerPos->y -= GetPlayerEyeHeight() * WorldScaleInverse();
+        if (FollowModelHead()) {
+            //move camera by render offset, which in this case is the current eye position
+            playerPos->y += GetRenderOffset();
+        }
+        else {
+            if (s_isRiding) {
+                //move camera by hardcodedRidingEyesOffset
+                playerPos->y += hardcodedRidingEyesOffset;
+            }
+            else if (s_isSwimming) {
+                //move camera by hardcodedSwimEyesOffset
+                playerPos->y += hardcodedSwimEyesOffset;
+            }
+            else {
+                //move camera by render offset, which in this case is the original eye offset
+                playerPos->y += GetRenderOffset();
+            }
         }
     }
 }
@@ -122,7 +141,7 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
             Log::print<INFO>("Automatic player eye height = {}", playerEyeHeight);
         }
 
-        applyCameraOffsets(&playerPos);
+        ApplyCameraOffsets(&playerPos);
 
         if (auto settings = GetFirstPersonSettingsForActiveEvent()) {
             if (settings->ignoreCameraRotation) {
@@ -211,7 +230,7 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
         readMemory(s_playerMtxAddress, &mtx);
         glm::fvec3 playerPos = mtx.getPos().getLE();
 
-        applyCameraOffsets(&playerPos);
+        ApplyCameraOffsets(&playerPos);
 
         basePos = playerPos;
         if (auto settings = GetFirstPersonSettingsForActiveEvent()) {

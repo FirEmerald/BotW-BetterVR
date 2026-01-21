@@ -1,4 +1,6 @@
-﻿namespace RulesGenerator
+﻿using RulesGenerator.Options;
+
+namespace RulesGenerator
 {
     internal readonly struct Preset(string name, string condition = "", bool isDefault = false, string comment = "")
     {

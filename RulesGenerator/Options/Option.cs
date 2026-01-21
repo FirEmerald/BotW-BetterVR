@@ -1,4 +1,4 @@
-﻿namespace RulesGenerator
+﻿namespace RulesGenerator.Options
 {
     internal interface IOption
     {
@@ -37,36 +37,6 @@
         public string GetValueString(T value)
         {
             return GetVariableString() + GetTypeString() + " = " + ToString(value);
-        }
-
-        public class Integer(string name, int defaultValue, string formatting = "", string comment = "") : Option<int>(name, defaultValue, comment)
-        {
-            public readonly string Formatting = formatting;
-
-            public override string GetTypeString()
-            {
-                return ":int";
-            }
-
-            public override string ToString(int value)
-            {
-                return value.ToString(Formatting);
-            }
-        }
-
-        public class Double(string name, double defaultValue, string formatting = "0.0###", string comment = "") : Option<double>(name, defaultValue, comment)
-        {
-            public readonly string Formatting = formatting;
-
-            public override string GetTypeString()
-            {
-                return "";
-            }
-
-            public override string ToString(double value)
-            {
-                return value.ToString(Formatting);
-            }
         }
     }
 }

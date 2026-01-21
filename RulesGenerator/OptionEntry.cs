@@ -1,4 +1,6 @@
-﻿namespace RulesGenerator
+﻿using RulesGenerator.Options;
+
+namespace RulesGenerator
 {
     internal interface IOptionEntry
     {

@@ -1,4 +1,6 @@
-﻿namespace RulesGenerator
+﻿using RulesGenerator.Options;
+
+namespace RulesGenerator
 {
     internal readonly struct Rules(string name, string path, string description, bool enabledByDefault)
     {

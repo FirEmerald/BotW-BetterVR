@@ -257,11 +257,11 @@ static float modelEyeHeight = 1.6;
 static float renderOffset = 1.6;
 static bool hasModelOffsets = false;
 
-float CemuHooks::getModelEyeHeight() {
+float CemuHooks::GetModelEyeHeight() {
     return modelEyeHeight;
 }
 
-float CemuHooks::getRenderOffset() {
+float CemuHooks::GetRenderOffset() {
     return renderOffset;
 }
 
@@ -385,7 +385,7 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
                 }
                 if (hasModelOffsets) {
                     if (FollowModelHead()) {
-                        renderOffset += (eyePos.y - renderOffset) * ModelOffsetSmoothingFactor();
+                        renderOffset += (eyePos.y - renderOffset) * CameraOffsetSmoothingFactorSetting();
                     }
                     else {
                         renderOffset = eyePos.y;

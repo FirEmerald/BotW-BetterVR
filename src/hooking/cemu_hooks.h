@@ -192,31 +192,47 @@ public:
         return GetSettings().HideModelHead();
     }
 
-    static float ModelOffsetSmoothingFactor() {
-        return GetSettings().ModelOffsetSmoothingFactor();
+    static float CameraOffsetSmoothingFactorSetting() {
+        return GetSettings().CameraOffsetSmoothingFactorSetting();
+    }
+
+    static bool IsStandingMode() {
+        return GetSettings().IsStandingMode();
+    }
+
+    static bool IsSeatedMode() {
+        return GetSettings().IsSeatedMode();
+    }
+
+    static bool IsEyesAnchor() {
+        return GetSettings().IsEyesAnchor();
+    }
+
+    static bool IsGroundAnchor() {
+        return GetSettings().IsGroundAnchor();
     }
 
     static float WorldScaleInverse() {
-        float worldScale = GetSettings().getWorldScale();
+        float worldScale = GetSettings().GetWorldScale();
         if (worldScale <= 0.0) {
             //this is automatic, sets players eye height to link's eye height
-            return getModelEyeHeight() / getPlayerEyeHeight();
+            return GetModelEyeHeight() / GetPlayerEyeHeight();
         }
         else {
             return 1.0 / worldScale;
         }
     }
 
-    static float getPlayerEyeHeight();
-    static float getModelEyeHeight();
-    static float getRenderOffset();
+    static float GetPlayerEyeHeight();
+    static float GetModelEyeHeight();
+    static float GetRenderOffset();
 
     static void OnPlayspaceRecenter() {
         //mark that we need the player's automatic eye height again
         MarkNeedsAutoEyeHeight();
     }
 
-    static void applyCameraOffsets(glm::fvec3* playerPos);
+    static void ApplyCameraOffsets(glm::fvec3* playerPos);
 
 private:
     HMODULE m_cemuHandle;
