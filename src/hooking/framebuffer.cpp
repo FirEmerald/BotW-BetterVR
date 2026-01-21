@@ -83,7 +83,7 @@ void VkDeviceOverrides::CmdClearColorImage(const vkroots::VkCommandBufferDispatc
                     VkExtent2D renderRes = it->second.first;
                     VkExtent2D swapchainRes = it->second.first;
                     if (VRManager::instance().XR->m_capabilities.isMetaSimulator) {
-                        //swapchainRes = VkExtent2D{ viewConfs[0].recommendedImageRectWidth, viewConfs[0].recommendedImageRectHeight };
+                        swapchainRes = VkExtent2D{ viewConfs[0].recommendedImageRectWidth, viewConfs[0].recommendedImageRectHeight };
                     }
 
                     layer3D = std::make_unique<RND_Renderer::Layer3D>(renderRes, swapchainRes);
