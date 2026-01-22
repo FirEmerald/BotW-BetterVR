@@ -474,6 +474,7 @@ struct data_VRSettingsIn {
     BEType<float> cameraOffsetSmoothingFactorSetting;
     BEType<int32_t> hideModelHeadSetting;
     BEType<int32_t> leftHandedSetting;
+    BEType<int32_t> invertElbowIKSetting;
     BEType<int32_t> guiFollowSetting;
     BEType<float> cameraHeightSetting;
     BEType<float> eyeHeightSetting;
@@ -523,6 +524,10 @@ struct data_VRSettingsIn {
 
     bool HideModelHead() const {
         return hideModelHeadSetting == 1;
+    }
+
+    bool InvertElbowIK() const {
+        return invertElbowIKSetting == 1;
     }
 
     float GetCameraOffset() const {

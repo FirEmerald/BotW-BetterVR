@@ -24,6 +24,7 @@ DoubleOption eyeHeightOption = new("eyeHeight", 1.6);
 DoubleOption worldScale = new("worldScale", 0.0);
 BoolOption enableDebugOverlay = new("enableDebugOverlay", false);
 BoolOption leftHanded = new("leftHanded", false);
+BoolOption invertElbowIK = new("invertElbowIK", false);
 EnumOption<AngularVelocityMode> buggyAngularVelocity = new("buggyAngularVelocity", AngularVelocityMode.AUTO, comment: "Whether the angular velocity is wrongly provided in local space. Possible Values: 0 is auto; 1 is forced on; 2 is forced off");
 
 EnumOption<CutsceneCameraMode> cutsceneCameraMode = new("cutsceneCameraMode", CutsceneCameraMode.MIXED);
@@ -67,6 +68,7 @@ rules
     .AddOption(worldScale)
     .AddOption(enableDebugOverlay)
     .AddOption(leftHanded)
+    .AddOption(invertElbowIK)
     .AddOption(buggyAngularVelocity)
 
     .AddOption(cutsceneCameraMode)
@@ -183,6 +185,17 @@ rules
             .AddPreset(
                 new Preset("Right-Handed Weapon (Default)", condition: isFirstPersonCondition, isDefault: true)
                     .AddValue(leftHanded, false)
+            )
+        )
+    .AddPresetCategory(
+        new PresetCategory("Invert Elbow IK (Fixes Some Custom Player Models Having Broken Elbows)")
+            .AddPreset(
+                new Preset("Invert", condition: isFirstPersonCondition)
+                    .AddValue(invertElbowIK, true)
+            )
+            .AddPreset(
+                new Preset("Do not invert", condition: isFirstPersonCondition, isDefault: true)
+                    .AddValue(invertElbowIK, false)
             )
         )
     .AddPresetCategory(

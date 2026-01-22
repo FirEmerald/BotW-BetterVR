@@ -25,6 +25,9 @@ HideModelHeadSetting:
 LeftHandModeSetting:
 .int $leftHanded
 
+InvertElbowIKSetting:
+.int $invertElbowIK
+
 GUIFollowModeSetting:
 .int $guiFollowMode
 
