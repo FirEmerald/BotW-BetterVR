@@ -107,13 +107,13 @@ rules
     .AddPresetCategory(
         new PresetCategory("Camera Height Anchor", "Camera Height Anchor")
             .AddPreset(
-                new Preset("Ground", condition: isFirstPersonCondition)
+                new Preset("Ground (Calibrates ground at playspace origin)", condition: isFirstPersonCondition)
                     .AddValue(cameraAnchor, CameraAnchor.GROUND)
                     .AddValue(dynamicCameraOffset, false)
                     .AddValue(hideModelHead, true)
             )
             .AddPreset(
-                new Preset("Eyes", condition: isFirstPersonCondition, isDefault: true)
+                new Preset("Eyes (Calibrates Link's eyes at player eye height)", condition: isFirstPersonCondition, isDefault: true)
                     .AddValue(cameraAnchor, CameraAnchor.EYES)
             )
         )
@@ -125,23 +125,23 @@ rules
                     .AddValue(dynamicCameraOffset, false)
             )
             .AddPreset(
-                new Preset("Use Dynamic Camera Offsets (Not Recommended, Motion Sickness Warning!)", condition: isEyeAnchorCondition)
+                new Preset("Use Dynamic Camera Offsets (Not Recommended, Motion Sickness Warning! Moves view up and down to match Link's eyes)", condition: isEyeAnchorCondition)
                     .AddValue(dynamicCameraOffset, true)
             )
         )
     .AddPresetCategory(
         new PresetCategory("Model Head", "Hide Model Head")
             .AddPreset(
-                new Preset("Hide Model Head", condition: isDynamicOffsetCondition, isDefault: true)
+                new Preset("Hide Model Head (prevents clipping)", condition: isDynamicOffsetCondition)
                     .AddValue(hideModelHead, true)
             )
             .AddPreset(
-                new Preset("Don't Hide Model Head", condition: isDynamicOffsetCondition)
+                new Preset("Don't Hide Model Head", condition: isDynamicOffsetCondition, isDefault: true)
                     .AddValue(hideModelHead, false)
             )
         )
     .AddPresetCategory(
-        new PresetCategory("Model Offset Smoothing", "Dynamic Offset Smoothing")
+        new PresetCategory("Dynamic Camera Offset Smoothing", "Dynamic Offset Smoothing")
             .AddPreset(
                 new Preset("No Smoothing", condition: isDynamicOffsetCondition)
                     .AddValue(cameraOffsetSmoothingFactor, 1)
@@ -276,21 +276,12 @@ PresetCategory eyeHeightCategory = new PresetCategory("User's Eye Height", "Firs
         new Preset("Automatic (calibrated when loading a save for the first time or recentering)", isDefault: true, condition: isEyeAnchorCondition)
             .AddValue(eyeHeightOption, 0)
     );
-for (double eyeHeight = 1; eyeHeight < 1.59; eyeHeight += 0.05)
+for (double eyeHeight = 1; eyeHeight <= 2.01; eyeHeight += 0.05)
 {
+    string name = eyeHeight.ToString("0.###") + "m/" + Utils.ToFeetAndInches(eyeHeight);
+    if (eyeHeight >= 1.59 && eyeHeight <= 1.61) name += " (roughly link's default eye height)";
     eyeHeightCategory.AddPreset(
-        new Preset(eyeHeight.ToString("0.###") + "m/" + Utils.ToFeetAndInches(eyeHeight), condition: isEyeAnchorCondition)
-            .AddValue(eyeHeightOption, eyeHeight)
-    );
-}
-eyeHeightCategory.AddPreset(
-    new Preset(1.6.ToString("0.###") + "m/" + Utils.ToFeetAndInches(1.6) + " (roughly link's default eye height)", condition: isEyeAnchorCondition)
-        .AddValue(eyeHeightOption, 1.6)
-);
-for (double eyeHeight = 1.65; eyeHeight <= 2.01; eyeHeight += 0.05)
-{
-    eyeHeightCategory.AddPreset(
-        new Preset(eyeHeight.ToString("0.###") + "m/" + Utils.ToFeetAndInches(eyeHeight), condition: isEyeAnchorCondition)
+        new Preset(name, condition: isEyeAnchorCondition)
             .AddValue(eyeHeightOption, eyeHeight)
     );
 }
@@ -333,28 +324,27 @@ PresetCategory worldScaleCategory = new PresetCategory("World Scale", "World Sca
         new Preset("Automatic (scales to player eye height)", isDefault: true, condition: isStandingEyes + " == 2")
             .AddValue(worldScale, 0)
     );
-for (double worldScaleVal = 0.5; worldScaleVal < 0.99; worldScaleVal += 0.1)
+for (double worldScaleVal = 0.5; worldScaleVal <= 2.01; worldScaleVal += 0.1)
 {
-    worldScaleCategory.AddPreset(
-        new Preset(worldScaleVal.ToString("0.###"))
-            .AddValue(worldScale, worldScaleVal)
-    );
-}
-worldScaleCategory
-    .AddPreset(
-        new Preset("1", condition: isStandingEyes + " == 2", comment: "Not default for standing")
-            .AddValue(worldScale, 1)
-    )
-    .AddPreset(
-        new Preset("1", condition: isStandingEyes + " != 2", isDefault: true, comment: "Default for seated")
-            .AddValue(worldScale, 1)
-    );
-for (double worldScaleVal = 1.1; worldScaleVal <= 2.01; worldScaleVal += 0.1)
-{
-    worldScaleCategory.AddPreset(
-        new Preset(worldScaleVal.ToString("0.###"))
-            .AddValue(worldScale, worldScaleVal)
-    );
+    if (worldScaleVal >= 0.99 && worldScaleVal <= 1.01)
+    {
+        worldScaleCategory
+            .AddPreset(
+                new Preset("1", condition: isStandingEyes + " == 2", comment: "Not default for standing")
+                    .AddValue(worldScale, 1)
+            )
+            .AddPreset(
+                new Preset("1", condition: isStandingEyes + " != 2", isDefault: true, comment: "Default for seated")
+                    .AddValue(worldScale, 1)
+            );
+    }
+    else
+    {
+        worldScaleCategory.AddPreset(
+            new Preset(worldScaleVal.ToString("0.###"))
+                .AddValue(worldScale, worldScaleVal)
+        );
+    }
 }
 rules
     .AddPresetCategory(worldScaleCategory);

@@ -68,7 +68,7 @@ $playStyle:int = 0
 # Camera Height Anchor
 
 [Preset]
-name = Ground
+name = Ground (Calibrates ground at playspace origin)
 category = Camera Height Anchor
 condition = $cameraMode == 1
 $cameraAnchor:int = 0
@@ -76,7 +76,7 @@ $dynamicEyeOffset:int = 0
 $hideModelHead:int = 1
 
 [Preset]
-name = Eyes
+name = Eyes (Calibrates Link's eyes at player eye height)
 category = Camera Height Anchor
 condition = $cameraMode == 1
 default = 1
@@ -93,7 +93,7 @@ default = 1
 $dynamicEyeOffset:int = 0
 
 [Preset]
-name = Use Dynamic Camera Offsets (Not Recommended, Motion Sickness Warning!)
+name = Use Dynamic Camera Offsets (Not Recommended, Motion Sickness Warning! Moves view up and down to match Link's eyes)
 category = Dynamic Camera Offset
 condition = $cameraAnchor == 1
 $dynamicEyeOffset:int = 1
@@ -102,16 +102,16 @@ $dynamicEyeOffset:int = 1
 # Hide Model Head
 
 [Preset]
-name = Hide Model Head
+name = Hide Model Head (prevents clipping)
 category = Model Head
 condition = $dynamicEyeOffset == 1
-default = 1
 $hideModelHead:int = 1
 
 [Preset]
 name = Don't Hide Model Head
 category = Model Head
 condition = $dynamicEyeOffset == 1
+default = 1
 $hideModelHead:int = 0
 
 
@@ -119,32 +119,32 @@ $hideModelHead:int = 0
 
 [Preset]
 name = No Smoothing
-category = Model Offset Smoothing
+category = Dynamic Camera Offset Smoothing
 condition = $dynamicEyeOffset == 1
 $cameraOffsetSmoothingFactor = 1.0
 
 [Preset]
 name = Low Smoothing
-category = Model Offset Smoothing
+category = Dynamic Camera Offset Smoothing
 condition = $dynamicEyeOffset == 1
 $cameraOffsetSmoothingFactor = 0.8
 
 [Preset]
 name = Medium Smoothing
-category = Model Offset Smoothing
+category = Dynamic Camera Offset Smoothing
 condition = $dynamicEyeOffset == 1
 $cameraOffsetSmoothingFactor = 0.5
 
 [Preset]
 name = High Smoothing (recommended)
-category = Model Offset Smoothing
+category = Dynamic Camera Offset Smoothing
 condition = $dynamicEyeOffset == 1
 default = 1
 $cameraOffsetSmoothingFactor = 0.1
 
 [Preset]
 name = Very High Smoothing
-category = Model Offset Smoothing
+category = Dynamic Camera Offset Smoothing
 condition = $dynamicEyeOffset == 1
 $cameraOffsetSmoothingFactor = 0.01
 
