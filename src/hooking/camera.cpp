@@ -219,7 +219,6 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
     glm::mat4x3 viewMatrix = camera.mtx.getLEMatrix();
     glm::mat4 worldGame = glm::inverse(glm::mat4(viewMatrix));
     glm::vec3 basePos = glm::vec3(worldGame[3]);
-    glm::vec3 headsetOffset = glm::vec3(0);
     glm::quat baseRot = glm::quat_cast(worldGame);
 
     // overwrite with our stored camera pos/rot
