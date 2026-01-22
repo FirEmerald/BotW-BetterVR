@@ -512,7 +512,7 @@ void CemuHooks::hook_ModifyProjectionUsingCamera(PPCInterpreter_t* hCPU) {
         std::optional<XrPosef> currPoseOpt = VRManager::instance().XR->GetRenderer()->GetPose(side);
         if (!currPoseOpt.has_value())
             return;
-        glm::fvec3 eyePos = ToGLM(currPoseOpt.value().position);
+        glm::fvec3 eyePos = ToGLM(currPoseOpt.value().position) * WorldScaleInverse();
         glm::fquat eyeRot = ToGLM(currPoseOpt.value().orientation);
 
         glm::vec3 newPos = basePos + (baseYaw * eyePos);
