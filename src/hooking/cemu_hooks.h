@@ -232,7 +232,7 @@ public:
         MarkNeedsAutoEyeHeight();
     }
 
-    static void ApplyCameraOffsets(glm::fvec3* playerPos);
+    static void ApplyCameraOffsets(glm::fvec3* playerPos, bool isRenderCamera);
 
 private:
     HMODULE m_cemuHandle;
