@@ -324,24 +324,26 @@ PresetCategory worldScaleCategory = new PresetCategory("World Scale", "World Sca
         new Preset("Automatic (scales to player eye height)", isDefault: true, condition: isStandingEyes + " == 2")
             .AddValue(worldScale, 0)
     );
-for (double worldScaleVal = 0.5; worldScaleVal <= 2.01; worldScaleVal += 0.1)
+for (double worldScaleVal = 0.5; worldScaleVal <= 2.01; worldScaleVal += 0.05)
 {
+    double height = worldScaleVal * 1.73;
+    string name = worldScaleVal.ToString("0.###") + " (suitable for people " + height.ToString("0.##") + "m/" + Utils.ToFeetAndInches(height) + " tall with vanilla link scale)";
     if (worldScaleVal >= 0.99 && worldScaleVal <= 1.01)
     {
         worldScaleCategory
             .AddPreset(
-                new Preset("1", condition: isStandingEyes + " == 2", comment: "Not default for standing")
+                new Preset(name, condition: isStandingEyes + " == 2", comment: "Not default for standing")
                     .AddValue(worldScale, 1)
             )
             .AddPreset(
-                new Preset("1", condition: isStandingEyes + " != 2", isDefault: true, comment: "Default for seated")
+                new Preset(name, condition: isStandingEyes + " != 2", isDefault: true, comment: "Default for seated")
                     .AddValue(worldScale, 1)
             );
     }
     else
     {
         worldScaleCategory.AddPreset(
-            new Preset(worldScaleVal.ToString("0.###"))
+            new Preset(name)
                 .AddValue(worldScale, worldScaleVal)
         );
     }
