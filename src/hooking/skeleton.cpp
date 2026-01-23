@@ -256,8 +256,6 @@ static glm::mat4 s_handCorrectionRotationRight = glm::mat4(1.0f);
 void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
 
-    if (IsThirdPerson()) return;
-
     const uint32_t gsysModelPtr = hCPU->gpr[3];
     const uint32_t matrixPtr = hCPU->gpr[4];
     const uint32_t scalePtr = hCPU->gpr[5];
@@ -271,6 +269,31 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
     std::string boneName((char*)(s_memoryBaseAddress + boneNamePtr));
     const bool isLeft = boneName.ends_with("_L");
     const OpenXR::EyeSide side = isLeft ? OpenXR::EyeSide::LEFT : OpenXR::EyeSide::RIGHT;
+
+
+    if (IsThirdPerson()) {
+        // head bones are set to 0.05, this just sets them back
+        if (isFaceBone(boneName)) {
+            BEVec3 finalScale;
+            finalScale = glm::fvec3(1.0f);
+            writeMemory(scalePtr, &finalScale);
+        }
+        return;
+    }
+
+    // reset face bones so they don't react to vr-driven poses
+    if (isFaceBone(boneName)) {
+        return;
+        BEMatrix34 finalMtx;
+        finalMtx.setPos(glm::fvec3());
+        finalMtx.setRotLE(glm::identity<glm::fquat>());
+        writeMemory(matrixPtr, &finalMtx);
+
+        BEVec3 finalScale;
+        finalScale = glm::fvec3(0.05);
+        writeMemory(scalePtr, &finalScale);
+        return;
+    }
 
     // get bone position data
     glm::mat4x3 gameMtx = getMemory<BEMatrix34>(matrixPtr).getLEMatrix();
@@ -325,19 +348,6 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
 
         s_handCorrectionRotationLeft = glm::mat4_cast(wristRotationHardcodedLeft);
         s_handCorrectionRotationRight = glm::mat4_cast(wristRotationHardcodedRight);
-    }
-
-    // reset face bones so they don't react to vr-driven poses
-    if (isFaceBone(boneName)) {
-        BEMatrix34 finalMtx;
-        finalMtx.setPos(glm::fvec3());
-        finalMtx.setRotLE(glm::identity<glm::fquat>());
-        writeMemory(matrixPtr, &finalMtx);
-
-        BEVec3 finalScale;
-        finalScale = glm::fvec3(0.05);
-        writeMemory(scalePtr, &finalScale);
-        return;
     }
 
     int boneIndex = s_skeleton.GetBoneIndex(boneName);
