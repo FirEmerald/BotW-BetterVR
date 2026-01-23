@@ -74,14 +74,17 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
         readMemory(s_playerAddress, &actor);
 
         PlayerMoveBitFlags moveBits = actor.moveBitFlags.getLE();
-        s_isSwimming = (std::to_underlying(moveBits) & std::to_underlying(PlayerMoveBitFlags::SWIMMING_1024)) != 0;
+        s_isSwimming = ((std::to_underlying(moveBits) & std::to_underlying(PlayerMoveBitFlags::IS_SWIMMING_OR_CLIMBING)) != 0) && 
+            ((std::to_underlying(moveBits) & std::to_underlying(PlayerMoveBitFlags::IS_SWIMMING)) != 0);
 
         // Todo: move those and their hooks in controls.cpp ?
         auto gameState = VRManager::instance().XR->m_gameState.load();
         // Unreliable flag, need to investigate
-        //gameState.is_climbing_wall = (std::to_underlying(moveBits) & std::to_underlying(PlayerMoveBitFlags::IS_WALL_CLIMBING_MAYBE_128)) != 0;
-        gameState.is_climbing_ladder = s_isLadderClimbing == 2 ? true : false;
+        gameState.is_climbing = ((std::to_underlying(moveBits) & std::to_underlying(PlayerMoveBitFlags::IS_SWIMMING_OR_CLIMBING)) != 0) && 
+            ((std::to_underlying(moveBits) & std::to_underlying(PlayerMoveBitFlags::IS_CLIMBING_WALL)) != 0) ||
+            s_isLadderClimbing == 2;
         gameState.is_riding_horse = s_isRiding == 2 ? true : false;
+        gameState.is_paragliding = (std::to_underlying(moveBits) & std::to_underlying(PlayerMoveBitFlags::IS_GLIDER_ACTIVE)) != 0;
         VRManager::instance().XR->m_gameState.store(gameState);
 
         // read player MTX

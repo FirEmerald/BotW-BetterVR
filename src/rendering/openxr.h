@@ -153,8 +153,8 @@ public:
         bool is_locking_on_target = false;
         bool is_shield_guarding = false;
         bool is_riding_horse = false;
-        bool is_climbing_wall = false;
-        bool is_climbing_ladder = false;
+        bool is_climbing = false;
+        bool is_paragliding = false;
 
         float left_hand_velocity = 0.0f;
         glm::fvec3 stored_left_hand_position = glm::fvec3(0.0f, 0.0f, 0.0f);

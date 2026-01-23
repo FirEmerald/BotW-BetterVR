@@ -790,18 +790,16 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         }
         
         // If climbing or paragliding, make the B button cancel instantly the action instead of long press to run
-        // Waiting for more reliable flags before enabling this
-        //if (gameState.is_climbing_ladder || gameState.is_climbing_wall /* || gameState.isParagliding*/)
-        //{
-        //    newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run_interact_cancel, VPAD_BUTTON_B);
-        //}
-        //else {
-        if (inputs.inGame.runState.lastEvent == ButtonState::Event::LongPress) {
-            newXRBtnHold |= VPAD_BUTTON_B;  // Run
+        if (gameState.is_climbing || gameState.is_paragliding) {
+            newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run_interact_cancel, VPAD_BUTTON_B);
         }
-        else
-            newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run_interact_cancel, VPAD_BUTTON_A);
-        //}
+        else {
+            if (inputs.inGame.runState.lastEvent == ButtonState::Event::LongPress) {
+                newXRBtnHold |= VPAD_BUTTON_B; // Run
+            }
+            else
+                newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run_interact_cancel, VPAD_BUTTON_A);
+        }
         
         // Wistle gesture
         if (isHandOverMouthSlot(leftGesture) && isHandOverMouthSlot(rightGesture)) {
