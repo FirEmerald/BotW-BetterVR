@@ -27,11 +27,12 @@ public:
         osLib_registerHLEFunction("coreinit", "hook_UpdateActorList", &hook_UpdateActorList);
         osLib_registerHLEFunction("coreinit", "hook_CreateNewActor", &hook_CreateNewActor);
 
-        // Camera Hooks
+        // Stereo Rendering/Camera Hooks
         osLib_registerHLEFunction("coreinit", "hook_BeginCameraSide", &hook_BeginCameraSide);
         osLib_registerHLEFunction("coreinit", "hook_ModifyLightPrePassProjectionMatrix", &hook_ModifyLightPrePassProjectionMatrix);
         osLib_registerHLEFunction("coreinit", "hook_OverwriteSeadPerspectiveProjectionSet", &hook_OverwriteSeadPerspectiveProjectionSet);
         osLib_registerHLEFunction("coreinit", "hook_ModifyProjectionUsingCamera", &hook_ModifyProjectionUsingCamera);
+        osLib_registerHLEFunction("coreinit", "hook_CheckIfCameraCanSeePos", &hook_CheckIfCameraCanSeePos);
         osLib_registerHLEFunction("coreinit", "hook_UpdateCameraForGameplay", &hook_UpdateCameraForGameplay);
         osLib_registerHLEFunction("coreinit", "hook_GetRenderCamera", &hook_GetRenderCamera);
         osLib_registerHLEFunction("coreinit", "hook_GetRenderProjection", &hook_GetRenderProjection);
@@ -247,6 +248,8 @@ private:
 
     static bool IsScreenOpen(ScreenId screen);
     static void InitWindowHandles();
+    static std::pair<glm::vec3, glm::fquat> CalculateVRWorldPose(const BESeadLookAtCamera& camera, uint8_t side);
+
     static void hook_UpdateSettings(PPCInterpreter_t* hCPU);
     
     static void MarkNeedsAutoEyeHeight();
@@ -259,6 +262,7 @@ private:
     static void hook_BeginCameraSide(PPCInterpreter_t* hCPU);
     static void hook_ModifyLightPrePassProjectionMatrix(PPCInterpreter_t* hCPU);
     static void hook_ModifyProjectionUsingCamera(PPCInterpreter_t* hCPU);
+    static void hook_CheckIfCameraCanSeePos(PPCInterpreter_t* hCPU);
     static void hook_OverwriteSeadPerspectiveProjectionSet(PPCInterpreter_t* hCPU);
     static void hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU);
     static void hook_GetRenderCamera(PPCInterpreter_t* hCPU);

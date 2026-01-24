@@ -256,28 +256,32 @@ static_assert(sizeof(PlayerOrEnemy) == 0x838, "PlayerOrEnemy size mismatch");
 // 0x00008002 for gliding
 // 0x00000090 for climbing
 // 0x00000410 for swimming (00001000001000000000000000000000)
+
+// Observed to be related to animations overrides.
+// Some player actions are represented by combinaisons of these flags.
+// No flags are set when in an event (interaction with npc, merchants, talks etc)
 enum class PlayerMoveBitFlags : uint32_t {
     IS_MOVING = 1 << 0,
-    IN_AIR_MAYBE_02 = 1 << 1,
-    UNK_004 = 1 << 2,
+    IS_IN_AIR = 1 << 1,
+    IS_CROUCHING = 1 << 2,
     UNK_008 = 1 << 3,
-    IS_LADDER_016 = 1 << 4,
-    UNK_032 = 1 << 5,
+    IS_SWIMMING_OR_CLIMBING = 1 << 4, // This used alone = climbing ladder. 
+    IS_PICKING_DROPPING_THROWING_OBJECT = 1 << 5,
     UNK_064 = 1 << 6,
-    IS_WALL_CLIMBING_MAYBE_128 = 1 << 7, // set while climbing?
+    IS_CLIMBING_WALL = 1 << 7, // This + IS_SWIMMING_OR_CLIMBING = IS_CLIMBING_WALL 
     UNK_256 = 1 << 8,
     UNK_512 = 1 << 9,
-    SWIMMING_1024 = 1 << 10,
-    UNK_2048 = 1 << 11,
+    IS_SWIMMING = 1 << 10, // This + IS_SWIMMING_OR_CLIMBING = IS_SWIMMING
+    IS_SWIMMING_DASH = 1 << 11, // This + IS_SWIMMING_OR_CLIMBING + IS_SWIMMING = IS_SWIMMING_DASH
     UNK_4096 = 1 << 12,
     UNK_8192 = 1 << 13,
     UNK_16384 = 1 << 14,
-    UNK_32768 = 1 << 15,
+    IS_GLIDER_ACTIVE = 1 << 15,
     UNK_65536 = 1 << 16,
     UNK_131072 = 1 << 17,
     UNK_262144 = 1 << 18,
-    UNK_524288 = 1 << 19,
-    UNK_1048576 = 1 << 20,
+    IS_RAGDOLL_ACTIVE = 1 << 19,
+    IS_RIDING_HORSE = 1 << 20,
     UNK_2097152 = 1 << 21,
     UNK_4194304 = 1 << 22,
     UNK_8388608 = 1 << 23,
@@ -409,6 +413,45 @@ enum WeaponType : uint32_t {
     UnknownWeapon = 0x5,
 };
 
+enum class EquipType {
+    None = 0,
+    Melee = 1,
+    Shield = 2,
+    Bow = 3,
+    Arrow = 4,
+    SheikahSlate = 5,
+    MagnetGlove = 6,
+    ThrowableObject = 7
+};
+
+enum class RumbleType {
+    Fixed,
+    Raising,
+    Falling,
+    OscillationSmooth,
+    OscillationFallingSawtoothWave,
+    OscillationRaisingSawtoothWave
+};
+
+ struct RumbleParameters {
+     bool prioritizeThisRumble = false;
+     int hand = 0;
+     RumbleType rumbleType = RumbleType::Fixed;
+     float oscillationFrequency = 0.0f;
+     bool keepRumblingOnEffectEnd = false; // requires stopInputsRumble() to manually stop the rumble
+     double effectDuration = 0;
+     float frequency = 0.0f;
+     float amplitude = 0.0f;
+ };
+
+enum class Direction {
+    Up,
+    Right,
+    Down,
+    Left,
+    None
+};
+
 struct Weapon : WeaponBase {
     PADDED_BYTES(0x72C, 0x870);
     AttackSensorInitArg setupAttackSensor;
@@ -480,6 +523,57 @@ struct ActCamera : ActorWiiU {
 };
 static_assert(offsetof(ActCamera, origCamMtx) == 0x550, "ActCamera.origCamMtx offset mismatch");
 static_assert(offsetof(ActCamera, finalCamMtx) == 0x5C0, "ActCamera.finalCamMtx offset mismatch");
+
+struct BESeadCamera {
+    BEMatrix34 mtx;
+    BEType<uint32_t> __vftable;
+};
+struct BESeadLookAtCamera : BESeadCamera {
+    BEVec3 pos;
+    BEVec3 at;
+    BEVec3 up;
+
+    bool operator==(const BESeadLookAtCamera& other) const {
+        return pos == other.pos && at == other.at && up == other.up;
+    }
+};
+static_assert(sizeof(BESeadCamera) == 0x34, "BESeadCamera size mismatch");
+static_assert(sizeof(BESeadLookAtCamera) == 0x58, "BESeadLookAtCamera size mismatch");
+
+// not identical memory layout wise
+struct Frustum {
+    glm::vec4 planes[6];
+
+    void update(const glm::mat4& vp) {
+        // Left
+        planes[0] = glm::vec4(vp[0][3] + vp[0][0], vp[1][3] + vp[1][0], vp[2][3] + vp[2][0], vp[3][3] + vp[3][0]);
+        // Right
+        planes[1] = glm::vec4(vp[0][3] - vp[0][0], vp[1][3] - vp[1][0], vp[2][3] - vp[2][0], vp[3][3] - vp[3][0]);
+        // Bottom
+        planes[2] = glm::vec4(vp[0][3] + vp[0][1], vp[1][3] + vp[1][1], vp[2][3] + vp[2][1], vp[3][3] + vp[3][1]);
+        // Top
+        planes[3] = glm::vec4(vp[0][3] - vp[0][1], vp[1][3] - vp[1][1], vp[2][3] - vp[2][1], vp[3][3] - vp[3][1]);
+        // Near
+        planes[4] = glm::vec4(vp[0][3] + vp[0][2], vp[1][3] + vp[1][2], vp[2][3] + vp[2][2], vp[3][3] + vp[3][2]);
+        // Far
+        planes[5] = glm::vec4(vp[0][3] - vp[0][2], vp[1][3] - vp[1][2], vp[2][3] - vp[2][2], vp[3][3] - vp[3][2]);
+
+        for (int i = 0; i < 6; ++i) {
+            float len = glm::length(glm::vec3(planes[i]));
+            planes[i] /= len;
+        }
+    }
+
+    bool checkSphere(const glm::vec3& center, float radius) const {
+        for (int i = 0; i < 6; ++i) {
+            float dist = glm::dot(glm::vec3(planes[i]), center) + planes[i].w;
+            if (dist < -radius) {
+                return false;
+            }
+        }
+        return true;
+    }
+};
 
 #pragma pack(pop)
 

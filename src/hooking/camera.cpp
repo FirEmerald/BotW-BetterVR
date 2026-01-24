@@ -133,7 +133,18 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
         readMemory(s_playerAddress, &actor);
 
         PlayerMoveBitFlags moveBits = actor.moveBitFlags.getLE();
-        s_isSwimming = (std::to_underlying(moveBits) & std::to_underlying(PlayerMoveBitFlags::SWIMMING_1024)) != 0;
+        s_isSwimming = ((std::to_underlying(moveBits) & std::to_underlying(PlayerMoveBitFlags::IS_SWIMMING_OR_CLIMBING)) != 0) && 
+            ((std::to_underlying(moveBits) & std::to_underlying(PlayerMoveBitFlags::IS_SWIMMING)) != 0);
+
+        // Todo: move those and their hooks in controls.cpp ?
+        auto gameState = VRManager::instance().XR->m_gameState.load();
+        // Unreliable flag, need to investigate
+        gameState.is_climbing = ((std::to_underlying(moveBits) & std::to_underlying(PlayerMoveBitFlags::IS_SWIMMING_OR_CLIMBING)) != 0) && 
+            ((std::to_underlying(moveBits) & std::to_underlying(PlayerMoveBitFlags::IS_CLIMBING_WALL)) != 0) ||
+            s_isLadderClimbing == 2;
+        gameState.is_riding_mount = s_isRiding == 2 ? true : false;
+        gameState.is_paragliding = (std::to_underlying(moveBits) & std::to_underlying(PlayerMoveBitFlags::IS_GLIDER_ACTIVE)) != 0;
+        VRManager::instance().XR->m_gameState.store(gameState);
 
         // read player MTX
         BEMatrix34& mtx = actor.mtx;
@@ -578,6 +589,112 @@ void CemuHooks::hook_ModifyProjectionUsingCamera(PPCInterpreter_t* hCPU) {
     writeMemory(projectionPtr, &perspectiveProjection);
 }
 
+std::pair<glm::vec3, glm::fquat> CemuHooks::CalculateVRWorldPose(const BESeadLookAtCamera& camera, uint8_t side) {
+    // in-game camera
+    glm::mat4x3 viewMatrix = camera.mtx.getLEMatrix();
+    glm::mat4 worldGame = glm::inverse(glm::mat4(viewMatrix));
+    glm::vec3 basePos = s_wsCameraPosition;
+    glm::quat baseRot = s_wsCameraRotation;
+    auto [swing, baseYaw] = swingTwistY(baseRot);
+
+    if (CemuHooks::IsFirstPerson()) {
+        // take link's direction, then rotate the headset position
+        BEMatrix34 playerMtx = {};
+        readMemory(s_playerMtxAddress, &playerMtx);
+        glm::fvec3 playerPos = playerMtx.getPos().getLE();
+
+        if (s_isRiding) {
+            playerPos.y -= hardcodedRidingOffset;
+        }
+        else if (s_isSwimming) {
+            playerPos.y += hardcodedSwimOffset;
+        }
+        else {
+            playerPos.y += GetSettings().playerHeightSetting.getLE();
+        }
+
+        basePos = playerPos;
+
+        if (auto settings = GetFirstPersonSettingsForActiveEvent()) {
+            if (settings->ignoreCameraRotation) {
+                glm::fquat playerRot = playerMtx.getRotLE();
+                auto [swing, yaw] = swingTwistY(playerRot);
+                baseYaw = yaw * glm::angleAxis(glm::radians(180.0f), glm::fvec3(0.0f, 1.0f, 0.0f));
+            }
+        }
+    }
+
+    // vr camera
+    std::optional<XrPosef> currPoseOpt = VRManager::instance().XR->GetRenderer()->GetPose((OpenXR::EyeSide)side);
+    if (!currPoseOpt.has_value()) {
+        return { basePos, baseRot };
+    }
+
+    glm::fvec3 eyePos = ToGLM(currPoseOpt.value().position);
+    glm::fquat eyeRot = ToGLM(currPoseOpt.value().orientation);
+
+    glm::vec3 newPos = basePos + (baseYaw * eyePos);
+    glm::fquat newRot = baseYaw * eyeRot;
+
+    return { newPos, newRot };
+}
+
+constexpr float VISIBILITY_CHECK_BUFFER = 1.5f;
+void CemuHooks::hook_CheckIfCameraCanSeePos(PPCInterpreter_t* hCPU) {
+    hCPU->instructionPointer = hCPU->sprNew.LR;
+
+    if (VRManager::instance().XR->GetRenderer() == nullptr) {
+        hCPU->gpr[3] = 1;
+        return;
+    }
+
+    uint32_t camPtr = hCPU->gpr[3];
+    uint32_t posPtr = hCPU->gpr[4];
+    float radius = hCPU->fpr[1].fp0;
+    float nearClip = hCPU->fpr[2].fp0;
+    float farClip = hCPU->fpr[3].fp0;
+
+    BESeadLookAtCamera camera = {};
+    readMemory(camPtr, &camera);
+
+    struct {
+        uint32_t x, y, z;
+    } posRaw;
+    readMemory(posPtr, &posRaw);
+
+    auto swapFloat = [](uint32_t val) -> float {
+        uint32_t swapped = ((val & 0xFF) << 24) | ((val & 0xFF00) << 8) | ((val & 0xFF0000) >> 8) | ((val & 0xFF000000) >> 24);
+        float f;
+        memcpy(&f, &swapped, 4);
+        return f;
+    };
+
+    glm::vec3 center(swapFloat(posRaw.x), swapFloat(posRaw.y), swapFloat(posRaw.z));
+
+    Frustum frustum;
+    bool visible = false;
+
+    for (int i = 0; i < 2; ++i) {
+        OpenXR::EyeSide side = (i == 0) ? OpenXR::EyeSide::LEFT : OpenXR::EyeSide::RIGHT;
+        if (auto fovOpt = VRManager::instance().XR->GetRenderer()->GetFOV(side)) {
+            auto [pos, rot] = CalculateVRWorldPose(camera, side);
+            glm::mat4 view = glm::inverse(glm::translate(glm::mat4(1.0f), pos) * glm::mat4_cast(rot));
+            glm::mat4 proj = calculateProjectionMatrix(nearClip, farClip, fovOpt.value());
+            glm::mat4 vp = proj * view;
+
+            frustum.update(vp);
+            if (frustum.checkSphere(center, radius+VISIBILITY_CHECK_BUFFER)) {
+                visible = true;
+                break;
+            }
+        }
+    }
+
+    Log::print<INFO>("Checking visibility of {} (rad = {}, near = {}, far = {}): {}", center, radius, nearClip, farClip, visible ? "visible" : "invisible");
+
+    hCPU->gpr[3] = visible ? 1 : 0;
+}
+
 void CemuHooks::hook_EndCameraSide(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
 
@@ -833,16 +950,6 @@ void CemuHooks::hook_FixLadder(PPCInterpreter_t* hCPU) {
     }
 }
 
-void CemuHooks::hook_PlayerLadderFix(PPCInterpreter_t* hCPU) {
-    hCPU->gpr[0] = hCPU->sprNew.LR;
-    hCPU->instructionPointer = 0x02D07CEC;
-
-    if (IsFirstPerson()) {
-        s_isLadderClimbing = 2;
-    }
-}
-
-
 void CemuHooks::hook_PlayerIsRiding(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
 
@@ -850,7 +957,13 @@ void CemuHooks::hook_PlayerIsRiding(PPCInterpreter_t* hCPU) {
     if (isRiding && IsFirstPerson()) {
         s_isRiding = 2;
     }
+}
 
-    // todo: remove this once hooked up to input system. Also, move to a better function, maybe controls.cpp?
-    //Log::print<VERBOSE>("Player is riding hook called: {}", hCPU->gpr[3]);
+void CemuHooks::hook_PlayerLadderFix(PPCInterpreter_t* hCPU) {
+    hCPU->gpr[0] = hCPU->sprNew.LR;
+    hCPU->instructionPointer = 0x02D07CEC;
+
+    if (IsFirstPerson()) {
+        s_isLadderClimbing = 2;
+    }
 }
