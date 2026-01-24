@@ -330,6 +330,7 @@ void OpenXR::CreateActions() {
 
         //for selection menus
         createAction(m_menuActionSet, "grab", "Select weapon/item from body slots (should match grab from in-game inputs)", XR_ACTION_TYPE_FLOAT_INPUT, m_inMenu_grabAction);
+        createAction(m_menuActionSet, "rune", "Select rune (should match use rune from in-game inputs)", XR_ACTION_TYPE_BOOLEAN_INPUT, m_inMenu_runeAction);
 
     }
 
@@ -409,6 +410,7 @@ void OpenXR::CreateActions() {
 
             XrActionSuggestedBinding{ .action = m_inMenu_grabAction, .binding = GetXRPath("/user/hand/left/input/squeeze/value") },
             XrActionSuggestedBinding{ .action = m_inMenu_grabAction, .binding = GetXRPath("/user/hand/right/input/squeeze/value") },
+            XrActionSuggestedBinding{ .action = m_inMenu_runeAction, .binding = GetXRPath("/user/hand/left/input/y/click") },
         };
         XrInteractionProfileSuggestedBinding suggestedBindingsInfo = { XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING };
         suggestedBindingsInfo.interactionProfile = GetXRPath("/interaction_profiles/oculus/touch_controller");
@@ -464,6 +466,7 @@ void OpenXR::CreateActions() {
 
             XrActionSuggestedBinding{ .action = m_inMenu_grabAction, .binding = GetXRPath("/user/hand/left/input/squeeze/force") },
             XrActionSuggestedBinding{ .action = m_inMenu_grabAction, .binding = GetXRPath("/user/hand/right/input/squeeze/force") },
+            XrActionSuggestedBinding{ .action = m_inMenu_runeAction, .binding = GetXRPath("/user/hand/left/input/b/click") },
         };
         XrInteractionProfileSuggestedBinding suggestedBindingsInfo = { XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING };
         suggestedBindingsInfo.interactionProfile = GetXRPath("/interaction_profiles/valve/index_controller");
@@ -671,6 +674,11 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
                 CheckButtonState(buttonPressed, buttonState);
             }
         }
+
+        XrActionStateGetInfo getUseRuneInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
+        getUseRuneInfo.action = m_inMenu_runeAction;
+        newState.inMenu.useRune_dpadMenu = { XR_TYPE_ACTION_STATE_BOOLEAN };
+        checkXRResult(xrGetActionStateBoolean(m_session, &getUseRuneInfo, &newState.inMenu.useRune_dpadMenu), "Failed to get use rune action value!");
     }
     else {
         for (EyeSide side : { EyeSide::LEFT, EyeSide::RIGHT }) {

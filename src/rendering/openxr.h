@@ -116,6 +116,7 @@ public:
             //for selection menus
             std::array<XrActionStateFloat, 2> grab;
             std::array<ButtonState, 2> grabState; // LEFT/RIGHT
+            XrActionStateBoolean useRune_dpadMenu;
         } inMenu;
     };
     std::atomic<InputState> m_input = InputState{};
@@ -130,9 +131,8 @@ public:
         bool was_in_game = false;
         bool map_open = false; // map = true, inventory = false
         bool dpad_menu_open = false;
-        bool rune_menu_open = false;
         Direction last_dpad_menu_open = Direction::None;
-        uint32_t last_dpad_grab_index = 2; //0 = left, 1 = right, 2 = neither
+        uint32_t last_dpad_grab_index = 3; //0 = left, 1 = right, 2 = rune menu, 3 = neither
 
         bool prevent_inputs = false;
         std::chrono::steady_clock::time_point prevent_inputs_time;
@@ -252,6 +252,7 @@ private:
 
     //for selection menu
     XrAction m_inMenu_grabAction = XR_NULL_HANDLE;
+    XrAction m_inMenu_runeAction = XR_NULL_HANDLE;
 
     std::unique_ptr<RND_Renderer> m_renderer;
     std::unique_ptr<RumbleManager> m_rumbleManager;

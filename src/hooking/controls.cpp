@@ -651,16 +651,7 @@ void handleMenuInput(
     buttonHold |= mapButton(inputs.inMenu.hold, VPAD_BUTTON_X);
     buttonHold |= mapButton(inputs.inMenu.leftTrigger, VPAD_BUTTON_L);
     buttonHold |= mapButton(inputs.inMenu.rightTrigger, VPAD_BUTTON_R);
-
-    // handle optional quick rune menu
-    if (gameState.rune_menu_open) {
-        if (inputs.inMenu.sort.currentState)
-            buttonHold |= VPAD_BUTTON_UP;
-        else
-            gameState.rune_menu_open = false;
-    }
-    else
-        buttonHold |= mapButton(inputs.inMenu.sort, VPAD_BUTTON_Y);
+    buttonHold |= mapButton(inputs.inMenu.sort, VPAD_BUTTON_Y);
 
 }
 
@@ -756,22 +747,31 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
             default: break;
         }
 
-        //TODO maybe add a setting for this?
-        if (gameState.last_dpad_grab_index == 0 || gameState.last_dpad_grab_index == 1) {
-            if (inputs.inMenu.grab[gameState.last_dpad_grab_index].isActive && !inputs.inMenu.grabState[gameState.last_dpad_grab_index].wasDownLastFrame) { //grab button released
+        if (gameState.last_dpad_grab_index == 2) {
+            if (inputs.inMenu.useRune_dpadMenu.isActive && !inputs.inMenu.useRune_dpadMenu.currentState) { //rune button released
                 gameState.dpad_menu_open = false;
                 gameState.last_dpad_menu_open = Direction::None;
-                gameState.last_dpad_grab_index = 2;
+                gameState.last_dpad_grab_index = 3;
             }
         }
+        else {
+            //TODO maybe add a setting for this?
+            if (gameState.last_dpad_grab_index != 3) {
+                if (inputs.inMenu.grab[gameState.last_dpad_grab_index].isActive && !inputs.inMenu.grabState[gameState.last_dpad_grab_index].wasDownLastFrame) { //grab button released
+                    gameState.dpad_menu_open = false;
+                    gameState.last_dpad_menu_open = Direction::None;
+                    gameState.last_dpad_grab_index = 3;
+                }
+            }
 
-        if (inputs.inMenu.select.currentState || inputs.inMenu.back.currentState) // need to add a way to quit dpad menu by pressing again grips
-        {
-            gameState.dpad_menu_open = false;
-            gameState.last_dpad_menu_open = Direction::None;
-            gameState.last_dpad_grab_index = 2;
-            //// prevents the arrow shoot on menu quit from the force equip bow input (see handleDpadMenu())
-            //newXRBtnHold |= VPAD_BUTTON_B;
+            if (inputs.inMenu.select.currentState || inputs.inMenu.back.currentState) // need to add a way to quit dpad menu by pressing again grips
+            {
+                gameState.dpad_menu_open = false;
+                gameState.last_dpad_menu_open = Direction::None;
+                gameState.last_dpad_grab_index = 3;
+                //// prevents the arrow shoot on menu quit from the force equip bow input (see handleDpadMenu())
+                //newXRBtnHold |= VPAD_BUTTON_B;
+            }
         }
     }
 
@@ -801,7 +801,9 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         
         // Optional rune inputs (for seated players)
         if (inputs.inGame.useRune_runeMenuState.lastEvent == ButtonState::Event::LongPress) {
-            gameState.rune_menu_open = true;
+            gameState.dpad_menu_open = true;
+            gameState.last_dpad_menu_open = Direction::Up;
+            gameState.last_dpad_grab_index = 2;
             newXRBtnHold |= VPAD_BUTTON_UP;  // Rune quick menu
         }
         if (inputs.inGame.useRune_runeMenuState.lastEvent == ButtonState::Event::ShortPress) {
