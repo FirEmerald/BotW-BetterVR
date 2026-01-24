@@ -670,9 +670,6 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
                 auto buttonPressed = action.currentState > 0.75f;
                 CheckButtonState(buttonPressed, buttonState);
             }
-            Log::print<INFO>("Test isActive {}: {}", side, action.isActive);
-            Log::print<INFO>("Test currentState {}: {}", side, action.currentState);
-            Log::print<INFO>("Test wasDownLastFrame {}: {}", side, buttonState.wasDownLastFrame);
         }
     }
     else {
