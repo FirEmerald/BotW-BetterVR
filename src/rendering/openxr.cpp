@@ -328,6 +328,9 @@ void OpenXR::CreateActions() {
         createAction(m_menuActionSet, "inmenu_map", "Close Map (Select Button)", XR_ACTION_TYPE_BOOLEAN_INPUT, m_inMenu_mapAction);
         createAction(m_menuActionSet, "inmenu_inventory", "Close Inventory (Wii U - Start Button)", XR_ACTION_TYPE_BOOLEAN_INPUT, m_inMenu_inventoryAction);
 
+        //for selection menus
+        createAction(m_menuActionSet, "grab", "Select weapon/item from body slots (should match grab from in-game inputs)", XR_ACTION_TYPE_FLOAT_INPUT, m_inMenu_grabAction);
+
     }
 
     {
@@ -347,7 +350,10 @@ void OpenXR::CreateActions() {
             //XrActionSuggestedBinding{ .action = m_selectAction, .binding = GetXRPath("/user/hand/right/input/select/click") },
             XrActionSuggestedBinding{ .action = m_backAction, .binding = GetXRPath("/user/hand/right/input/menu/click") },
             XrActionSuggestedBinding{ .action = m_sortAction, .binding = GetXRPath("/user/hand/left/input/select/click") },
-            XrActionSuggestedBinding{ .action = m_holdAction, .binding = GetXRPath("/user/hand/left/input/menu/click") }
+            XrActionSuggestedBinding{ .action = m_holdAction, .binding = GetXRPath("/user/hand/left/input/menu/click") },
+
+            XrActionSuggestedBinding{ .action = m_inMenu_grabAction, .binding = GetXRPath("/user/hand/left/input/select/click") },
+            XrActionSuggestedBinding{ .action = m_inMenu_grabAction, .binding = GetXRPath("/user/hand/right/input/select/click") }
         };
         XrInteractionProfileSuggestedBinding suggestedBindingsInfo = { XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING };
         suggestedBindingsInfo.interactionProfile = GetXRPath("/interaction_profiles/khr/simple_controller");
@@ -400,6 +406,9 @@ void OpenXR::CreateActions() {
             XrActionSuggestedBinding{ .action = m_rightTriggerAction, .binding = GetXRPath("/user/hand/right/input/trigger/value") },
             XrActionSuggestedBinding{ .action = m_inMenu_mapAction, .binding = GetXRPath("/user/hand/left/input/thumbstick/click") },
             XrActionSuggestedBinding{ .action = m_inMenu_inventoryAction, .binding = GetXRPath("/user/hand/right/input/thumbstick/click") },
+
+            XrActionSuggestedBinding{ .action = m_inMenu_grabAction, .binding = GetXRPath("/user/hand/left/input/squeeze/value") },
+            XrActionSuggestedBinding{ .action = m_inMenu_grabAction, .binding = GetXRPath("/user/hand/right/input/squeeze/value") },
         };
         XrInteractionProfileSuggestedBinding suggestedBindingsInfo = { XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING };
         suggestedBindingsInfo.interactionProfile = GetXRPath("/interaction_profiles/oculus/touch_controller");
@@ -452,6 +461,9 @@ void OpenXR::CreateActions() {
             XrActionSuggestedBinding{ .action = m_rightTriggerAction, .binding = GetXRPath("/user/hand/right/input/trigger/value") },
             XrActionSuggestedBinding{ .action = m_inMenu_mapAction, .binding = GetXRPath("/user/hand/left/input/thumbstick/click") },
             XrActionSuggestedBinding{ .action = m_inMenu_inventoryAction, .binding = GetXRPath("/user/hand/right/input/thumbstick/click") },
+
+            XrActionSuggestedBinding{ .action = m_inMenu_grabAction, .binding = GetXRPath("/user/hand/left/input/squeeze/force") },
+            XrActionSuggestedBinding{ .action = m_inMenu_grabAction, .binding = GetXRPath("/user/hand/right/input/squeeze/force") },
         };
         XrInteractionProfileSuggestedBinding suggestedBindingsInfo = { XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING };
         suggestedBindingsInfo.interactionProfile = GetXRPath("/interaction_profiles/valve/index_controller");
@@ -643,6 +655,25 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
         newState.inMenu.inventory = { XR_TYPE_ACTION_STATE_BOOLEAN };
         checkXRResult(xrGetActionStateBoolean(m_session, &getInventoryMenuInfo, &newState.inMenu.inventory), "Failed to get inventory action value!");
     
+        //for selection menus
+        for (EyeSide side : { EyeSide::LEFT, EyeSide::RIGHT }) {
+            XrActionStateGetInfo getGrabInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
+            getGrabInfo.action = m_inMenu_grabAction;
+            getGrabInfo.subactionPath = m_handPaths[side];
+            newState.inMenu.grab[side] = { XR_TYPE_ACTION_STATE_FLOAT };
+            checkXRResult(xrGetActionStateFloat(m_session, &getGrabInfo, &newState.inMenu.grab[side]), "Failed to get grab action value!");
+
+            auto& action = newState.inMenu.grab[side];
+            auto& buttonState = newState.inMenu.grabState[side];
+
+            if (action.isActive == XR_TRUE) {
+                auto buttonPressed = action.currentState > 0.75f;
+                CheckButtonState(buttonPressed, buttonState);
+            }
+            Log::print<INFO>("Test isActive {}: {}", side, action.isActive);
+            Log::print<INFO>("Test currentState {}: {}", side, action.currentState);
+            Log::print<INFO>("Test wasDownLastFrame {}: {}", side, buttonState.wasDownLastFrame);
+        }
     }
     else {
         for (EyeSide side : { EyeSide::LEFT, EyeSide::RIGHT }) {

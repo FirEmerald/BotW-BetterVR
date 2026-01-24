@@ -242,9 +242,11 @@ void handleLeftHandInGameInput(
 
     // Handle shoulder slot interactions
     if (isHandOverLeftShoulderSlot(leftGesture) || isHandOverRightShoulderSlot(leftGesture)) {
-        if (handleDpadMenu(inputs.inGame.grabState[0].lastEvent, leftGesture, buttonHold, gameState))
+        if (handleDpadMenu(inputs.inGame.grabState[0].lastEvent, leftGesture, buttonHold, gameState)) {
+            gameState.last_dpad_grab_index = 0;
             // Don't process normal input when opening dpad menu
             return;
+        }
 
         // Handle equip/unequip
         if (!gameState.prevent_grab_inputs && isGrabPressed) {
@@ -277,9 +279,11 @@ void handleLeftHandInGameInput(
     // Handle waist slot interaction (Rune)
     if (isHandOverLeftWaistSlot(leftGesture)) {    
         // Handle dpad menu
-        if (handleDpadMenu(inputs.inGame.grabState[0].lastEvent, leftGesture, buttonHold, gameState))
+        if (handleDpadMenu(inputs.inGame.grabState[0].lastEvent, leftGesture, buttonHold, gameState)) {
+            gameState.last_dpad_grab_index = 0;
             // Don't process normal input when opening dpad menu
             return;
+        }
 
         if (!gameState.prevent_grab_inputs && isGrabPressed) {
             rumbleMgr->enqueueInputsRumbleCommand(leftRumbleFall);
@@ -386,9 +390,11 @@ void handleRightHandInGameInput(
     // Handle shoulder slot interactions
     if (isHandOverLeftShoulderSlot(rightGesture) || isHandOverRightShoulderSlot(rightGesture)) {
         // Handle dpad menu
-        if (handleDpadMenu(inputs.inGame.grabState[1].lastEvent, rightGesture, buttonHold, gameState))
+        if (handleDpadMenu(inputs.inGame.grabState[1].lastEvent, rightGesture, buttonHold, gameState)) {
+            gameState.last_dpad_grab_index = 1;
             // Don't process normal input when opening dpad menu
             return;
+        }
 
         // Handle equip/unequip
         if (!gameState.prevent_grab_inputs && isGrabPressedShort) {
@@ -437,9 +443,11 @@ void handleRightHandInGameInput(
     // Handle waist slot interaction (Rune)
     if (isHandOverLeftWaistSlot(rightGesture)) {   
         // Handle dpad menu
-        if (handleDpadMenu(inputs.inGame.grabState[1].lastEvent, rightGesture, buttonHold, gameState))
+        if (handleDpadMenu(inputs.inGame.grabState[1].lastEvent, rightGesture, buttonHold, gameState)) {
+            gameState.last_dpad_grab_index = 1;
             // Don't process normal input when opening dpad menu
             return;
+        }
 
         if (!gameState.prevent_grab_inputs && isGrabPressedShort) {
             rumbleMgr->enqueueInputsRumbleCommand(rightRumbleFall);
@@ -748,10 +756,20 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
             default: break;
         }
 
+        //TODO maybe add a setting for this?
+        if (gameState.last_dpad_grab_index == 0 || gameState.last_dpad_grab_index == 1) {
+            if (inputs.inMenu.grab[gameState.last_dpad_grab_index].isActive && !inputs.inMenu.grabState[gameState.last_dpad_grab_index].wasDownLastFrame) { //grab button released
+                gameState.dpad_menu_open = false;
+                gameState.last_dpad_menu_open = Direction::None;
+                gameState.last_dpad_grab_index = 2;
+            }
+        }
+
         if (inputs.inMenu.select.currentState || inputs.inMenu.back.currentState) // need to add a way to quit dpad menu by pressing again grips
         {
             gameState.dpad_menu_open = false;
             gameState.last_dpad_menu_open = Direction::None;
+            gameState.last_dpad_grab_index = 2;
             //// prevents the arrow shoot on menu quit from the force equip bow input (see handleDpadMenu())
             //newXRBtnHold |= VPAD_BUTTON_B;
         }
