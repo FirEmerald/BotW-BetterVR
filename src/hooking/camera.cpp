@@ -91,6 +91,9 @@ void CemuHooks::ApplyCameraOffsets(glm::fvec3* playerPos, bool isRenderCamera) {
     }
 }
 
+const uint32_t swimmingFlags = std::to_underlying(PlayerMoveBitFlags::IS_SWIMMING_OR_CLIMBING) | std::to_underlying(PlayerMoveBitFlags::IS_SWIMMING);
+const uint32_t climbingFlags = std::to_underlying(PlayerMoveBitFlags::IS_SWIMMING_OR_CLIMBING) | std::to_underlying(PlayerMoveBitFlags::IS_CLIMBING_WALL);
+
 void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
 
@@ -133,14 +136,12 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
         readMemory(s_playerAddress, &actor);
 
         PlayerMoveBitFlags moveBits = actor.moveBitFlags.getLE();
-        s_isSwimming = ((std::to_underlying(moveBits) & std::to_underlying(PlayerMoveBitFlags::IS_SWIMMING_OR_CLIMBING)) != 0) && 
-            ((std::to_underlying(moveBits) & std::to_underlying(PlayerMoveBitFlags::IS_SWIMMING)) != 0);
+        s_isSwimming = (std::to_underlying(moveBits) & swimmingFlags) == swimmingFlags;
 
         // Todo: move those and their hooks in controls.cpp ?
         auto gameState = VRManager::instance().XR->m_gameState.load();
         // Unreliable flag, need to investigate
-        gameState.is_climbing = ((std::to_underlying(moveBits) & std::to_underlying(PlayerMoveBitFlags::IS_SWIMMING_OR_CLIMBING)) != 0) && 
-            ((std::to_underlying(moveBits) & std::to_underlying(PlayerMoveBitFlags::IS_CLIMBING_WALL)) != 0) ||
+        gameState.is_climbing = (std::to_underlying(moveBits) & climbingFlags) == climbingFlags ||
             s_isLadderClimbing == 2;
         gameState.is_riding_mount = s_isRiding == 2 ? true : false;
         gameState.is_paragliding = (std::to_underlying(moveBits) & std::to_underlying(PlayerMoveBitFlags::IS_GLIDER_ACTIVE)) != 0;
@@ -603,15 +604,7 @@ std::pair<glm::vec3, glm::fquat> CemuHooks::CalculateVRWorldPose(const BESeadLoo
         readMemory(s_playerMtxAddress, &playerMtx);
         glm::fvec3 playerPos = playerMtx.getPos().getLE();
 
-        if (s_isRiding) {
-            playerPos.y -= hardcodedRidingOffset;
-        }
-        else if (s_isSwimming) {
-            playerPos.y += hardcodedSwimOffset;
-        }
-        else {
-            playerPos.y += GetSettings().playerHeightSetting.getLE();
-        }
+        ApplyCameraOffsets(&playerPos, true);
 
         basePos = playerPos;
 
