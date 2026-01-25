@@ -747,37 +747,39 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
             default: break;
         }
 
-        if (gameState.last_dpad_grab_index == 2) {
-            if (inputs.inMenu.useRune_dpadMenu.isActive && !inputs.inMenu.useRune_dpadMenu.currentState) { //rune button released
-                gameState.dpad_menu_open = false;
-                gameState.last_dpad_menu_open = Direction::None;
-                gameState.last_dpad_grab_index = 3;
-            }
-        }
-        else {
-            //TODO maybe add a setting for this?
-            if (gameState.last_dpad_grab_index != 3) {
-                if (inputs.inMenu.grab[gameState.last_dpad_grab_index].isActive && !inputs.inMenu.grabState[gameState.last_dpad_grab_index].wasDownLastFrame) { //grab button released
+        if (!gameState.prevent_inputs) {
+            if (gameState.last_dpad_grab_index == 2) {
+                if (!inputs.inMenu.useRune_dpadMenu.currentState) { //rune button released
                     gameState.dpad_menu_open = false;
                     gameState.last_dpad_menu_open = Direction::None;
                     gameState.last_dpad_grab_index = 3;
                 }
             }
+            else {
+                //TODO maybe add a setting for this?
+                if (gameState.last_dpad_grab_index != 3) {
+                    if (!inputs.inMenu.grabState[gameState.last_dpad_grab_index].wasDownLastFrame) { //grab button released
+                        gameState.dpad_menu_open = false;
+                        gameState.last_dpad_menu_open = Direction::None;
+                        gameState.last_dpad_grab_index = 3;
+                    }
+                }
 
-            if (inputs.inMenu.select.currentState || inputs.inMenu.back.currentState) // need to add a way to quit dpad menu by pressing again grips
-            {
-                gameState.dpad_menu_open = false;
-                gameState.last_dpad_menu_open = Direction::None;
-                gameState.last_dpad_grab_index = 3;
-                //// prevents the arrow shoot on menu quit from the force equip bow input (see handleDpadMenu())
-                //newXRBtnHold |= VPAD_BUTTON_B;
+                if (inputs.inMenu.back.currentState) // need to add a way to quit dpad menu by pressing again grips
+                {
+                    gameState.dpad_menu_open = false;
+                    gameState.last_dpad_menu_open = Direction::None;
+                    gameState.last_dpad_grab_index = 3;
+                    //// prevents the arrow shoot on menu quit from the force equip bow input (see handleDpadMenu())
+                    //newXRBtnHold |= VPAD_BUTTON_B;
+                }
             }
         }
     }
 
-    // Process inputs
-    if (gameState.in_game) {
-        if (!gameState.prevent_inputs) {
+    if (!gameState.prevent_inputs) {
+        // Process inputs
+        if (gameState.in_game) {
             // prevent jump when exiting menus with B button
             newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.jump, VPAD_BUTTON_X);
 
@@ -795,67 +797,65 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
                 newXRBtnHold |= VPAD_BUTTON_PLUS;
                 gameState.map_open = false;
             }
-        }
 
-        newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.crouch, VPAD_BUTTON_STICK_L);
-        
-        // Optional rune inputs (for seated players)
-        if (inputs.inGame.useRune_runeMenuState.lastEvent == ButtonState::Event::LongPress) {
-            gameState.dpad_menu_open = true;
-            gameState.last_dpad_menu_open = Direction::Up;
-            gameState.last_dpad_grab_index = 2;
-            newXRBtnHold |= VPAD_BUTTON_UP;  // Rune quick menu
-        }
-        if (inputs.inGame.useRune_runeMenuState.lastEvent == ButtonState::Event::ShortPress) {
-            newXRBtnHold |= VPAD_BUTTON_L;  // Use rune
-            gameState.last_item_held = EquipType::SheikahSlate;
-        }
-        
-        // If climbing or paragliding, make the B button cancel instantly the action instead of long press to run
-        if (gameState.is_climbing || gameState.is_paragliding) {
-            newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run_interact_cancel, VPAD_BUTTON_B);
-        }
-        else if (gameState.is_riding_mount)
-        {
-            newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run_interact_cancel, VPAD_BUTTON_A);
-            newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.useLeftItem, VPAD_BUTTON_B);
+            newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.crouch, VPAD_BUTTON_STICK_L);
+
+            // Optional rune inputs (for seated players)
+            if (inputs.inGame.useRune_runeMenuState.lastEvent == ButtonState::Event::LongPress) {
+                gameState.dpad_menu_open = true;
+                gameState.last_dpad_menu_open = Direction::Up;
+                gameState.last_dpad_grab_index = 2;
+                newXRBtnHold |= VPAD_BUTTON_UP; // Rune quick menu
+            }
+            if (inputs.inGame.useRune_runeMenuState.lastEvent == ButtonState::Event::ShortPress) {
+                newXRBtnHold |= VPAD_BUTTON_L; // Use rune
+                gameState.last_item_held = EquipType::SheikahSlate;
+            }
+
+            // If climbing or paragliding, make the B button cancel instantly the action instead of long press to run
+            if (gameState.is_climbing || gameState.is_paragliding) {
+                newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run_interact_cancel, VPAD_BUTTON_B);
+            }
+            else if (gameState.is_riding_mount) {
+                newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run_interact_cancel, VPAD_BUTTON_A);
+                newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.useLeftItem, VPAD_BUTTON_B);
+            }
+            else {
+                if (inputs.inGame.runState.lastEvent == ButtonState::Event::LongPress) {
+                    newXRBtnHold |= VPAD_BUTTON_B; // Run
+                }
+                else {
+                    newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run_interact_cancel, VPAD_BUTTON_A);
+                }
+            }
+
+            // Whistle gesture
+            if (isHandOverMouthSlot(leftGesture) && isHandOverMouthSlot(rightGesture)) {
+                if (inputs.inGame.grabState[0].wasDownLastFrame && inputs.inGame.grabState[1].wasDownLastFrame) {
+                    rumbleMgr->enqueueInputsRumbleCommand({ true, 0, RumbleType::OscillationRaisingSawtoothWave, 1.0f, false, 0.25, 0.2f, 0.2f });
+                    newXRBtnHold |= VPAD_BUTTON_DOWN;
+                }
+            }
+
+            // Hand-specific input
+            handleLeftHandInGameInput(newXRBtnHold, inputs, gameState, leftGesture, leftJoystickDir, leftStickSource, rightStickSource, now);
+            handleRightHandInGameInput(newXRBtnHold, inputs, gameState, rightGesture, rightStickSource, rightJoystickDir, now);
+
+            // Trigger handling
+            handleLeftTriggerBindings(newXRBtnHold, inputs, gameState, leftGesture);
+            handleRightTriggerBindings(newXRBtnHold, inputs, gameState, rightGesture);
+
+            //// Rune cancel with left trigger
+            //if (inputs.inGame.leftTrigger.currentState &&
+            //    gameState.left_equip_type == EquipType::Rune) {
+            //    RumbleParameters rumble = { true, 1, 0.5f, false, 0.25, 0.3f, 0.3f };
+            //    rumbleMgr->enqueueInputsRumbleCommand(rumble);
+            //    newXRBtnHold |= VPAD_BUTTON_B;
+            //}
         }
         else {
-            if (inputs.inGame.runState.lastEvent == ButtonState::Event::LongPress) {
-                newXRBtnHold |= VPAD_BUTTON_B; // Run
-            }
-            else
-                newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run_interact_cancel, VPAD_BUTTON_A);
+            handleMenuInput(newXRBtnHold, inputs, gameState, leftJoystickDir);
         }
-
-        // Whistle gesture
-        if (isHandOverMouthSlot(leftGesture) && isHandOverMouthSlot(rightGesture)) {
-            if (inputs.inGame.grabState[0].wasDownLastFrame && inputs.inGame.grabState[1].wasDownLastFrame) {
-                rumbleMgr->enqueueInputsRumbleCommand({ true, 0, RumbleType::OscillationRaisingSawtoothWave, 1.0f, false, 0.25, 0.2f, 0.2f });
-                newXRBtnHold |= VPAD_BUTTON_DOWN;
-            }
-        }
-        
-        // Hand-specific input
-        handleLeftHandInGameInput(newXRBtnHold, inputs, gameState, leftGesture, 
-                                   leftJoystickDir, leftStickSource, rightStickSource, now);
-        handleRightHandInGameInput(newXRBtnHold, inputs, gameState, rightGesture, rightStickSource,
-                                    rightJoystickDir, now);
-        
-        // Trigger handling
-        handleLeftTriggerBindings(newXRBtnHold, inputs, gameState, leftGesture);
-        handleRightTriggerBindings(newXRBtnHold, inputs, gameState, rightGesture);
-        
-        //// Rune cancel with left trigger
-        //if (inputs.inGame.leftTrigger.currentState && 
-        //    gameState.left_equip_type == EquipType::Rune) {
-        //    RumbleParameters rumble = { true, 1, 0.5f, false, 0.25, 0.3f, 0.3f };
-        //    rumbleMgr->enqueueInputsRumbleCommand(rumble);
-        //    newXRBtnHold |= VPAD_BUTTON_B;
-        //}
-    }
-    else {
-        handleMenuInput(newXRBtnHold, inputs, gameState, leftJoystickDir);
     }
     
     // Update rumble/haptics
