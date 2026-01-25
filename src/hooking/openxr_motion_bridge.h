@@ -136,8 +136,8 @@ public:
 
         // Using Right Hand (index 1) for motion controls
         const int handIdx = 1;
-        auto& poseState = inputs.inGame.poseLocation[handIdx];
-        auto& velState = inputs.inGame.poseVelocity[handIdx];
+        auto& poseState = inputs.global.poseLocation[handIdx];
+        auto& velState = inputs.global.poseVelocity[handIdx];
 
         if ((poseState.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) && inputs.inGame.in_game) {
             glm::quat orientation = ToGLM(poseState.pose.orientation);

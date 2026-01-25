@@ -324,10 +324,10 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
 
     // get vr controller position and rotation
     const OpenXR::InputState inputs = VRManager::instance().XR->m_input.load();
-    if (!inputs.inGame.pose[side].isActive)
+    if (!inputs.global.pose[side].isActive)
         return;
 
-    const auto& pose = inputs.inGame.poseLocation[side];
+    const auto& pose = inputs.global.poseLocation[side];
     glm::fvec3 controllerPos = glm::fvec3();
     glm::fquat controllerRot = glm::identity<glm::fquat>();
     if (pose.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) {
@@ -392,6 +392,7 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
                         Log::print<INFO>("Default model eye height = {}", eyePos.y);
                     }
                 }
+                //TODO figure out why this fails when climbing sometimes
                 if (hasModelOffsets) {
                     if (FollowModelHead()) {
                         renderOffset += (eyePos.y - renderOffset) * CameraOffsetSmoothingFactorSetting();

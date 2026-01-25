@@ -395,7 +395,7 @@ void CemuHooks::hook_EnableWeaponAttackSensor(PPCInterpreter_t* hCPU) {
     }
 
     m_motionAnalyzers[heldIndex].ResetIfWeaponTypeChanged(weaponType);
-    m_motionAnalyzers[heldIndex].Update(state.inGame.poseLocation[heldIndex], state.inGame.poseVelocity[heldIndex], headset.value(), state.inGame.inputTime);
+    m_motionAnalyzers[heldIndex].Update(state.global.poseLocation[heldIndex], state.global.poseVelocity[heldIndex], headset.value(), state.inGame.inputTime);
 
     // Use the analysed motion to determine whether the weapon is swinging or stabbing, and whether the attackSensor should be active this frame
     bool CHEAT_alwaysEnableWeaponCollision = false;
@@ -471,7 +471,7 @@ void CemuHooks::hook_EquipWeapon(PPCInterpreter_t* hCPU) {
     auto input = VRManager::instance().XR->m_input.load();
     // Check both hands for a short press to pick up weapon
     for (int side = 0; side < 2; ++side) {
-        auto& grabState = input.inGame.grabState[side];
+        auto& grabState = input.global.grabState[side];
         // todo: Make sword smaller while its equipped. I think this might be a member value, but otherwise we can just scale the weapon matrix.
 
         //if (input.inGame.in_game && grabState.shortPress) {

@@ -208,9 +208,10 @@ void handleLeftHandInGameInput(
     constexpr RumbleParameters RuneRumble = { true, 0, RumbleType::OscillationSmooth, 1.0f, false, 1.0, 0.25f, 0.25f };
     
     auto* rumbleMgr = VRManager::instance().XR->GetRumbleManager();
-    bool isGrabPressed = inputs.inGame.grabState[0].lastEvent == ButtonState::Event::ShortPress;
-    bool isGrabPressedLong = inputs.inGame.grabState[0].lastEvent == ButtonState::Event::LongPress;
-    bool isCurrentGrabPressed = inputs.inGame.grabState[0].wasDownLastFrame;
+    bool isInteractPressed = inputs.inGame.interactState[0].lastEvent == ButtonState::Event::ShortPress;
+    bool isGrabPressed = inputs.global.grabState[0].lastEvent == ButtonState::Event::ShortPress;
+    bool isGrabPressedLong = inputs.global.grabState[0].lastEvent == ButtonState::Event::LongPress;
+    bool isCurrentGrabPressed = inputs.global.grabState[0].wasDownLastFrame;
     
     // Rune rumbles
     if (gameState.left_equip_type == EquipType::SheikahSlate)
@@ -234,7 +235,7 @@ void handleLeftHandInGameInput(
         rumbleMgr->enqueueInputsRumbleCommand(leftRumbleFall);
 
     // Handle Parry gesture
-    auto handVelocity = glm::length(ToGLM(inputs.inGame.poseVelocity[0].linearVelocity));
+    auto handVelocity = glm::length(ToGLM(inputs.global.poseVelocity[0].linearVelocity));
     if (handVelocity > 4.0f && gameState.left_equip_type == EquipType::Shield && leftGesture.isNearChestHeight) {
         buttonHold |= VPAD_BUTTON_A;
         rumbleMgr->enqueueInputsRumbleCommand(leftRumbleFall);
@@ -242,7 +243,7 @@ void handleLeftHandInGameInput(
 
     // Handle shoulder slot interactions
     if (isHandOverLeftShoulderSlot(leftGesture) || isHandOverRightShoulderSlot(leftGesture)) {
-        if (handleDpadMenu(inputs.inGame.grabState[0].lastEvent, leftGesture, buttonHold, gameState)) {
+        if (handleDpadMenu(inputs.global.grabState[0].lastEvent, leftGesture, buttonHold, gameState)) {
             gameState.last_dpad_grab_index = 0;
             // Don't process normal input when opening dpad menu
             return;
@@ -279,7 +280,7 @@ void handleLeftHandInGameInput(
     // Handle waist slot interaction (Rune)
     if (isHandOverLeftWaistSlot(leftGesture)) {    
         // Handle dpad menu
-        if (handleDpadMenu(inputs.inGame.grabState[0].lastEvent, leftGesture, buttonHold, gameState)) {
+        if (handleDpadMenu(inputs.global.grabState[0].lastEvent, leftGesture, buttonHold, gameState)) {
             gameState.last_dpad_grab_index = 0;
             // Don't process normal input when opening dpad menu
             return;
@@ -307,7 +308,7 @@ void handleLeftHandInGameInput(
             rightStickSource.currentState.y = 0.0f;
 
             if (!gameState.left_hand_position_stored) {
-                gameState.stored_left_hand_position = ToGLM(inputs.inGame.poseLocation[0].pose.position);
+                gameState.stored_left_hand_position = ToGLM(inputs.global.poseLocation[0].pose.position);
                 gameState.left_hand_position_stored = true;
                 rumbleMgr->enqueueInputsRumbleCommand(leftRumbleFall);
             }
@@ -359,7 +360,7 @@ void handleLeftHandInGameInput(
     //    return;
     //}
     
-    if (isGrabPressed) {
+    if (isInteractPressed) {
         // Handle grab action
         if (!gameState.prevent_grab_inputs) {
             buttonHold |= VPAD_BUTTON_A;
@@ -382,15 +383,16 @@ void handleRightHandInGameInput(
     constexpr RumbleParameters rightRumbleInfiniteRaise = { true, 1, RumbleType::Raising, 0.5f, true, 1.0, 0.25f, 0.25f };
 
     auto* rumbleMgr = VRManager::instance().XR->GetRumbleManager();
-    bool isGrabPressedShort = inputs.inGame.grabState[1].lastEvent == ButtonState::Event::ShortPress;
-    bool isGrabPressedLong = inputs.inGame.grabState[1].lastEvent == ButtonState::Event::LongPress;
-    bool isCurrentGrabPressed = inputs.inGame.grabState[1].wasDownLastFrame;
+    bool isInteractPressed = inputs.inGame.interactState[1].lastEvent == ButtonState::Event::ShortPress;
+    bool isGrabPressedShort = inputs.global.grabState[1].lastEvent == ButtonState::Event::ShortPress;
+    bool isGrabPressedLong = inputs.global.grabState[1].lastEvent == ButtonState::Event::LongPress;
+    bool isCurrentGrabPressed = inputs.global.grabState[1].wasDownLastFrame;
     bool isTriggerPressed = inputs.inGame.useRightItem.currentState;
     
     // Handle shoulder slot interactions
     if (isHandOverLeftShoulderSlot(rightGesture) || isHandOverRightShoulderSlot(rightGesture)) {
         // Handle dpad menu
-        if (handleDpadMenu(inputs.inGame.grabState[1].lastEvent, rightGesture, buttonHold, gameState)) {
+        if (handleDpadMenu(inputs.global.grabState[1].lastEvent, rightGesture, buttonHold, gameState)) {
             gameState.last_dpad_grab_index = 1;
             // Don't process normal input when opening dpad menu
             return;
@@ -443,7 +445,7 @@ void handleRightHandInGameInput(
     // Handle waist slot interaction (Rune)
     if (isHandOverLeftWaistSlot(rightGesture)) {   
         // Handle dpad menu
-        if (handleDpadMenu(inputs.inGame.grabState[1].lastEvent, rightGesture, buttonHold, gameState)) {
+        if (handleDpadMenu(inputs.global.grabState[1].lastEvent, rightGesture, buttonHold, gameState)) {
             gameState.last_dpad_grab_index = 1;
             // Don't process normal input when opening dpad menu
             return;
@@ -483,7 +485,7 @@ void handleRightHandInGameInput(
             rightStickSource.currentState.y = 0.0f;
 
             if (!gameState.right_hand_position_stored) {
-                gameState.stored_right_hand_position = ToGLM(inputs.inGame.poseLocation[1].pose.position);
+                gameState.stored_right_hand_position = ToGLM(inputs.global.poseLocation[1].pose.position);
                 gameState.right_hand_position_stored = true;
                 rumbleMgr->enqueueInputsRumbleCommand(rightRumbleFall);
             }
@@ -523,7 +525,7 @@ void handleRightHandInGameInput(
     else
         gameState.right_hand_position_stored = false;
 
-    if (isGrabPressedShort) {
+    if (isInteractPressed) {
         // Handle grab action
         if (!gameState.prevent_grab_inputs) {
             buttonHold |= VPAD_BUTTON_A;
@@ -730,8 +732,8 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         const auto headsetMtx = headsetPose.value();
         const glm::fvec3 headsetPos(headsetMtx[3]);
         
-        const auto leftHandPos = ToGLM(inputs.inGame.poseLocation[0].pose.position);
-        const auto rightHandPos = ToGLM(inputs.inGame.poseLocation[1].pose.position);
+        const auto leftHandPos = ToGLM(inputs.global.poseLocation[0].pose.position);
+        const auto rightHandPos = ToGLM(inputs.global.poseLocation[1].pose.position);
         
         leftGesture = calculateHandGesture(gameState, leftHandPos, headsetMtx, headsetPos, gameState.left_hand_position_stored, gameState.stored_left_hand_position);
         rightGesture = calculateHandGesture(gameState, rightHandPos, headsetMtx, headsetPos, gameState.right_hand_position_stored, gameState.stored_right_hand_position);
@@ -748,7 +750,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         }
 
         if (gameState.last_dpad_grab_index == 2) {
-            if (inputs.inMenu.useRune_dpadMenu.isActive && !inputs.inMenu.useRune_dpadMenu.currentState) { //rune button released
+            if (inputs.global.useRune_dpadMenu.isActive && !inputs.global.useRune_dpadMenu.currentState) { //rune button released
                 gameState.dpad_menu_open = false;
                 gameState.last_dpad_menu_open = Direction::None;
                 gameState.last_dpad_grab_index = 3;
@@ -757,7 +759,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         else {
             //TODO maybe add a setting for this?
             if (gameState.last_dpad_grab_index != 3) {
-                if (inputs.inMenu.grab[gameState.last_dpad_grab_index].isActive && !inputs.inMenu.grabState[gameState.last_dpad_grab_index].wasDownLastFrame) { //grab button released
+                if (inputs.global.grab[gameState.last_dpad_grab_index].isActive && !inputs.global.grabState[gameState.last_dpad_grab_index].wasDownLastFrame) { //grab button released
                     gameState.dpad_menu_open = false;
                     gameState.last_dpad_menu_open = Direction::None;
                     gameState.last_dpad_grab_index = 3;
@@ -800,13 +802,13 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.crouch, VPAD_BUTTON_STICK_L);
         
         // Optional rune inputs (for seated players)
-        if (inputs.inGame.useRune_runeMenuState.lastEvent == ButtonState::Event::LongPress) {
+        if (inputs.global.useRune_runeMenuState.lastEvent == ButtonState::Event::LongPress) {
             gameState.dpad_menu_open = true;
             gameState.last_dpad_menu_open = Direction::Up;
             gameState.last_dpad_grab_index = 2;
             newXRBtnHold |= VPAD_BUTTON_UP;  // Rune quick menu
         }
-        if (inputs.inGame.useRune_runeMenuState.lastEvent == ButtonState::Event::ShortPress) {
+        if (inputs.global.useRune_runeMenuState.lastEvent == ButtonState::Event::ShortPress) {
             newXRBtnHold |= VPAD_BUTTON_L;  // Use rune
             gameState.last_item_held = EquipType::SheikahSlate;
         }
@@ -830,7 +832,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
 
         // Whistle gesture
         if (isHandOverMouthSlot(leftGesture) && isHandOverMouthSlot(rightGesture)) {
-            if (inputs.inGame.grabState[0].wasDownLastFrame && inputs.inGame.grabState[1].wasDownLastFrame) {
+            if (inputs.global.grabState[0].wasDownLastFrame && inputs.global.grabState[1].wasDownLastFrame) {
                 rumbleMgr->enqueueInputsRumbleCommand({ true, 0, RumbleType::OscillationRaisingSawtoothWave, 1.0f, false, 0.25, 0.2f, 0.2f });
                 newXRBtnHold |= VPAD_BUTTON_DOWN;
             }
@@ -876,10 +878,10 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
             return glm::angleAxis(euler.y, glm::vec3(0, 1, 0));
         };
 
-        glm::fquat controllerRotation = ToGLM(inputs.inGame.poseLocation[OpenXR::EyeSide::LEFT].pose.orientation);
+        glm::fquat controllerRotation = ToGLM(inputs.global.poseLocation[OpenXR::EyeSide::LEFT].pose.orientation);
         glm::fquat controllerYawRotation = isolateYaw(controllerRotation);
 
-        glm::fquat moveRotation = inputs.inGame.pose[OpenXR::EyeSide::LEFT].isActive ? glm::inverse(VRManager::instance().XR->m_inputCameraRotation.load() * controllerYawRotation) : glm::identity<glm::fquat>();
+        glm::fquat moveRotation = inputs.global.pose[OpenXR::EyeSide::LEFT].isActive ? glm::inverse(VRManager::instance().XR->m_inputCameraRotation.load() * controllerYawRotation) : glm::identity<glm::fquat>();
 
         glm::vec3 localMoveVec(leftStickSource.currentState.x, 0.0f, leftStickSource.currentState.y);
 
