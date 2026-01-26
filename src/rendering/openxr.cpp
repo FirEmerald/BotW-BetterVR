@@ -537,8 +537,8 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
     checkXRResult(xrSyncActions(m_session, &syncInfo), "Failed to sync actions!");
 
     InputState newState = m_input.load();
-    newState.inGame.in_game = !inMenu;
-    newState.inGame.inputTime = predictedFrameTime;
+    newState.global.in_game = !inMenu;
+    newState.global.inputTime = predictedFrameTime;
 
     for (EyeSide side : { EyeSide::LEFT, EyeSide::RIGHT }) {
         XrActionStateGetInfo getPoseInfo = { XR_TYPE_ACTION_STATE_GET_INFO };

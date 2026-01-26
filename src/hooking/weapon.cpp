@@ -395,7 +395,7 @@ void CemuHooks::hook_EnableWeaponAttackSensor(PPCInterpreter_t* hCPU) {
     }
 
     m_motionAnalyzers[heldIndex].ResetIfWeaponTypeChanged(weaponType);
-    m_motionAnalyzers[heldIndex].Update(state.global.poseLocation[heldIndex], state.global.poseVelocity[heldIndex], headset.value(), state.inGame.inputTime);
+    m_motionAnalyzers[heldIndex].Update(state.global.poseLocation[heldIndex], state.global.poseVelocity[heldIndex], headset.value(), state.global.inputTime);
 
     // Use the analysed motion to determine whether the weapon is swinging or stabbing, and whether the attackSensor should be active this frame
     bool CHEAT_alwaysEnableWeaponCollision = false;
