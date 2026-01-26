@@ -260,7 +260,7 @@ RND_Renderer::ImGuiOverlay::~ImGuiOverlay() {
 }
 
 void RND_Renderer::ImGuiOverlay::Update() {
-    ImGui::GetIO().FontGlobalScale = 0.9f;
+    ImGui::GetIO().FontGlobalScale = 1.0f;
 
     POINT p;
     GetCursorPos(&p);
@@ -284,14 +284,22 @@ void RND_Renderer::ImGuiOverlay::Update() {
     ImVec2 physicalRes = ImVec2(renderPhysicalWidth, renderPhysicalHeight);
     ImVec2 framebufferRes = ImVec2((float)m_outputRes.width, (float)m_outputRes.height);
 
-    ImGui::GetIO().DisplaySize = physicalRes;
+    // calculate a virtual resolution to keep UI size consistent
+    float uiScaleFactor = (float)renderPhysicalHeight / 1080.0f;
+    if (uiScaleFactor < 0.1f) uiScaleFactor = 0.1f;
+
+    uiScaleFactor *= 2.0f;
+
+    ImVec2 logicalRes = ImVec2(physicalRes.x / uiScaleFactor, physicalRes.y / uiScaleFactor);
+
+    ImGui::GetIO().DisplaySize = logicalRes;
 
     // calculate the black bars
     uint32_t blackBarWidth = (nonCenteredWindowWidth - renderPhysicalWidth) / 2;
     uint32_t blackBarHeight = (nonCenteredWindowHeight - renderPhysicalHeight) / 2;
 
     // adjust the framebuffer scale
-    ImGui::GetIO().DisplayFramebufferScale = framebufferRes / physicalRes;
+    ImGui::GetIO().DisplayFramebufferScale = framebufferRes / logicalRes;
 
     // the actual window is centered, so add offsets to both x and y on both sides
     p.x = p.x - blackBarWidth;
@@ -303,7 +311,7 @@ void RND_Renderer::ImGuiOverlay::Update() {
     ImGui::GetIO().AddFocusEvent(isWindowFocused);
     if (isWindowFocused) {
         // update mouse state depending on if the window is focused
-        ImGui::GetIO().AddMousePosEvent((float)p.x, (float)p.y);
+        ImGui::GetIO().AddMousePosEvent((float)p.x / uiScaleFactor, (float)p.y / uiScaleFactor);
 
         ImGui::GetIO().AddMouseButtonEvent(0, GetAsyncKeyState(VK_LBUTTON) & 0x8000);
         ImGui::GetIO().AddMouseButtonEvent(1, GetAsyncKeyState(VK_RBUTTON) & 0x8000);
@@ -525,7 +533,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
     ImGui::SetNextWindowSize(windowWidth, ImGuiCond_Always);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 
-    if (ImGui::Begin("BetterVR Settings & Help##Settings", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove)) {
+    if (ImGui::Begin("BetterVR Settings & Help | Long-Press Right Thumbstick To Exit Or Press B##Settings", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove)) {
         bool changed = false;
 
         if (ImGui::BeginTabBar("HelpMenuTabs")) {
@@ -611,7 +619,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     if (performanceOverlay >= 1) {
                         static const int freqOptions[] = { 30, 60, 72, 80, 90, 120, 144 };
                         int currentFreq = (int)settings.performanceOverlayFrequency.load();
-                        int freqIdx = 1; // Default to 60
+                        int freqIdx = 5; // Default to 90
                         for (int i = 0; i < std::size(freqOptions); i++) {
                             if (freqOptions[i] == currentFreq) {
                                 freqIdx = i;

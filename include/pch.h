@@ -472,7 +472,7 @@ struct ModSettings {
     std::atomic<float> playerHeightOffset = 0.0f;
     std::atomic_bool leftHanded = false;
     std::atomic_bool uiFollowsGaze = true;
-    std::atomic_bool cropFlatTo16x9 = false;
+    std::atomic_bool cropFlatTo16x9 = true;
 
     // advanced settings
     std::atomic_bool enableDebugOverlay = false;
