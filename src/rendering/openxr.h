@@ -24,7 +24,7 @@ public:
         bool isMetaSimulator;
     } m_capabilities = {};
 
-    union InputState {
+    struct InputState {
         struct ButtonState {
             enum class Event {
                 None,
@@ -36,6 +36,8 @@ public:
             bool wasDownLastFrame = false;
             bool longFired = false;
             bool waitingForSecond = false;
+            bool longFired_actedUpon = false;
+            bool longFired_stillPressed = false;
             std::chrono::steady_clock::time_point pressStartTime;
             std::chrono::steady_clock::time_point lastReleaseTime;
 
@@ -49,28 +51,7 @@ public:
             }
         };
 
-        //Do not write to Global once you have written to InGame or InMenu!
-        //We take advantage of guaranteed union behavior so that the members of global are the same as the corresponding members of inGame and inMenu
-        //But writing to Global will cause all the unique values of either of those to become garbage
-        struct Global {
-            // the header of all structures should be the same
-            bool in_game;
-            XrTime inputTime;
-            std::optional<EyeSide> lastPickupSide;
-
-            //global inputs
-            std::array<XrActionStatePose, 2> pose;
-            std::array<XrSpaceLocation, 2> poseLocation;
-            std::array<XrSpaceVelocity, 2> poseVelocity;
-            std::array<XrSpaceLocation, 2> hmdRelativePoseLocation;
-
-            std::array<XrActionStateFloat, 2> grab;
-            std::array<ButtonState, 2> grabState; // LEFT/RIGHT
-            XrActionStateBoolean useRune_dpadMenu;
-            ButtonState useRune_runeMenuState;
-        } global;
-        struct InGame {
-            // the header of all structures should be the same
+        struct Shared {
             bool in_game = true;
             XrTime inputTime;
             std::optional<EyeSide> lastPickupSide = std::nullopt;
@@ -81,52 +62,34 @@ public:
             std::array<XrSpaceVelocity, 2> poseVelocity;
             std::array<XrSpaceLocation, 2> hmdRelativePoseLocation;
 
-            std::array<XrActionStateFloat, 2> grab;
-            std::array<ButtonState, 2> grabState; // LEFT/RIGHT
-            XrActionStateBoolean useRune_dpadMenu;
-            ButtonState useRune_runeMenuState;
+            XrActionStateBoolean inventory_map;
+            ButtonState inventory_mapState;
+            XrActionStateBoolean modMenu;
+            ButtonState modMenuState;
+        } shared;
 
-            // shared
-            XrActionStateBoolean map_scope;
-            XrActionStateBoolean inventory;
+        struct InGame {
+            XrActionStateBoolean crouch_scope;
+            ButtonState crouch_scopeState;
 
-            // unique
             XrActionStateVector2f move;
             XrActionStateVector2f camera;
-            XrActionStateBoolean crouch;
-            //XrActionStateBoolean scope;
 
-            std::array<XrActionStateFloat, 2> interact;
-            XrActionStateBoolean jump;
-            XrActionStateBoolean run_interact_cancel;
+            std::array<XrActionStateFloat, 2> grab;
+            XrActionStateBoolean jump_cancel;
+            XrActionStateBoolean run_interact;
+            ButtonState runState;
+            XrActionStateBoolean useRune_dpadMenu;
+            ButtonState useRune_runeMenuState;
 
             XrActionStateBoolean useLeftItem;
             XrActionStateBoolean useRightItem;
 
             std::array<bool, 2> drop_weapon; // LEFT/RIGHT
 
-            std::array<ButtonState, 2> interactState; // LEFT/RIGHT
-            ButtonState runState;
-            ButtonState map_scopeState;
+            std::array<ButtonState, 2> grabState; // LEFT/RIGHT
         } inGame;
         struct InMenu {
-            // the header of all structures should be the same
-            bool in_game = false;
-            XrTime inputTime;
-            std::optional<EyeSide> lastPickupSide = std::nullopt;
-
-            //global inputs
-            std::array<XrActionStatePose, 2> pose;
-            std::array<XrSpaceLocation, 2> poseLocation;
-            std::array<XrSpaceVelocity, 2> poseVelocity;
-            std::array<XrSpaceLocation, 2> hmdRelativePoseLocation;
-
-            std::array<XrActionStateFloat, 2> grab;
-            std::array<ButtonState, 2> grabState; // LEFT/RIGHT
-            XrActionStateBoolean useRune_dpadMenu;
-            ButtonState useRune_runeMenuState;
-
-            // unique
             XrActionStateVector2f scroll;
             XrActionStateVector2f navigate;
 
@@ -140,9 +103,6 @@ public:
 
             XrActionStateBoolean leftTrigger;
             XrActionStateBoolean rightTrigger;
-
-            XrActionStateBoolean map;
-            XrActionStateBoolean inventory;
         } inMenu;
 
         const std::string debug() {
@@ -289,8 +249,9 @@ public:
         bool right_hand_position_stored = false;
         int magnesis_forward_frames_interval = 0;
         bool weapon_throwed = false;
-    } gameState ;
+    };
     std::atomic<GameState> m_gameState{};
+    std::atomic_bool m_isMenuOpen;
 
     // We'll manage the rumble commands priority inside controls.cpp
     struct RumbleParameters {
@@ -343,19 +304,18 @@ private:
     XrActionSet m_gameplayActionSet = XR_NULL_HANDLE;
     XrAction m_moveAction = XR_NULL_HANDLE;
     XrAction m_cameraAction = XR_NULL_HANDLE;
-    XrAction m_crouchAction = XR_NULL_HANDLE;
-    //XrAction m_scopeAction = XR_NULL_HANDLE;
     
     XrAction m_interactAction = XR_NULL_HANDLE;
     XrAction m_jumpAction = XR_NULL_HANDLE;
-    XrAction m_run_interact_cancelAction = XR_NULL_HANDLE;
+    XrAction m_run_interactAction = XR_NULL_HANDLE;
     XrAction m_useRune_dpadMenu_Action = XR_NULL_HANDLE;
+    XrAction m_modMenuAction = XR_NULL_HANDLE; //imgui mod menu
 
     XrAction m_useLeftItemAction = XR_NULL_HANDLE;
     XrAction m_useRightItemAction = XR_NULL_HANDLE;
 
-    XrAction m_map_scopeAction = XR_NULL_HANDLE;
-    XrAction m_inventoryAction = XR_NULL_HANDLE;
+    XrAction m_crouch_scopeAction = XR_NULL_HANDLE;
+    XrAction m_inGame_inventory_mapAction = XR_NULL_HANDLE;
 
     // menu actions
     XrActionSet m_menuActionSet = XR_NULL_HANDLE;
@@ -371,8 +331,8 @@ private:
     XrAction m_leftTriggerAction= XR_NULL_HANDLE;
     XrAction m_rightTriggerAction = XR_NULL_HANDLE;
 
-    XrAction m_inMenu_mapAction = XR_NULL_HANDLE; // menu button
-    XrAction m_inMenu_inventoryAction = XR_NULL_HANDLE;
+    //XrAction m_inMenu_mapAction = XR_NULL_HANDLE; // menu button
+    XrAction m_inMenu_inventory_mapAction = XR_NULL_HANDLE; 
 
     std::unique_ptr<RND_Renderer> m_renderer;
     std::unique_ptr<RumbleManager> m_rumbleManager;

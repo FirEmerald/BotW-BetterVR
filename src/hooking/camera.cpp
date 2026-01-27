@@ -118,8 +118,10 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
 
     Log::print<RENDERING>("[{}] Getting gameplay camera (pos = {})", side, oldCameraPosition);
 
-    // remove verticality from the camera position to avoid pitch changes that aren't from the VR headset
-    oldCameraPosition.y = oldCameraTarget.y;
+    if (GetSettings().GetCameraMode() == CameraMode::FIRST_PERSON) {
+        // remove verticality from the camera position to avoid pitch changes that aren't from the VR headset
+        oldCameraPosition.y = oldCameraTarget.y;
+    }
 
     // construct glm matrix from the existing camera parameters
     glm::mat4 existingGameMtx = glm::lookAtRH(oldCameraPosition, oldCameraTarget, oldCameraUp);
@@ -159,8 +161,8 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
 
         ApplyCameraOffsets(&playerPos, false);
 
-        if (auto settings = GetFirstPersonSettingsForActiveEvent()) {
-            if (settings->ignoreCameraRotation) {
+        if (auto eventSettings = GetFirstPersonSettingsForActiveEvent()) {
+            if (eventSettings->ignoreCameraRotation) {
                 glm::fquat playerRot = mtx.getRotLE();
                 auto [swing, baseYaw] = swingTwistY(playerRot);
                 s_wsCameraRotation = baseYaw * glm::angleAxis(glm::radians(180.0f), glm::fvec3(0.0f, 1.0f, 0.0f));
@@ -248,9 +250,9 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
         ApplyCameraOffsets(&playerPos, true);
 
         basePos = playerPos;
-        if (auto settings = GetFirstPersonSettingsForActiveEvent()) {
+        if (auto eventSettings = GetFirstPersonSettingsForActiveEvent()) {
 
-            if (settings->ignoreCameraRotation) {
+            if (eventSettings->ignoreCameraRotation) {
                 glm::fquat playerRot = playerMtx.getRotLE();
                 auto [swing, yaw] = swingTwistY(playerRot);
                 baseYaw = yaw * glm::angleAxis(glm::radians(180.0f), glm::fvec3(0.0f, 1.0f, 0.0f));
@@ -509,9 +511,9 @@ void CemuHooks::hook_ModifyProjectionUsingCamera(PPCInterpreter_t* hCPU) {
             BEMatrix34 playerMtx = {};
             readMemory(s_playerMtxAddress, &playerMtx);
 
-            if (auto settings = GetFirstPersonSettingsForActiveEvent()) {
+            if (auto eventSettings = GetFirstPersonSettingsForActiveEvent()) {
 
-                if (settings->ignoreCameraRotation) {
+                if (eventSettings->ignoreCameraRotation) {
                     glm::fquat playerRot = playerMtx.getRotLE();
                     auto [swing, yaw] = swingTwistY(playerRot);
                     baseYaw = yaw * glm::angleAxis(glm::radians(180.0f), glm::fvec3(0.0f, 1.0f, 0.0f));
@@ -608,8 +610,8 @@ std::pair<glm::vec3, glm::fquat> CemuHooks::CalculateVRWorldPose(const BESeadLoo
 
         basePos = playerPos;
 
-        if (auto settings = GetFirstPersonSettingsForActiveEvent()) {
-            if (settings->ignoreCameraRotation) {
+        if (auto eventSettings = GetFirstPersonSettingsForActiveEvent()) {
+            if (eventSettings->ignoreCameraRotation) {
                 glm::fquat playerRot = playerMtx.getRotLE();
                 auto [swing, yaw] = swingTwistY(playerRot);
                 baseYaw = yaw * glm::angleAxis(glm::radians(180.0f), glm::fvec3(0.0f, 1.0f, 0.0f));
@@ -746,7 +748,7 @@ void CemuHooks::hook_UseCameraDistance(PPCInterpreter_t* hCPU) {
         hCPU->fpr[13].fp0 = 0.0f;
     }
     else {
-        hCPU->fpr[13].fp0 = hCPU->fpr[10].fp0;
+        hCPU->fpr[13].fp0 = GetSettings().thirdPlayerDistance;
     }
 }
 
@@ -915,7 +917,7 @@ void CemuHooks::hook_OverwriteCameraParam(PPCInterpreter_t* hCPU) {
 
     hCPU->instructionPointer = hCPU->sprNew.LR;
 
-    if (GetSettings().IsFirstPersonMode()) {
+    if (GetSettings().GetCameraMode() == CameraMode::THIRD_PERSON) {
         uint32_t superLowAddress = 0x102B3150; // points to 0.0000011920929
         writeMemoryBE(hCPU->gpr[4], &superLowAddress);
         return;
@@ -929,7 +931,7 @@ void CemuHooks::hook_FixLadder(PPCInterpreter_t* hCPU) {
 
     auto input = VRManager::instance().XR->m_input.load();
 
-    if (input.inGame.in_game && s_isLadderClimbing == 0) {
+    if (input.shared.in_game && s_isLadderClimbing == 0) {
         return;
     }
 

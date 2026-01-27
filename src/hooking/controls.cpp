@@ -237,7 +237,7 @@ void handleLeftHandInGameInput(
         rumbleMgr->enqueueInputsRumbleCommand(leftRumbleFall);
 
     // Handle Parry gesture
-    auto handVelocity = glm::length(ToGLM(inputs.global.poseVelocity[0].linearVelocity));
+    auto handVelocity = glm::length(ToGLM(inputs.shared.poseVelocity[0].linearVelocity));
     if (handVelocity > 4.0f && gameState.left_equip_type == EquipType::Shield && leftGesture.isNearChestHeight) {
         buttonHold |= VPAD_BUTTON_A;
         rumbleMgr->enqueueInputsRumbleCommand(leftRumbleFall);
@@ -306,7 +306,7 @@ void handleLeftHandInGameInput(
             rightStickSource.currentState.y = 0.0f;
 
             if (!gameState.left_hand_position_stored) {
-                gameState.stored_left_hand_position = ToGLM(inputs.global.poseLocation[0].pose.position);
+                gameState.stored_left_hand_position = ToGLM(inputs.shared.poseLocation[0].pose.position);
                 gameState.left_hand_position_stored = true;
                 rumbleMgr->enqueueInputsRumbleCommand(leftRumbleFall);
             }
@@ -479,7 +479,7 @@ void handleRightHandInGameInput(
             rightStickSource.currentState.y = 0.0f;
 
             if (!gameState.right_hand_position_stored) {
-                gameState.stored_right_hand_position = ToGLM(inputs.global.poseLocation[1].pose.position);
+                gameState.stored_right_hand_position = ToGLM(inputs.shared.poseLocation[1].pose.position);
                 gameState.right_hand_position_stored = true;
                 rumbleMgr->enqueueInputsRumbleCommand(rightRumbleFall);
             }
@@ -638,9 +638,9 @@ void handleMenuInput(
     if (!gameState.prevent_inputs) {
         buttonHold |= mapButton(inputs.inMenu.back, VPAD_BUTTON_B);
         if (gameState.map_open)
-            buttonHold |= mapButton(inputs.inMenu.map, VPAD_BUTTON_MINUS);
+            buttonHold |= mapButton(inputs.shared.inventory_map, VPAD_BUTTON_MINUS);
         else
-            buttonHold |= mapButton(inputs.inMenu.inventory, VPAD_BUTTON_PLUS);
+            buttonHold |= mapButton(inputs.shared.inventory_map, VPAD_BUTTON_PLUS);
     }
 
     buttonHold |= mapButton(inputs.inMenu.select, VPAD_BUTTON_A);
@@ -663,8 +663,16 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     VPADStatus vpadStatus = {};
 
     auto* renderer = VRManager::instance().XR->GetRenderer();
+    if (!renderer) {
+        return;
+    }
+    auto* imguiOverlay = renderer->m_imguiOverlay.get();
+    if (!imguiOverlay) {
+        return;
+    }
+
     // todo: revert this to unblock gamepad input
-    if (!(renderer && renderer->m_imguiOverlay && renderer->m_imguiOverlay->ShouldBlockGameInput())) {
+    if (!imguiOverlay->ShouldBlockGameInput()) {
         readMemory(vpadStatusOffset, &vpadStatus);
     }
 
@@ -676,7 +684,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
 
     // fetch game state
     auto gameState = VRManager::instance().XR->m_gameState.load(); 
-    gameState.in_game = inputs.inGame.in_game;
+    gameState.in_game = inputs.shared.in_game;
 
     // use the previous values if no new values are written from hook_ChangeWeaponMtx this frame
     if (gameState.has_something_in_hand)
@@ -700,6 +708,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     constexpr std::chrono::milliseconds delay{ 400 };
     const auto now = std::chrono::steady_clock::now();
 
+
     // check if we need to prevent inputs from happening
     if (gameState.in_game != gameState.was_in_game) {
         gameState.prevent_inputs = true;
@@ -712,6 +721,24 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     if (gameState.prevent_grab_inputs && now >= gameState.prevent_grab_time + delay)
         gameState.prevent_grab_inputs = false;
 
+    // toggleable help menu
+    auto& isMenuOpen = VRManager::instance().XR->m_isMenuOpen;
+
+    if (inputs.shared.modMenuState.lastEvent == ButtonState::Event::ShortPress) {
+        isMenuOpen = !isMenuOpen;
+    }
+
+    // allow the gamepad inputs to control the imgui overlay
+    imguiOverlay->ProcessInputs(inputs);
+
+    // ignore stick input when the help menu is open
+    if (isMenuOpen) {
+        leftStickSource.currentState = { 0.0f, 0.0f };
+        rightStickSource.currentState = { 0.0f, 0.0f };
+        leftJoystickDir = Direction::None;
+        rightJoystickDir = Direction::None;
+    }
+
     //Log::print<INFO>("last_weapon_held_hand : {}", gameState.last_weapon_held_hand);
     //Log::print<INFO>("Is weapon held : {}", gameState.is_weapon_or_object_held);
     //Log::print<INFO>("Weapon Type : {}", (int)gameState.left_weapon_type);
@@ -721,13 +748,13 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     HandGestureState leftGesture = {};
     HandGestureState rightGesture = {};
 
-    auto headsetPose = VRManager::instance().XR->GetRenderer()->GetMiddlePose();
+    auto headsetPose = renderer->GetMiddlePose();
     if (headsetPose.has_value()) {
         const auto headsetMtx = headsetPose.value();
         const glm::fvec3 headsetPos(headsetMtx[3]);
         
-        const auto leftHandPos = ToGLM(inputs.global.poseLocation[0].pose.position);
-        const auto rightHandPos = ToGLM(inputs.global.poseLocation[1].pose.position);
+        const auto leftHandPos = ToGLM(inputs.shared.poseLocation[0].pose.position);
+        const auto rightHandPos = ToGLM(inputs.shared.poseLocation[1].pose.position);
         
         leftGesture = calculateHandGesture(gameState, leftHandPos, headsetMtx, headsetPos, gameState.left_hand_position_stored, gameState.stored_left_hand_position);
         rightGesture = calculateHandGesture(gameState, rightHandPos, headsetMtx, headsetPos, gameState.right_hand_position_stored, gameState.stored_right_hand_position);
@@ -744,28 +771,35 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         }
     }
 
-    if (!gameState.prevent_inputs) {
-        // Process inputs
-        if (gameState.in_game) {
-            // prevent jump when exiting menus with B button
-            newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.jump, VPAD_BUTTON_X);
 
-            // Scope
-            if (inputs.inGame.map_scopeState.lastEvent == ButtonState::Event::LongPress) {
+    // Process inputs
+    if (isMenuOpen) {
+        // ignore stick input when the mod menu is open
+    }
+    else if (gameState.in_game) {
+        if (!gameState.prevent_inputs) {
+            // prevent jump when exiting menus with B button
+            newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.jump_cancel, VPAD_BUTTON_X);
+
+            //// Scope
+            if (inputs.inGame.crouch_scopeState.lastEvent == ButtonState::Event::LongPress) {
                 newXRBtnHold |= VPAD_BUTTON_STICK_R;
             }
 
             // Handle map and inventory menu toggle
-            if (inputs.inGame.map_scopeState.lastEvent == ButtonState::Event::ShortPress) {
-                newXRBtnHold |= VPAD_BUTTON_MINUS;
-                gameState.map_open = true;
-            }
-            if (inputs.inGame.inventory.currentState) {
+            if (inputs.shared.inventory_mapState.lastEvent == ButtonState::Event::ShortPress) {
                 newXRBtnHold |= VPAD_BUTTON_PLUS;
                 gameState.map_open = false;
             }
+            if (inputs.shared.inventory_mapState.lastEvent == ButtonState::Event::LongPress) {
+                newXRBtnHold |= VPAD_BUTTON_MINUS;
+                gameState.map_open = true;
+            }
+        }
 
-        newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.crouch, VPAD_BUTTON_STICK_L);
+        if (inputs.inGame.crouch_scopeState.lastEvent == ButtonState::Event::ShortPress) {
+            newXRBtnHold |= VPAD_BUTTON_STICK_L;
+        }
         
         // Optional rune inputs (for seated players)
         if (inputs.global.useRune_runeMenuState.lastEvent == ButtonState::Event::LongPress) {
@@ -778,11 +812,11 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         
         // If climbing or paragliding, make the B button cancel instantly the action instead of long press to run
         if (gameState.is_climbing || gameState.is_paragliding) {
-            newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run_interact_cancel, VPAD_BUTTON_B);
+            newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run_interact, VPAD_BUTTON_B);
         }
         else if (gameState.is_riding_mount)
         {
-            newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run_interact_cancel, VPAD_BUTTON_A);
+            newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run_interact, VPAD_BUTTON_A);
             newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.useLeftItem, VPAD_BUTTON_B);
         }
         else {
@@ -790,7 +824,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
                 newXRBtnHold |= VPAD_BUTTON_B; // Run
             }
             else
-                newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run_interact_cancel, VPAD_BUTTON_A);
+                newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run_interact, VPAD_BUTTON_A);
         }
 
         // Whistle gesture
@@ -822,49 +856,16 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     else {
         handleMenuInput(newXRBtnHold, inputs, gameState, leftJoystickDir);
     }
-    
+
     // Update rumble/haptics
     rumbleMgr->updateHaptics();
-
-
 
     // sticks
     static uint32_t oldXRStickHold = 0;
     uint32_t newXRStickHold = 0;
 
     // movement/navigation stick
-    if (inputs.inGame.in_game) {
-        auto isolateYaw = [](const glm::fquat& q) -> glm::fquat {
-            glm::vec3 euler = glm::eulerAngles(q);
-            euler.x = 0.0f;
-            euler.z = 0.0f;
-            return glm::angleAxis(euler.y, glm::vec3(0, 1, 0));
-        };
-
-        glm::fquat controllerRotation = ToGLM(inputs.global.poseLocation[OpenXR::EyeSide::LEFT].pose.orientation);
-        glm::fquat controllerYawRotation = isolateYaw(controllerRotation);
-
-        glm::fquat moveRotation = inputs.global.pose[OpenXR::EyeSide::LEFT].isActive ? glm::inverse(VRManager::instance().XR->m_inputCameraRotation.load() * controllerYawRotation) : glm::identity<glm::fquat>();
-
-        glm::vec3 localMoveVec(leftStickSource.currentState.x, 0.0f, leftStickSource.currentState.y);
-
-        glm::vec3 worldMoveVec = moveRotation * localMoveVec;
-
-        float inputLen = glm::length(glm::vec2(leftStickSource.currentState.x, leftStickSource.currentState.y));
-        if (inputLen > 1e-3f) {
-            worldMoveVec = glm::normalize(worldMoveVec) * inputLen;
-        }
-        else {
-            worldMoveVec = glm::vec3(0.0f);
-        }
-
-        worldMoveVec = {0, 0, 0};
-
-        vpadStatus.leftStick = { worldMoveVec.x + leftStickSource.currentState.x + vpadStatus.leftStick.x.getLE(), worldMoveVec.z + leftStickSource.currentState.y + vpadStatus.leftStick.y.getLE() };
-    }
-    else {
-        vpadStatus.leftStick = { leftStickSource.currentState.x + vpadStatus.leftStick.x.getLE(), leftStickSource.currentState.y + vpadStatus.leftStick.y.getLE() };
-    }
+    vpadStatus.leftStick = { leftStickSource.currentState.x + vpadStatus.leftStick.x.getLE(), leftStickSource.currentState.y + vpadStatus.leftStick.y.getLE() };
 
     if (leftStickSource.currentState.x <= -AXIS_THRESHOLD || (HAS_FLAG(oldXRStickHold, VPAD_STICK_L_EMULATION_LEFT) && leftStickSource.currentState.x <= -HOLD_THRESHOLD))
         newXRStickHold |= VPAD_STICK_L_EMULATION_LEFT;
@@ -954,7 +955,7 @@ void CemuHooks::hook_CreateNewActor(PPCInterpreter_t* hCPU) {
     hCPU->gpr[3] = 0;
 
     // OpenXR::InputState inputs = VRManager::instance().XR->m_input.load();
-    // if (!inputs.inGame.in_game) {
+    // if (!inputs.shared.in_game) {
     //     hCPU->gpr[3] = 0;
     //     return;
     // }
