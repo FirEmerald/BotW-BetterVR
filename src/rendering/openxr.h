@@ -62,20 +62,23 @@ public:
             std::array<XrSpaceLocation, 2> hmdRelativePoseLocation;
 
             // shared
-            XrActionStateBoolean map_scope;
-            XrActionStateBoolean inventory_help;
-            ButtonState inventoryState;
+            XrActionStateBoolean crouch_scope;
+            ButtonState crouch_scopeState;
+            XrActionStateBoolean inventory_map;
+            ButtonState inventory_mapState;
 
             // unique
             XrActionStateVector2f move;
             XrActionStateVector2f camera;
-            XrActionStateBoolean crouch;
-            //XrActionStateBoolean scope;
 
             std::array<XrActionStateFloat, 2> grab;
-            XrActionStateBoolean jump;
-            XrActionStateBoolean run_interact_cancel;
+            XrActionStateBoolean jump_cancel;
+            XrActionStateBoolean run_interact;
+            ButtonState runState;
             XrActionStateBoolean useRune_dpadMenu;
+            ButtonState useRune_runeMenuState;
+            XrActionStateBoolean modMenu; //imgui mod menu
+            ButtonState modMenuState;
 
             XrActionStateBoolean useLeftItem;
             XrActionStateBoolean useRightItem;
@@ -83,9 +86,6 @@ public:
             std::array<bool, 2> drop_weapon; // LEFT/RIGHT
 
             std::array<ButtonState, 2> grabState; // LEFT/RIGHT
-            ButtonState runState;
-            ButtonState map_scopeState;
-            ButtonState useRune_runeMenuState;
         } inGame;
         struct InMenu {
             bool in_game = false;
@@ -98,9 +98,8 @@ public:
             std::array<XrSpaceLocation, 2> hmdRelativePoseLocation;
 
             // shared
-            XrActionStateBoolean map;
-            XrActionStateBoolean inventory_help;
-            ButtonState inventoryState;
+            XrActionStateBoolean inventory_map;
+            ButtonState inventory_mapState;
 
             // unique
             XrActionStateVector2f scroll;
@@ -217,19 +216,18 @@ private:
     XrActionSet m_gameplayActionSet = XR_NULL_HANDLE;
     XrAction m_moveAction = XR_NULL_HANDLE;
     XrAction m_cameraAction = XR_NULL_HANDLE;
-    XrAction m_crouchAction = XR_NULL_HANDLE;
-    //XrAction m_scopeAction = XR_NULL_HANDLE;
     
     XrAction m_grab_interactAction = XR_NULL_HANDLE;
     XrAction m_jumpAction = XR_NULL_HANDLE;
-    XrAction m_run_interact_cancelAction = XR_NULL_HANDLE;
+    XrAction m_run_interactAction = XR_NULL_HANDLE;
     XrAction m_useRune_dpadMenu_Action = XR_NULL_HANDLE;
+    XrAction m_modMenuAction = XR_NULL_HANDLE; //imgui mod menu
 
     XrAction m_useLeftItemAction = XR_NULL_HANDLE;
     XrAction m_useRightItemAction = XR_NULL_HANDLE;
 
-    XrAction m_map_scopeAction = XR_NULL_HANDLE;
-    XrAction m_inventoryAction = XR_NULL_HANDLE;
+    XrAction m_crouch_scopeAction = XR_NULL_HANDLE;
+    XrAction m_inGame_inventory_mapAction = XR_NULL_HANDLE;
 
     XrAction m_rumbleAction = XR_NULL_HANDLE;
 
@@ -247,8 +245,8 @@ private:
     XrAction m_leftTriggerAction= XR_NULL_HANDLE;
     XrAction m_rightTriggerAction = XR_NULL_HANDLE;
 
-    XrAction m_inMenu_mapAction = XR_NULL_HANDLE; // menu button
-    XrAction m_inMenu_inventoryAction = XR_NULL_HANDLE; 
+    //XrAction m_inMenu_mapAction = XR_NULL_HANDLE; // menu button
+    XrAction m_inMenu_inventory_mapAction = XR_NULL_HANDLE; 
 
     std::unique_ptr<RND_Renderer> m_renderer;
     std::unique_ptr<RumbleManager> m_rumbleManager;

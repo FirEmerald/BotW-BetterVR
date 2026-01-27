@@ -634,9 +634,9 @@ void handleMenuInput(
     if (!gameState.prevent_inputs) {
         buttonHold |= mapButton(inputs.inMenu.back, VPAD_BUTTON_B);
         if (gameState.map_open)
-            buttonHold |= mapButton(inputs.inMenu.map, VPAD_BUTTON_MINUS);
+            buttonHold |= mapButton(inputs.inMenu.inventory_map, VPAD_BUTTON_MINUS);
         else
-            buttonHold |= mapButton(inputs.inMenu.inventory_help, VPAD_BUTTON_PLUS);
+            buttonHold |= mapButton(inputs.inMenu.inventory_map, VPAD_BUTTON_PLUS);
     }
 
     buttonHold |= mapButton(inputs.inMenu.select, VPAD_BUTTON_A);
@@ -728,17 +728,9 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
 
     // toggleable help menu
     auto& isMenuOpen = VRManager::instance().XR->m_isMenuOpen;
-    bool inventoryLongPress = inputs.inGame.inventoryState.lastEvent == ButtonState::Event::LongPress && inputs.inGame.inventoryState.longFired_actedUpon;
 
-    if (inventoryLongPress) {
-        inputs.inGame.inventoryState.longFired_actedUpon = false;
+    if (inputs.inGame.modMenuState.lastEvent == ButtonState::Event::ShortPress) {
         isMenuOpen = !isMenuOpen;
-
-        // ignore stick input when the help menu is open
-        leftStickSource.currentState = { 0.0f, 0.0f };
-        rightStickSource.currentState = { 0.0f, 0.0f };
-        leftJoystickDir = Direction::None;
-        rightJoystickDir = Direction::None;
     }
 
     // allow the gamepad inputs to control the imgui overlay
@@ -787,30 +779,36 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
 
     // Process inputs
     if (isMenuOpen) {
-        // ignore in-game inputs when the help menu is open
+        // ignore stick input when the mod menu is open
+        leftStickSource.currentState = { 0.0f, 0.0f };
+        rightStickSource.currentState = { 0.0f, 0.0f };
+        leftJoystickDir = Direction::None;
+        rightJoystickDir = Direction::None;
     }
     else if (gameState.in_game) {
         if (!gameState.prevent_inputs) {
             // prevent jump when exiting menus with B button
-            newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.jump, VPAD_BUTTON_X);
+            newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.jump_cancel, VPAD_BUTTON_X);
 
-            // Scope
-            if (inputs.inGame.map_scopeState.lastEvent == ButtonState::Event::LongPress) {
+            //// Scope
+            if (inputs.inGame.crouch_scopeState.lastEvent == ButtonState::Event::LongPress) {
                 newXRBtnHold |= VPAD_BUTTON_STICK_R;
             }
 
             // Handle map and inventory menu toggle
-            if (inputs.inGame.map_scopeState.lastEvent == ButtonState::Event::ShortPress) {
-                newXRBtnHold |= VPAD_BUTTON_MINUS;
-                gameState.map_open = true;
-            }
-            if (inputs.inGame.inventoryState.lastEvent == ButtonState::Event::ShortPress) {
+            if (inputs.inGame.inventory_mapState.lastEvent == ButtonState::Event::ShortPress) {
                 newXRBtnHold |= VPAD_BUTTON_PLUS;
                 gameState.map_open = false;
             }
+            if (inputs.inGame.inventory_mapState.lastEvent == ButtonState::Event::LongPress) {
+                newXRBtnHold |= VPAD_BUTTON_MINUS;
+                gameState.map_open = true;
+            }
         }
 
-        newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.crouch, VPAD_BUTTON_STICK_L);
+        if (inputs.inGame.crouch_scopeState.lastEvent == ButtonState::Event::ShortPress) {
+            newXRBtnHold |= VPAD_BUTTON_STICK_L;
+        }
         
         // Optional rune inputs (for seated players)
         if (inputs.inGame.useRune_runeMenuState.lastEvent == ButtonState::Event::LongPress) {
@@ -824,11 +822,11 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         
         // If climbing or paragliding, make the B button cancel instantly the action instead of long press to run
         if (gameState.is_climbing || gameState.is_paragliding) {
-            newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run_interact_cancel, VPAD_BUTTON_B);
+            newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run_interact, VPAD_BUTTON_B);
         }
         else if (gameState.is_riding_mount)
         {
-            newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run_interact_cancel, VPAD_BUTTON_A);
+            newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run_interact, VPAD_BUTTON_A);
             newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.useLeftItem, VPAD_BUTTON_B);
         }
         else {
@@ -836,7 +834,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
                 newXRBtnHold |= VPAD_BUTTON_B; // Run
             }
             else
-                newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run_interact_cancel, VPAD_BUTTON_A);
+                newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run_interact, VPAD_BUTTON_A);
         }
 
         // Whistle gesture

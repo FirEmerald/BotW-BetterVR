@@ -408,8 +408,8 @@ void RND_Renderer::ImGuiOverlay::ProcessInputs(OpenXR::InputState& inputs) {
     XrActionStateVector2f stick;
     if (inputs.inGame.in_game) {
         stick = inputs.inGame.move;
-        backDown = inputs.inGame.run_interact_cancel.currentState;
-        confirmDown = inputs.inGame.jump.currentState;
+        backDown = inputs.inGame.jump_cancel.currentState;
+        confirmDown = inputs.inGame.run_interact.currentState;
     }
     else {
         stick = inputs.inMenu.navigate;
@@ -473,9 +473,9 @@ void RND_Renderer::ImGuiOverlay::ProcessInputs(OpenXR::InputState& inputs) {
     // if no inputs or popup is open, allow closing the menu using the cancel/back button
     bool shouldClose = false;
     if (inGame) {
-        if (inputs.inGame.run_interact_cancel.changedSinceLastSync && inputs.inGame.run_interact_cancel.currentState) {
+        if (inputs.inGame.jump_cancel.changedSinceLastSync && inputs.inGame.jump_cancel.currentState) {
             shouldClose = true;
-            inputs.inGame.run_interact_cancel.currentState = XR_FALSE;
+            inputs.inGame.jump_cancel.currentState = XR_FALSE;
         }
     }
     else {
