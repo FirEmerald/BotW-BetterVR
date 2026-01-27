@@ -136,8 +136,8 @@ public:
 
         // Using Right Hand (index 1) for motion controls
         const int handIdx = 1;
-        auto& poseState = inputs.inGame.poseLocation[handIdx];
-        auto& velState = inputs.inGame.poseVelocity[handIdx];
+        auto& poseState = inputs.global.poseLocation[handIdx];
+        auto& velState = inputs.global.poseVelocity[handIdx];
 
         if ((poseState.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) && inputs.inGame.in_game) {
             glm::quat orientation = ToGLM(poseState.pose.orientation);
@@ -146,11 +146,11 @@ public:
 
             float dt = 1.0f / 60.0f;
             if (lastInputTime != 0) {
-                dt = (float)(inputs.inGame.inputTime - lastInputTime) * 1e-9f;
+                dt = (float)(inputs.global.inputTime - lastInputTime) * 1e-9f;
             }
             if (dt <= 1e-5f) dt = 1.0f / 60.0f;
             if (dt > 0.1f) dt = 0.1f;
-            lastInputTime = inputs.inGame.inputTime;
+            lastInputTime = inputs.global.inputTime;
 
             // Calculate Acceleration (World Space) + Gravity
             glm::vec3 accWorld = (linearVel - lastWorldVelocity) / dt;
