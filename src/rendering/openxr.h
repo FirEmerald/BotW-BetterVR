@@ -146,35 +146,41 @@ public:
         } inMenu;
 
         const std::string debug() {
-            return "Global:\n" +
-                   debug("grab left", global.grab[0]) + debug(global.grabState[0]) +
-                   debug("grab right", global.grab[1]) + debug(global.grabState[1]) +
-                   debug("useRune_dpadMenu", global.useRune_dpadMenu) + debug(global.useRune_runeMenuState) +
-                   "In Game:\n" +
-                   debug("map_scope", inGame.map_scope) + debug(inGame.map_scopeState) + 
-                   debug("inventory", inGame.inventory) +
-                   debug("move", inGame.move) +
-                   debug("camera", inGame.camera) +
-                   debug("crouch", inGame.crouch) +
-                   debug("interact left", inGame.interact[0]) + debug(inGame.interactState[0]) + 
-                   debug("interact right", inGame.interact[1]) + debug(inGame.interactState[1]) +
-                   debug("jump", inGame.jump) +
-                   debug("run_interact_cancel", inGame.run_interact_cancel) + debug(inGame.runState) +
-                   debug("useLeftItem", inGame.useLeftItem) +
-                   debug("useRightItem", inGame.useRightItem) +
-                   "In Menu:\n" +
-                   debug("scroll", inMenu.scroll) +
-                   debug("navigate", inMenu.navigate) +
-                   debug("select", inMenu.select) +
-                   debug("back", inMenu.back) +
-                   debug("sort", inMenu.sort) +
-                   debug("hold", inMenu.hold) +
-                   debug("leftGrip", inMenu.leftGrip) +
-                   debug("rightGrip", inMenu.rightGrip) +
-                   debug("leftTrigger", inMenu.leftTrigger) +
-                   debug("rightTrigger", inMenu.rightTrigger) +
-                   debug("map", inMenu.map) +
-                   debug("inventory", inMenu.inventory);
+            std::string header = "Global:\n" +
+                                 debug("grab left", global.grab[0]) + debug(global.grabState[0]) +
+                                 debug("grab right", global.grab[1]) + debug(global.grabState[1]) +
+                                 debug("useRune_dpadMenu", global.useRune_dpadMenu) + debug(global.useRune_runeMenuState);
+            if (global.in_game) {
+                return header +
+                       "In Game:\n" +
+                       debug("map_scope", inGame.map_scope) + debug(inGame.map_scopeState) +
+                       debug("inventory", inGame.inventory) +
+                       debug("move", inGame.move) +
+                       debug("camera", inGame.camera) +
+                       debug("crouch", inGame.crouch) +
+                       debug("interact left", inGame.interact[0]) + debug(inGame.interactState[0]) +
+                       debug("interact right", inGame.interact[1]) + debug(inGame.interactState[1]) +
+                       debug("jump", inGame.jump) +
+                       debug("run_interact_cancel", inGame.run_interact_cancel) + debug(inGame.runState) +
+                       debug("useLeftItem", inGame.useLeftItem) +
+                       debug("useRightItem", inGame.useRightItem);
+            }
+            else {
+                return header +
+                       "In Menu:\n" +
+                       debug("scroll", inMenu.scroll) +
+                       debug("navigate", inMenu.navigate) +
+                       debug("select", inMenu.select) +
+                       debug("back", inMenu.back) +
+                       debug("sort", inMenu.sort) +
+                       debug("hold", inMenu.hold) +
+                       debug("leftGrip", inMenu.leftGrip) +
+                       debug("rightGrip", inMenu.rightGrip) +
+                       debug("leftTrigger", inMenu.leftTrigger) +
+                       debug("rightTrigger", inMenu.rightTrigger) +
+                       debug("map", inMenu.map) +
+                       debug("inventory", inMenu.inventory);
+            }
         }
 
         const std::string debug(std::string name, XrActionStateBoolean action) {
@@ -213,6 +219,31 @@ public:
     std::atomic<InputState> m_input = InputState{};
     std::atomic<glm::fquat> m_inputCameraRotation = glm::identity<glm::fquat>();
 
+    enum QuickMenu : uint32_t {
+        QM_NONE = (uint32_t)0,
+        QM_WEAPON = (uint32_t)VPAD_BUTTON_RIGHT,
+        QM_SHIELD = (uint32_t)VPAD_BUTTON_LEFT,
+        QM_BOW = (uint32_t)VPAD_BUTTON_RIGHT,
+        QM_ARROW = (uint32_t)VPAD_BUTTON_LEFT,
+        QM_RUNE = (uint32_t)VPAD_BUTTON_UP
+    };
+
+    class QuickMenuButton {
+    public:
+        static bool None(InputState inputState) {
+            return false;
+        };
+        static bool LGrab(InputState inputState) {
+            return inputState.global.grabState[0].wasDownLastFrame;
+        };
+        static bool RGrab(InputState inputState) {
+            return inputState.global.grabState[1].wasDownLastFrame;
+        };
+        static bool Rune(InputState inputState) {
+            return inputState.global.useRune_runeMenuState.wasDownLastFrame;
+        };
+    };
+
     struct GameState {
         bool left_equip_type_set_this_frame = false;
         bool right_equip_type_set_this_frame = false;
@@ -221,9 +252,8 @@ public:
         bool in_game = false;
         bool was_in_game = false;
         bool map_open = false; // map = true, inventory = false
-        bool dpad_menu_open = false;
-        Direction last_dpad_menu_open = Direction::None;
-        uint32_t last_dpad_grab_index = 3; //0 = left, 1 = right, 2 = rune menu, 3 = neither
+        QuickMenu current_quick_menu = QuickMenu::QM_NONE;
+        bool (*current_quick_menu_button)(InputState) = QuickMenuButton::None;
 
         bool prevent_inputs = false;
         std::chrono::steady_clock::time_point prevent_inputs_time;

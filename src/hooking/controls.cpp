@@ -162,7 +162,13 @@ bool isHandFarEnoughFromStoredPosition(const HandGestureState& gesture) {
     return gesture.isFarEnoughFromStoredPosition;
 }
 
-bool handleDpadMenu(ButtonState::Event lastEvent, HandGestureState handGesture, uint32_t& buttonHold, OpenXR::GameState& gameState ) {
+void openDpadMenu(uint32_t& buttonHold, OpenXR::GameState& gameState, OpenXR::QuickMenu menu, bool (*button)(OpenXR::InputState)) {
+    buttonHold |= menu;
+    gameState.current_quick_menu = menu;
+    gameState.current_quick_menu_button = button;
+}
+
+bool handleDpadMenu(ButtonState::Event lastEvent, HandGestureState handGesture, uint32_t& buttonHold, OpenXR::GameState& gameState, bool (*quickMenuButton)(OpenXR::InputState) ) {
     if (lastEvent == ButtonState::Event::LongPress) {
         //Inverse the menu side for bows, so the menu corresponds to the hand side holding the weapon
         //eg : left hands hold bow, open bow menu with left shoulder, arrow menu with right shoulder
@@ -172,19 +178,15 @@ bool handleDpadMenu(ButtonState::Event lastEvent, HandGestureState handGesture, 
         if (doesBowJustBroke)
             buttonHold |= VPAD_BUTTON_ZR;
         if (isHandOverRightShoulderSlot(handGesture)) {
-            buttonHold |= isBowEquipped ? VPAD_BUTTON_LEFT : VPAD_BUTTON_RIGHT;
-            gameState.last_dpad_menu_open = isBowEquipped ? Direction::Left : Direction::Right;
+            openDpadMenu(buttonHold, gameState, isBowEquipped ? OpenXR::QuickMenu::QM_ARROW : OpenXR::QuickMenu::QM_WEAPON, quickMenuButton);
         }
         else if (isHandOverLeftShoulderSlot(handGesture)) {
-            buttonHold |= isBowEquipped ? VPAD_BUTTON_RIGHT : VPAD_BUTTON_LEFT;
-            gameState.last_dpad_menu_open = isBowEquipped ? Direction::Right : Direction::Left;
+            openDpadMenu(buttonHold, gameState, isBowEquipped ? OpenXR::QuickMenu::QM_BOW : OpenXR::QuickMenu::QM_SHIELD, quickMenuButton);
         }
         // if not over shoulders slots, then it's over waist
         else {
-            buttonHold |= VPAD_BUTTON_UP;
-            gameState.last_dpad_menu_open = Direction::Up;
+            openDpadMenu(buttonHold, gameState, OpenXR::QuickMenu::QM_RUNE, quickMenuButton);
         }
-        gameState.dpad_menu_open = true;
         return true;
     }
     return false;
@@ -243,11 +245,9 @@ void handleLeftHandInGameInput(
 
     // Handle shoulder slot interactions
     if (isHandOverLeftShoulderSlot(leftGesture) || isHandOverRightShoulderSlot(leftGesture)) {
-        if (handleDpadMenu(inputs.global.grabState[0].lastEvent, leftGesture, buttonHold, gameState)) {
-            gameState.last_dpad_grab_index = 0;
+        if (handleDpadMenu(inputs.global.grabState[0].lastEvent, leftGesture, buttonHold, gameState, OpenXR::QuickMenuButton::LGrab))
             // Don't process normal input when opening dpad menu
             return;
-        }
 
         // Handle equip/unequip
         if (!gameState.prevent_grab_inputs && isGrabPressed) {
@@ -280,11 +280,9 @@ void handleLeftHandInGameInput(
     // Handle waist slot interaction (Rune)
     if (isHandOverLeftWaistSlot(leftGesture)) {    
         // Handle dpad menu
-        if (handleDpadMenu(inputs.global.grabState[0].lastEvent, leftGesture, buttonHold, gameState)) {
-            gameState.last_dpad_grab_index = 0;
+        if (handleDpadMenu(inputs.global.grabState[0].lastEvent, leftGesture, buttonHold, gameState, OpenXR::QuickMenuButton::LGrab))
             // Don't process normal input when opening dpad menu
             return;
-        }
 
         if (!gameState.prevent_grab_inputs && isGrabPressed) {
             rumbleMgr->enqueueInputsRumbleCommand(leftRumbleFall);
@@ -392,11 +390,9 @@ void handleRightHandInGameInput(
     // Handle shoulder slot interactions
     if (isHandOverLeftShoulderSlot(rightGesture) || isHandOverRightShoulderSlot(rightGesture)) {
         // Handle dpad menu
-        if (handleDpadMenu(inputs.global.grabState[1].lastEvent, rightGesture, buttonHold, gameState)) {
-            gameState.last_dpad_grab_index = 1;
+        if (handleDpadMenu(inputs.global.grabState[1].lastEvent, rightGesture, buttonHold, gameState, OpenXR::QuickMenuButton::RGrab))
             // Don't process normal input when opening dpad menu
             return;
-        }
 
         // Handle equip/unequip
         if (!gameState.prevent_grab_inputs && isGrabPressedShort) {
@@ -445,11 +441,9 @@ void handleRightHandInGameInput(
     // Handle waist slot interaction (Rune)
     if (isHandOverLeftWaistSlot(rightGesture)) {   
         // Handle dpad menu
-        if (handleDpadMenu(inputs.global.grabState[1].lastEvent, rightGesture, buttonHold, gameState)) {
-            gameState.last_dpad_grab_index = 1;
+        if (handleDpadMenu(inputs.global.grabState[1].lastEvent, rightGesture, buttonHold, gameState, OpenXR::QuickMenuButton::RGrab))
             // Don't process normal input when opening dpad menu
             return;
-        }
 
         if (!gameState.prevent_grab_inputs && isGrabPressedShort) {
             rumbleMgr->enqueueInputsRumbleCommand(rightRumbleFall);
@@ -740,40 +734,13 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     }
     
     // dpad menu toggle
-    if (gameState.dpad_menu_open)
-    {
-        switch (gameState.last_dpad_menu_open) {
-            case Direction::Left:  newXRBtnHold |= VPAD_BUTTON_LEFT; break;
-            case Direction::Right: newXRBtnHold |= VPAD_BUTTON_RIGHT; break;
-            case Direction::Up: newXRBtnHold |= VPAD_BUTTON_UP; break;
-            default: break;
-        }
-
-        if (gameState.last_dpad_grab_index == 2) {
-            if (inputs.global.useRune_dpadMenu.isActive && !inputs.global.useRune_dpadMenu.currentState) { //rune button released
-                gameState.dpad_menu_open = false;
-                gameState.last_dpad_menu_open = Direction::None;
-                gameState.last_dpad_grab_index = 3;
-            }
-        }
-        else {
-            //TODO maybe add a setting for this?
-            if (gameState.last_dpad_grab_index != 3) {
-                if (inputs.global.grab[gameState.last_dpad_grab_index].isActive && !inputs.global.grabState[gameState.last_dpad_grab_index].wasDownLastFrame) { //grab button released
-                    gameState.dpad_menu_open = false;
-                    gameState.last_dpad_menu_open = Direction::None;
-                    gameState.last_dpad_grab_index = 3;
-                }
-            }
-
-            if (inputs.inMenu.select.currentState || inputs.inMenu.back.currentState) // need to add a way to quit dpad menu by pressing again grips
-            {
-                gameState.dpad_menu_open = false;
-                gameState.last_dpad_menu_open = Direction::None;
-                gameState.last_dpad_grab_index = 3;
-                //// prevents the arrow shoot on menu quit from the force equip bow input (see handleDpadMenu())
-                //newXRBtnHold |= VPAD_BUTTON_B;
-            }
+    if (gameState.current_quick_menu != OpenXR::QuickMenu::QM_NONE) {
+        newXRBtnHold |= gameState.current_quick_menu;
+        if (!gameState.current_quick_menu_button(inputs)) {
+            gameState.current_quick_menu = OpenXR::QuickMenu::QM_NONE;
+            gameState.current_quick_menu_button = OpenXR::QuickMenuButton::None;
+            //// prevents the arrow shoot on menu quit from the force equip bow input (see handleDpadMenu())
+            //newXRBtnHold |= VPAD_BUTTON_B;
         }
     }
 
@@ -803,10 +770,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         
         // Optional rune inputs (for seated players)
         if (inputs.global.useRune_runeMenuState.lastEvent == ButtonState::Event::LongPress) {
-            gameState.dpad_menu_open = true;
-            gameState.last_dpad_menu_open = Direction::Up;
-            gameState.last_dpad_grab_index = 2;
-            newXRBtnHold |= VPAD_BUTTON_UP;  // Rune quick menu
+            openDpadMenu(newXRBtnHold, gameState, OpenXR::QuickMenu::QM_RUNE, OpenXR::QuickMenuButton::Rune); // Rune quick menu
         }
         if (inputs.global.useRune_runeMenuState.lastEvent == ButtonState::Event::ShortPress) {
             newXRBtnHold |= VPAD_BUTTON_L;  // Use rune
