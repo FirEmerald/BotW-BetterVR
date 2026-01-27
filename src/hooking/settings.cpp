@@ -21,11 +21,18 @@ static void Settings_ReadLine(ImGuiContext*, ImGuiSettingsHandler*, void* entry,
     float f_val;
     if (sscanf(line, "CameraMode=%d", &i_val) == 1)      { s->cameraMode.store((CameraMode)i_val); return; }
     if (sscanf(line, "PlayMode=%d", &i_val) == 1)        { s->playMode.store((PlayMode)i_val); return; }
+    if (sscanf(line, "CameraAnchor=%d", &i_val) == 1)        { s->cameraAnchor.store((CameraAnchor)i_val); return; }
     if (sscanf(line, "ThirdPlayerDistance=%f", &f_val) == 1) { s->thirdPlayerDistance.store(f_val); return; }
     if (sscanf(line, "CutsceneCameraMode=%d", &i_val) == 1) { s->cutsceneCameraMode.store((EventMode)i_val); return; }
     if (sscanf(line, "UseBlackBarsForCutscenes=%d", &i_val) == 1) { s->useBlackBarsForCutscenes.store(i_val); return; }
+    if (sscanf(line, "UseDynamicEyeOffsets=%d", &i_val) == 1) { s->dynamicEyeOffset.store(i_val); return; }
+    if (sscanf(line, "DynamicEyeOffsetSmoothing=%f", &f_val) == 1) { s->dynamicEyeOffsetSmoothing.store(f_val); return; }
+    if (sscanf(line, "HidePlayerHead=%d", &i_val) == 1) { s->hideHead.store(i_val); return; }
     if (sscanf(line, "PlayerHeightOffset=%f", &f_val) == 1) { s->playerHeightOffset.store(f_val); return; }
+    if (sscanf(line, "PlayerEyeHeight=%f", &f_val) == 1) { s->eyeHeight.store(f_val); return; }
+    if (sscanf(line, "WorldScale=%f", &f_val) == 1) { s->worldScale.store(f_val); return; }
     if (sscanf(line, "LeftHanded=%d", &i_val) == 1)      { s->leftHanded.store(i_val); return; }
+    if (sscanf(line, "InvertElbowIK=%d", &i_val) == 1)      { s->leftHanded.store(i_val); return; }
     if (sscanf(line, "UiFollowsGaze=%d", &i_val) == 1)   { s->uiFollowsGaze.store(i_val); return; }
     if (sscanf(line, "CropFlatTo16x9=%d", &i_val) == 1)  { s->cropFlatTo16x9.store(i_val); return; }
     if (sscanf(line, "EnableDebugOverlay=%d", &i_val) == 1) { s->enableDebugOverlay.store(i_val); return; }
@@ -40,11 +47,18 @@ static void Settings_WriteAll(ImGuiContext* ctx, ImGuiSettingsHandler* handler, 
     buf->appendf("[%s][Settings]\n", handler->TypeName);
     buf->appendf("CameraMode=%d\n", (int)s.cameraMode.load());
     buf->appendf("PlayMode=%d\n", (int)s.playMode.load());
+    buf->appendf("CameraAnchor=%d\n", (int)s.cameraAnchor.load());
     buf->appendf("ThirdPlayerDistance=%.3f\n", s.thirdPlayerDistance.load());
     buf->appendf("CutsceneCameraMode=%d\n", (int)s.cutsceneCameraMode.load());
     buf->appendf("UseBlackBarsForCutscenes=%d\n", (int)s.useBlackBarsForCutscenes.load());
+    buf->appendf("UseDynamicEyeOffsets=%d\n", (int)s.dynamicEyeOffset.load());
+    buf->appendf("DynamicEyeOffsetSmoothing=%.3f\n", s.dynamicEyeOffsetSmoothing.load());
+    buf->appendf("HidePlayerHead=%.3f\n", s.hideHead.load());
     buf->appendf("PlayerHeightOffset=%.3f\n", s.playerHeightOffset.load());
+    buf->appendf("PlayerEyeHeight=%.3f\n", s.eyeHeight.load());
+    buf->appendf("WorldScale=%.3f\n", s.worldScale.load());
     buf->appendf("LeftHanded=%d\n", (int)s.leftHanded.load());
+    buf->appendf("InvertElbowIK=%d\n", (int)s.invertElbowIK.load());
     buf->appendf("UiFollowsGaze=%d\n", (int)s.uiFollowsGaze.load());
     buf->appendf("CropFlatTo16x9=%d\n", (int)s.cropFlatTo16x9.load());
     buf->appendf("EnableDebugOverlay=%d\n", (int)s.enableDebugOverlay.load());

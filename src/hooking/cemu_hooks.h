@@ -185,34 +185,6 @@ public:
 
     static void DrawDebugOverlays();
 
-    static bool FollowModelHead() {
-        return GetSettings().FollowModelHead();
-    }
-
-    static bool HideModelHead() {
-        return GetSettings().HideModelHead();
-    }
-
-    static float CameraOffsetSmoothingFactorSetting() {
-        return GetSettings().CameraOffsetSmoothingFactorSetting();
-    }
-
-    static bool IsStandingMode() {
-        return GetSettings().IsStandingMode();
-    }
-
-    static bool IsSeatedMode() {
-        return GetSettings().IsSeatedMode();
-    }
-
-    static bool IsEyesAnchor() {
-        return GetSettings().IsEyesAnchor();
-    }
-
-    static bool IsGroundAnchor() {
-        return GetSettings().IsGroundAnchor();
-    }
-
     static float WorldScaleInverse() {
         float worldScale = GetSettings().GetWorldScale();
         if (worldScale <= 0.0) {

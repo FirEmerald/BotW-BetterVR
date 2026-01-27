@@ -211,9 +211,9 @@ void handleLeftHandInGameInput(
     
     auto* rumbleMgr = VRManager::instance().XR->GetRumbleManager();
     bool isInteractPressed = inputs.inGame.interactState[0].lastEvent == ButtonState::Event::ShortPress;
-    bool isGrabPressed = inputs.global.grabState[0].lastEvent == ButtonState::Event::ShortPress;
-    bool isGrabPressedLong = inputs.global.grabState[0].lastEvent == ButtonState::Event::LongPress;
-    bool isCurrentGrabPressed = inputs.global.grabState[0].wasDownLastFrame;
+    bool isGrabPressed = inputs.shared.grabState[0].lastEvent == ButtonState::Event::ShortPress;
+    bool isGrabPressedLong = inputs.shared.grabState[0].lastEvent == ButtonState::Event::LongPress;
+    bool isCurrentGrabPressed = inputs.shared.grabState[0].wasDownLastFrame;
     
     // Rune rumbles
     if (gameState.left_equip_type == EquipType::SheikahSlate)
@@ -245,7 +245,7 @@ void handleLeftHandInGameInput(
 
     // Handle shoulder slot interactions
     if (isHandOverLeftShoulderSlot(leftGesture) || isHandOverRightShoulderSlot(leftGesture)) {
-        if (handleDpadMenu(inputs.global.grabState[0].lastEvent, leftGesture, buttonHold, gameState, OpenXR::QuickMenuButton::LGrab))
+        if (handleDpadMenu(inputs.shared.grabState[0].lastEvent, leftGesture, buttonHold, gameState, OpenXR::QuickMenuButton::LGrab))
             // Don't process normal input when opening dpad menu
             return;
 
@@ -280,7 +280,7 @@ void handleLeftHandInGameInput(
     // Handle waist slot interaction (Rune)
     if (isHandOverLeftWaistSlot(leftGesture)) {    
         // Handle dpad menu
-        if (handleDpadMenu(inputs.global.grabState[0].lastEvent, leftGesture, buttonHold, gameState, OpenXR::QuickMenuButton::LGrab))
+        if (handleDpadMenu(inputs.shared.grabState[0].lastEvent, leftGesture, buttonHold, gameState, OpenXR::QuickMenuButton::LGrab))
             // Don't process normal input when opening dpad menu
             return;
 
@@ -382,15 +382,15 @@ void handleRightHandInGameInput(
 
     auto* rumbleMgr = VRManager::instance().XR->GetRumbleManager();
     bool isInteractPressed = inputs.inGame.interactState[1].lastEvent == ButtonState::Event::ShortPress;
-    bool isGrabPressedShort = inputs.global.grabState[1].lastEvent == ButtonState::Event::ShortPress;
-    bool isGrabPressedLong = inputs.global.grabState[1].lastEvent == ButtonState::Event::LongPress;
-    bool isCurrentGrabPressed = inputs.global.grabState[1].wasDownLastFrame;
+    bool isGrabPressedShort = inputs.shared.grabState[1].lastEvent == ButtonState::Event::ShortPress;
+    bool isGrabPressedLong = inputs.shared.grabState[1].lastEvent == ButtonState::Event::LongPress;
+    bool isCurrentGrabPressed = inputs.shared.grabState[1].wasDownLastFrame;
     bool isTriggerPressed = inputs.inGame.useRightItem.currentState;
     
     // Handle shoulder slot interactions
     if (isHandOverLeftShoulderSlot(rightGesture) || isHandOverRightShoulderSlot(rightGesture)) {
         // Handle dpad menu
-        if (handleDpadMenu(inputs.global.grabState[1].lastEvent, rightGesture, buttonHold, gameState, OpenXR::QuickMenuButton::RGrab))
+        if (handleDpadMenu(inputs.shared.grabState[1].lastEvent, rightGesture, buttonHold, gameState, OpenXR::QuickMenuButton::RGrab))
             // Don't process normal input when opening dpad menu
             return;
 
@@ -441,7 +441,7 @@ void handleRightHandInGameInput(
     // Handle waist slot interaction (Rune)
     if (isHandOverLeftWaistSlot(rightGesture)) {   
         // Handle dpad menu
-        if (handleDpadMenu(inputs.global.grabState[1].lastEvent, rightGesture, buttonHold, gameState, OpenXR::QuickMenuButton::RGrab))
+        if (handleDpadMenu(inputs.shared.grabState[1].lastEvent, rightGesture, buttonHold, gameState, OpenXR::QuickMenuButton::RGrab))
             // Don't process normal input when opening dpad menu
             return;
 
@@ -802,10 +802,10 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         }
         
         // Optional rune inputs (for seated players)
-        if (inputs.global.useRune_runeMenuState.lastEvent == ButtonState::Event::LongPress) {
+        if (inputs.shared.useRune_runeMenuState.lastEvent == ButtonState::Event::LongPress) {
             openDpadMenu(newXRBtnHold, gameState, OpenXR::QuickMenu::QM_RUNE, OpenXR::QuickMenuButton::Rune); // Rune quick menu
         }
-        if (inputs.global.useRune_runeMenuState.lastEvent == ButtonState::Event::ShortPress) {
+        if (inputs.shared.useRune_runeMenuState.lastEvent == ButtonState::Event::ShortPress) {
             newXRBtnHold |= VPAD_BUTTON_L;  // Use rune
             gameState.last_item_held = EquipType::SheikahSlate;
         }
@@ -829,7 +829,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
 
         // Whistle gesture
         if (isHandOverMouthSlot(leftGesture) && isHandOverMouthSlot(rightGesture)) {
-            if (inputs.global.grabState[0].wasDownLastFrame && inputs.global.grabState[1].wasDownLastFrame) {
+            if (inputs.shared.grabState[0].wasDownLastFrame && inputs.shared.grabState[1].wasDownLastFrame) {
                 rumbleMgr->enqueueInputsRumbleCommand({ true, 0, RumbleType::OscillationRaisingSawtoothWave, 1.0f, false, 0.25, 0.2f, 0.2f });
                 newXRBtnHold |= VPAD_BUTTON_DOWN;
             }

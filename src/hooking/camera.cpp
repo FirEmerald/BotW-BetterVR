@@ -38,7 +38,7 @@ float playerEyeHeight = 1.6;
 bool gotEyeHeight = false;
 
 float CemuHooks::GetPlayerEyeHeight() {
-    float heightFromSettings = GetSettings().GetEyeHeight();
+    float heightFromSettings = GetSettings().GetPlayerEyeHeight();
     if (heightFromSettings > 0.0) return heightFromSettings;
     else return playerEyeHeight;
 }
@@ -48,10 +48,10 @@ void CemuHooks::MarkNeedsAutoEyeHeight() {
 }
 
 void CemuHooks::ApplyCameraOffsets(glm::fvec3* playerPos, bool isRenderCamera) {
-    if (IsGroundAnchor()) {
+    if (GetSettings().GetCameraAnchor() == CameraAnchor::GROUND) {
         if (s_isRiding || !s_isSwimming || isRenderCamera) {
             //perform camera offset
-            playerPos->y += (GetSettings().GetCameraOffset() * WorldScaleInverse());
+            playerPos->y += (GetSettings().GetPlayerHeightOffset() * WorldScaleInverse());
             if (s_isRiding) {
                 //move camera by hardcodedRidingGroundOffset
                 playerPos->y += hardcodedRidingGroundOffset;
@@ -70,7 +70,7 @@ void CemuHooks::ApplyCameraOffsets(glm::fvec3* playerPos, bool isRenderCamera) {
     else {
         //move camera so that player eye height is origin.
         playerPos->y -= GetPlayerEyeHeight() * WorldScaleInverse();
-        if (FollowModelHead()) {
+        if (GetSettings().UseDynamicEyeOffset()) {
             //move camera by render offset, which in this case is the current eye position
             playerPos->y += GetRenderOffset();
         }
@@ -262,7 +262,7 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
     }
     else {
         //perform camera offset
-        basePos.y += (GetSettings().GetCameraOffset() * WorldScaleInverse());
+        basePos.y += (GetSettings().GetPlayerHeightOffset() * WorldScaleInverse());
     }
 
     s_lastCameraMtx = glm::fmat4x3(glm::scale(glm::translate(glm::identity<glm::fmat4>(), basePos), glm::vec3(WorldScaleInverse())) * glm::mat4(baseYawWithoutClimbingFix));

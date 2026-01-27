@@ -66,6 +66,11 @@ public:
             ButtonState inventory_mapState;
             XrActionStateBoolean modMenu;
             ButtonState modMenuState;
+
+            std::array<XrActionStateFloat, 2> grab;
+            std::array<ButtonState, 2> grabState; // LEFT/RIGHT
+            XrActionStateBoolean useRune_dpadMenu;
+            ButtonState useRune_runeMenuState;
         } shared;
 
         struct InGame {
@@ -75,19 +80,16 @@ public:
             XrActionStateVector2f move;
             XrActionStateVector2f camera;
 
-            std::array<XrActionStateFloat, 2> grab;
+            std::array<XrActionStateFloat, 2> interact;
             XrActionStateBoolean jump_cancel;
             XrActionStateBoolean run_interact;
             ButtonState runState;
-            XrActionStateBoolean useRune_dpadMenu;
-            ButtonState useRune_runeMenuState;
 
             XrActionStateBoolean useLeftItem;
             XrActionStateBoolean useRightItem;
 
             std::array<bool, 2> drop_weapon; // LEFT/RIGHT
-
-            std::array<ButtonState, 2> grabState; // LEFT/RIGHT
+            std::array<ButtonState, 2> interactState; // LEFT/RIGHT
         } inGame;
         struct InMenu {
             XrActionStateVector2f scroll;
@@ -106,41 +108,33 @@ public:
         } inMenu;
 
         const std::string debug() {
-            std::string header = "Global:\n" +
-                                 debug("grab left", global.grab[0]) + debug(global.grabState[0]) +
-                                 debug("grab right", global.grab[1]) + debug(global.grabState[1]) +
-                                 debug("useRune_dpadMenu", global.useRune_dpadMenu) + debug(global.useRune_runeMenuState);
-            if (global.in_game) {
-                return header +
-                       "In Game:\n" +
-                       debug("map_scope", inGame.map_scope) + debug(inGame.map_scopeState) +
-                       debug("inventory", inGame.inventory) +
-                       debug("move", inGame.move) +
-                       debug("camera", inGame.camera) +
-                       debug("crouch", inGame.crouch) +
-                       debug("interact left", inGame.interact[0]) + debug(inGame.interactState[0]) +
-                       debug("interact right", inGame.interact[1]) + debug(inGame.interactState[1]) +
-                       debug("jump", inGame.jump) +
-                       debug("run_interact_cancel", inGame.run_interact_cancel) + debug(inGame.runState) +
-                       debug("useLeftItem", inGame.useLeftItem) +
-                       debug("useRightItem", inGame.useRightItem);
-            }
-            else {
-                return header +
-                       "In Menu:\n" +
-                       debug("scroll", inMenu.scroll) +
-                       debug("navigate", inMenu.navigate) +
-                       debug("select", inMenu.select) +
-                       debug("back", inMenu.back) +
-                       debug("sort", inMenu.sort) +
-                       debug("hold", inMenu.hold) +
-                       debug("leftGrip", inMenu.leftGrip) +
-                       debug("rightGrip", inMenu.rightGrip) +
-                       debug("leftTrigger", inMenu.leftTrigger) +
-                       debug("rightTrigger", inMenu.rightTrigger) +
-                       debug("map", inMenu.map) +
-                       debug("inventory", inMenu.inventory);
-            }
+            return "Shared:\n" +
+                   debug("inventory_map", shared.inventory_map) + debug(shared.inventory_mapState) +
+                   debug("modMenu", shared.modMenu) + debug(shared.modMenuState) +
+                   debug("grab left", shared.grab[0]) + debug(shared.grabState[0]) +
+                   debug("grab right", shared.grab[1]) + debug(shared.grabState[1]) +
+                   debug("useRune_dpadMenu", shared.useRune_dpadMenu) + debug(shared.useRune_runeMenuState) +
+                   "In Game:\n" +
+                   debug("crouch_scope", inGame.crouch_scope) + debug(inGame.crouch_scopeState) +
+                   debug("move", inGame.move) +
+                   debug("camera", inGame.camera) +
+                   debug("interact left", inGame.interact[0]) + debug(inGame.interactState[0]) +
+                   debug("interact right", inGame.interact[1]) + debug(inGame.interactState[1]) +
+                   debug("jump_cancel", inGame.jump_cancel) +
+                   debug("run_interact", inGame.run_interact) + debug(inGame.runState) +
+                   debug("useLeftItem", inGame.useLeftItem) +
+                   debug("useRightItem", inGame.useRightItem) +
+                   "In Menu:\n" +
+                   debug("scroll", inMenu.scroll) +
+                   debug("navigate", inMenu.navigate) +
+                   debug("select", inMenu.select) +
+                   debug("back", inMenu.back) +
+                   debug("sort", inMenu.sort) +
+                   debug("hold", inMenu.hold) +
+                   debug("leftGrip", inMenu.leftGrip) +
+                   debug("rightGrip", inMenu.rightGrip) +
+                   debug("leftTrigger", inMenu.leftTrigger) +
+                   debug("rightTrigger", inMenu.rightTrigger);
         }
 
         const std::string debug(std::string name, XrActionStateBoolean action) {
@@ -194,13 +188,13 @@ public:
             return false;
         };
         static bool LGrab(InputState inputState) {
-            return inputState.global.grabState[0].wasDownLastFrame;
+            return inputState.shared.grabState[0].wasDownLastFrame;
         };
         static bool RGrab(InputState inputState) {
-            return inputState.global.grabState[1].wasDownLastFrame;
+            return inputState.shared.grabState[1].wasDownLastFrame;
         };
         static bool Rune(InputState inputState) {
-            return inputState.global.useRune_runeMenuState.wasDownLastFrame;
+            return inputState.shared.useRune_runeMenuState.wasDownLastFrame;
         };
     };
 
@@ -288,12 +282,15 @@ private:
     XrSpace m_headSpace = XR_NULL_HANDLE;
     std::array<XrPath, 2> m_handPaths = { XR_NULL_PATH, XR_NULL_PATH };
 
-    //always active actions
-    XrActionSet m_globalActionSet = XR_NULL_HANDLE;
+    //shared actions
+    XrActionSet m_sharedActionSet = XR_NULL_HANDLE;
     std::array<XrSpace, 2> m_handSpaces = { XR_NULL_HANDLE, XR_NULL_HANDLE };
 
     XrAction m_gripPoseAction = XR_NULL_HANDLE;
     XrAction m_aimPoseAction = XR_NULL_HANDLE;
+
+    XrAction m_modMenuAction = XR_NULL_HANDLE; //imgui mod menu
+    XrAction m_inventory_mapAction = XR_NULL_HANDLE;
 
     XrAction m_grabAction = XR_NULL_HANDLE;
     XrAction m_runeAction = XR_NULL_HANDLE;
@@ -309,13 +306,11 @@ private:
     XrAction m_jumpAction = XR_NULL_HANDLE;
     XrAction m_run_interactAction = XR_NULL_HANDLE;
     XrAction m_useRune_dpadMenu_Action = XR_NULL_HANDLE;
-    XrAction m_modMenuAction = XR_NULL_HANDLE; //imgui mod menu
 
     XrAction m_useLeftItemAction = XR_NULL_HANDLE;
     XrAction m_useRightItemAction = XR_NULL_HANDLE;
 
     XrAction m_crouch_scopeAction = XR_NULL_HANDLE;
-    XrAction m_inGame_inventory_mapAction = XR_NULL_HANDLE;
 
     // menu actions
     XrActionSet m_menuActionSet = XR_NULL_HANDLE;
@@ -330,9 +325,6 @@ private:
 
     XrAction m_leftTriggerAction= XR_NULL_HANDLE;
     XrAction m_rightTriggerAction = XR_NULL_HANDLE;
-
-    //XrAction m_inMenu_mapAction = XR_NULL_HANDLE; // menu button
-    XrAction m_inMenu_inventory_mapAction = XR_NULL_HANDLE; 
 
     std::unique_ptr<RND_Renderer> m_renderer;
     std::unique_ptr<RumbleManager> m_rumbleManager;

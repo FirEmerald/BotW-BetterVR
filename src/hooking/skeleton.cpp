@@ -294,7 +294,7 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
     }
 
     // reset face bones so they don't react to vr-driven poses
-    if (HideModelHead() && isFaceBone(boneName)) {
+    if (GetSettings().ShouldHideHead() && isFaceBone(boneName)) {
         BEMatrix34 finalMtx;
         finalMtx.setPos(glm::fvec3());
         finalMtx.setRotLE(glm::identity<glm::fquat>());
@@ -377,7 +377,7 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
         // calculate eye offset from eyeball bones
         static glm::vec3 eyeOffset = glm::vec3(0.0f);
         static bool offsetCalculated = false;
-        if (!offsetCalculated || FollowModelHead()) {
+        if (!offsetCalculated || GetSettings().UseDynamicEyeOffset()) {
             Bone* eyeL = s_skeleton.GetBone("Eyeball_L");
             Bone* eyeR = s_skeleton.GetBone("Eyeball_R");
 
@@ -394,8 +394,8 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
                 }
                 //TODO figure out why this fails when climbing sometimes
                 if (hasModelOffsets) {
-                    if (FollowModelHead()) {
-                        renderOffset += (eyePos.y - renderOffset) * CameraOffsetSmoothingFactorSetting();
+                    if (GetSettings().UseDynamicEyeOffset()) {
+                        renderOffset += (eyePos.y - renderOffset) * GetSettings().GetDynamicEyeOffsetSmoothing();
                     }
                     else {
                         renderOffset = eyePos.y;
@@ -447,7 +447,7 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
         // apply manual offset
         targetPos += yawRot * s_manualBodyOffset;
 
-        if (FollowModelHead()) {
+        if (GetSettings().UseDynamicEyeOffset()) {
             // restore original game Y position
             targetPos.y = bonePos.y;
         }

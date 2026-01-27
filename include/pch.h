@@ -439,118 +439,26 @@ enum class EventMode : int32_t {
     ALWAYS_THIRD_PERSON = 3,
 };
 
-enum CameraMode {
+enum class CameraMode : int32_t {
     THIRD_PERSON = 0,
     FIRST_PERSON = 1
 };
 
-enum PlayStyle {
-    SEATED = 0,
-    STANDING = 1
-};
-
-enum CameraAnchor {
+enum class CameraAnchor : int32_t {
     GROUND = 0,
     EYES = 1
 };
-
-enum GuiMode {
-    IN_FRONT = 0,
-    FOLLOW_HEAD = 1
-};
-
-enum AngularVelocityMode {
-    AUTO = 0,
-    FORCED_ON = 1,
-    FORCED_OFF = 2
-};
-
-enum CutsceneCameraMode {
-    FIRST_PERSON_ONLY = 1,
-    MIXED = 2,
-    THIRD_PERSON_ONLY = 3
-};
-
-struct data_VRSettingsIn {
-    BEType<int32_t> cameraModeSetting;
-    BEType<int32_t> playStyleSetting;
-    BEType<int32_t> cameraAnchorSetting;
-    BEType<int32_t> dynamicEyeOffsetSetting;
-    BEType<float> cameraOffsetSmoothingFactorSetting;
-    BEType<int32_t> hideModelHeadSetting;
-    BEType<int32_t> leftHandedSetting;
-    BEType<int32_t> invertElbowIKSetting;
-    BEType<int32_t> guiFollowSetting;
-    BEType<float> cameraHeightSetting;
-    BEType<float> eyeHeightSetting;
-    BEType<float> worldScaleSetting;
-    BEType<int32_t> enable2DVRView;
-    BEType<int32_t> cropFlatTo16x9Setting;
-    BEType<int32_t> enableDebugOverlay;
-    BEType<int32_t> buggyAngularVelocity;
-    BEType<int32_t> cutsceneCameraMode;
-    BEType<int32_t> cutsceneBlackBars;
 
 enum class PlayMode : int32_t {
     SEATED = 0,
     STANDING = 1,
 };
 
-    bool IsFirstPersonMode() const {
-        return cameraModeSetting.getLE() != CameraMode::THIRD_PERSON;
-    }
 enum class GazeFollowUISetting : int32_t {
     FIXED = 0,
     FOLLOW_LOOKING_DIRECTION = 1,
 };
 
-    bool IsThirdPersonMode() const {
-        return cameraModeSetting.getLE() == CameraMode::THIRD_PERSON;
-    }
-
-    bool IsStandingMode() const {
-        return playStyleSetting.getLE() != PlayStyle::SEATED;
-    }
-
-    bool IsSeatedMode() const {
-        return playStyleSetting.getLE() == PlayStyle::SEATED;
-    }
-
-    bool IsEyesAnchor() const {
-        return cameraAnchorSetting.getLE() != CameraAnchor::GROUND;
-    }
-
-    bool IsGroundAnchor() const {
-        return cameraAnchorSetting.getLE() == CameraAnchor::GROUND;
-    }
-
-    bool FollowModelHead() const {
-        return dynamicEyeOffsetSetting == 1;
-    }
-
-    float CameraOffsetSmoothingFactorSetting() const {
-        return cameraOffsetSmoothingFactorSetting.getLE();
-    }
-
-    bool HideModelHead() const {
-        return hideModelHeadSetting == 1;
-    }
-
-    bool InvertElbowIK() const {
-        return invertElbowIKSetting == 1;
-    }
-
-    float GetCameraOffset() const {
-        return cameraHeightSetting.getLE();
-    }
-
-    float GetEyeHeight() const {
-        return eyeHeightSetting.getLE();
-    }
-
-    float GetWorldScale() const {
-        return worldScaleSetting.getLE();
-    }
 enum class AngularVelocityFixerMode : int32_t {
     AUTO = 0, // Angular velocity fixer is automatically enabled for Oculus Link
     FORCED_ON = 1,
@@ -561,13 +469,20 @@ struct ModSettings {
     // playing mode settings
     std::atomic<CameraMode> cameraMode = CameraMode::FIRST_PERSON;
     std::atomic<PlayMode> playMode = PlayMode::STANDING;
+    std::atomic<CameraAnchor> cameraAnchor = CameraAnchor::GROUND;
     std::atomic<float> thirdPlayerDistance = 0.5f;
     std::atomic<EventMode> cutsceneCameraMode = EventMode::FOLLOW_DEFAULT_EVENT_SETTINGS;
     std::atomic_bool useBlackBarsForCutscenes = false;
 
     // first-person settings
+    std::atomic_bool dynamicEyeOffset = false;
+    std::atomic<float> dynamicEyeOffsetSmoothing = 0.1f;
+    std::atomic_bool hideHead = true;
     std::atomic<float> playerHeightOffset = 0.0f;
+    std::atomic<float> eyeHeight = 0.0f;
+    std::atomic<float> worldScale = 0.0f;
     std::atomic_bool leftHanded = false;
+    std::atomic_bool invertElbowIK = false;
     std::atomic_bool uiFollowsGaze = true;
     std::atomic_bool cropFlatTo16x9 = true;
 
@@ -580,8 +495,22 @@ struct ModSettings {
     CameraMode GetCameraMode() const { return cameraMode; }
 
     PlayMode GetPlayMode() const { return playMode; }
+
+    CameraAnchor GetCameraAnchor() const { return cameraAnchor; }
+
     bool DoesUIFollowGaze() const { return uiFollowsGaze; }
     bool IsLeftHanded() const { return leftHanded; }
+    bool InvertElbowIK() const { return invertElbowIK; }
+    bool UseDynamicEyeOffset() const { return dynamicEyeOffset; }
+    float GetDynamicEyeOffsetSmoothing() const { return dynamicEyeOffsetSmoothing; }
+    float ShouldHideHead() const { 
+        if (cameraMode == CameraMode::THIRD_PERSON)
+            return false;
+        else if (!dynamicEyeOffset)
+            return true;
+        else
+            return hideHead;
+    }
     float GetPlayerHeightOffset() const {
         // disable height offset in third-person mode
         if (GetCameraMode() == CameraMode::THIRD_PERSON) {
@@ -590,6 +519,8 @@ struct ModSettings {
 
         return playerHeightOffset;
     }
+    float GetPlayerEyeHeight() const { return eyeHeight; }
+    float GetWorldScale() const { return worldScale; }
     EventMode GetCutsceneCameraMode() const {
         // if in third-person mode, always use third-person cutscene camera
         if (GetCameraMode() == CameraMode::THIRD_PERSON) {
@@ -609,23 +540,23 @@ struct ModSettings {
 
     std::string ToString() const {
         std::string buffer = "";
-        std::format_to(std::back_inserter(buffer), " - Camera Mode: {}\n", IsFirstPersonMode() ? "First Person" : "Third Person");
-        std::format_to(std::back_inserter(buffer), " - Play Style: {}\n", IsStandingMode() ? "Standing" : "Sitting");
-        std::format_to(std::back_inserter(buffer), " - Camera Anchor: {}\n", IsEyesAnchor() ? "Eye Height" : "Ground Level");
-        std::format_to(std::back_inserter(buffer), " - Camera Offset Smoothing Factor: {}\n", cameraOffsetSmoothingFactorSetting.getLE());
-        std::format_to(std::back_inserter(buffer), " - Hide Model Head: {}\n", HideModelHead() ? "Yes" : "NO");
+        std::format_to(std::back_inserter(buffer), " - Camera Mode: {}\n", GetCameraMode() == CameraMode::FIRST_PERSON ? "First Person" : "Third Person");
+        std::format_to(std::back_inserter(buffer), " - Play Style: {}\n", GetPlayMode() == PlayMode::STANDING ? "Standing" : "Sitting");
+        std::format_to(std::back_inserter(buffer), " - Camera Anchor: {}\n", GetCameraAnchor() == CameraAnchor::EYES ? "Eyes" : "Ground");
+        std::format_to(std::back_inserter(buffer), " - Dynamic Camera Offsets: {}\n", UseDynamicEyeOffset() ? "Yes" : "No");
+        std::format_to(std::back_inserter(buffer), " - Camera Offset Smoothing Factor: {}\n", GetDynamicEyeOffsetSmoothing());
+        std::format_to(std::back_inserter(buffer), " - Hide Model Head: {}\n", ShouldHideHead() ? "Yes" : "No");
         std::format_to(std::back_inserter(buffer), " - Left Handed: {}\n", IsLeftHanded() ? "Yes" : "No");
-        std::format_to(std::back_inserter(buffer), " - GUI Follow Setting: {}\n", UIFollowsLookingDirection() ? "Follow Looking Direction" : "Fixed");
-        std::format_to(std::back_inserter(buffer), " - Camera Offset: {} meters\n", cameraHeightSetting.getLE());
-        if (eyeHeightSetting.getLE() <= 0.0)
+        std::format_to(std::back_inserter(buffer), " - GUI Follow Setting: {}\n", DoesUIFollowGaze() ? "Follow Looking Direction" : "Fixed");
+        std::format_to(std::back_inserter(buffer), " - Camera Offset: {} meters\n", GetPlayerHeightOffset());
+        if (eyeHeight <= 0.0) 
         std::format_to(std::back_inserter(buffer), " - Eye Height: Automatic\n");
-        else
-        std::format_to(std::back_inserter(buffer), " - Eye Height: {} meters\n", eyeHeightSetting.getLE());
-        if (worldScaleSetting.getLE() <= 0.0)
+        else 
+        std::format_to(std::back_inserter(buffer), " - Eye Height: {} meters\n", GetPlayerEyeHeight());
+        if (worldScale <= 0.0) 
         std::format_to(std::back_inserter(buffer), " - World Scale: Automatic\n");
-        else
-        std::format_to(std::back_inserter(buffer), " - World Scale: {}\n", worldScaleSetting.getLE());
-        std::format_to(std::back_inserter(buffer), " - 2D VR View Enabled: {}\n", Is2DVRViewEnabled() ? "Yes" : "No");
+        else 
+        std::format_to(std::back_inserter(buffer), " - World Scale: {}\n", GetWorldScale());
         std::format_to(std::back_inserter(buffer), " - Crop Flat to 16:9: {}\n", ShouldFlatPreviewBeCroppedTo16x9() ? "Yes" : "No");
         std::format_to(std::back_inserter(buffer), " - Debug Overlay: {}\n", ShowDebugOverlay() ? "Enabled" : "Disabled");
         std::format_to(std::back_inserter(buffer), " - Cutscene Camera Mode: {}\n", GetCutsceneCameraMode() == EventMode::ALWAYS_FIRST_PERSON ? "Always First Person" : (GetCutsceneCameraMode() == EventMode::ALWAYS_THIRD_PERSON ? "Always Third Person" : "Follow Default Event Settings"));
