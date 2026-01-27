@@ -549,10 +549,24 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                 ImGui::SameLine();
                 if (ImGui::RadioButton("Third Person", &cameraMode, 0)) { settings.cameraMode = CameraMode::THIRD_PERSON; changed = true; }
 
+                ImGui::Separator();
+                ImGui::Text("Play Mode");
+                int playMode = (int)settings.playMode.load();
+                if (ImGui::RadioButton("Standing", &playMode, 1)) { settings.playMode = PlayMode::STANDING; changed = true; }
+                ImGui::SameLine();
+                if (ImGui::RadioButton("Seated", &playMode, 0)) { settings.playMode = PlayMode::SEATED; changed = true; }
+
+                ImGui::Separator();
+                ImGui::Text("Camera Anchor");
+                int cameraAnchor = (int)settings.cameraAnchor.load();
+                if (ImGui::RadioButton("Eyes", &cameraAnchor, 1)) { settings.cameraAnchor = CameraAnchor::EYES; changed = true; }
+                ImGui::SameLine();
+                if (ImGui::RadioButton("Ground", &cameraAnchor, 0)) { settings.cameraAnchor = CameraAnchor::GROUND; changed = true; }
+
                 ImGui::Spacing();
                 ImGui::Separator();
                 ImGui::Text("Camera / Player Options");
-                if (cameraMode == 0) {
+                if (cameraMode == static_cast<int32_t>(CameraMode::THIRD_PERSON)) {
                     float distance = settings.thirdPlayerDistance;
                     if (ImGui::SliderFloat("Camera Distance", &distance, 0.4f, 1.1f, "%.2f")) {
                         settings.thirdPlayerDistance = distance;
@@ -560,16 +574,61 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     }
                 }
                 else {
-                    ImGui::Text("Player Height Offset");
-                    float height = settings.playerHeightOffset;
-                    std::string heightOffsetValueStr = std::format("{0}{1:.02f} meters / {0}{2:.02f} feet", (height > 0.0f ? "+" : ""), height, height * 3.28084f);
-                    if (ImGui::SliderFloat("Height Offset", &height, -0.5f, 1.0f, heightOffsetValueStr.c_str())) {
-                        settings.playerHeightOffset = height;
-                        changed = true;
+                    if (cameraAnchor == static_cast<int32_t>(CameraAnchor::GROUND)) {
+                        ImGui::Text("Player Height Offset");
+                        float height = settings.playerHeightOffset;
+                        std::string heightOffsetValueStr = std::format("{0}{1:.02f} meters / {0}{2:.02f} feet", (height > 0.0f ? "+" : ""), height, height * 3.28084f);
+                        if (ImGui::SliderFloat("Height Offset", &height, -0.5f, 1.0f, heightOffsetValueStr.c_str())) {
+                            settings.playerHeightOffset = height;
+                            changed = true;
+                        }
+                        if (ImGui::Button("Reset Height")) {
+                            settings.playerHeightOffset = 0.0f;
+                            changed = true;
+                        }
                     }
-                    if (ImGui::Button("Reset Height")) {
-                        settings.playerHeightOffset = 0.0f;
-                        changed = true;
+                    else {
+                        ImGui::Text("Player Eye Height");
+                        float height = settings.eyeHeight;
+                        std::string heightValueStr;
+                        if (height == 0.0f)
+                            heightValueStr = "Automatic (Calibrates on first game load or recenter)";
+                        else
+                            heightValueStr = std::format("{0}{1:.02f} meters / {0}{2:.02f} feet", (height > 0.0f ? "+" : ""), height, height * 3.28084f);
+                        if (ImGui::SliderFloat("Eye Height", &height, 0.0f, 3.0f, heightValueStr.c_str())) {
+                            settings.eyeHeight = height;
+                            changed = true;
+                        }
+                        if (ImGui::Button("Set Eye Height To Automatic")) {
+                            settings.eyeHeight = 0.0f;
+                            changed = true;
+                        }
+
+                        bool dynamicCameraOffset = settings.dynamicEyeOffset;
+                        if (ImGui::Checkbox("Use dynamic camera offset", &dynamicCameraOffset)) {
+                            settings.dynamicEyeOffset = dynamicCameraOffset ? 1 : 0;
+                            changed = true;
+                        }
+
+                        if (dynamicCameraOffset) {
+                            ImGui::Text("Dynamic Camera Offset Smoothing Factor (lower values mean more smoothing)");
+                            float smoothingFactor = settings.dynamicEyeOffsetSmoothing;
+                            std::string smoothingFactorStr = std::format("{0}", smoothingFactor);
+                            if (ImGui::SliderFloat("Smoothing Factor", &smoothingFactor, 0.01f, 1.0f, smoothingFactorStr.c_str())) {
+                                settings.dynamicEyeOffsetSmoothing = smoothingFactor;
+                                changed = true;
+                            }
+                            if (ImGui::Button("Reset Smoothing Factor")) {
+                                settings.dynamicEyeOffsetSmoothing = 0.1f;
+                                changed = true;
+                            }
+
+                            bool hideHead = settings.hideHead;
+                            if (ImGui::Checkbox("Hide Player Head", &hideHead)) {
+                                settings.hideHead = hideHead ? 1 : 0;
+                                changed = true;
+                            }
+                        }
                     }
 
                     //bool leftHanded = settings.leftHanded;
@@ -577,6 +636,28 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     //    settings.leftHanded = leftHanded ? 1 : 0;
                     //    changed = true;
                     //}
+
+                    bool invertElbows = settings.invertElbowIK;
+                    if (ImGui::Checkbox("Invert Elbow IK (fixes some custom models)", &invertElbows)) {
+                        settings.invertElbowIK = invertElbows ? 1 : 0;
+                        changed = true;
+                    }
+                }
+
+                ImGui::Text("World Scale");
+                float worldScale = settings.worldScale;
+                std::string worldScaleValueStr;
+                if (worldScale == 0.0f)
+                    worldScaleValueStr = "Automatic (Calibrates on first game load or recenter)";
+                else
+                    worldScaleValueStr = std::format("{0}", worldScale);
+                if (ImGui::SliderFloat("World Scale", &worldScale, 0.1f, 3.0f, worldScaleValueStr.c_str())) {
+                    settings.worldScale = worldScale;
+                    changed = true;
+                }
+                if (ImGui::Button("Set World Scale To Automatic")) {
+                    settings.worldScale = 0.0f;
+                    changed = true;
                 }
 
                 ImGui::Spacing();
