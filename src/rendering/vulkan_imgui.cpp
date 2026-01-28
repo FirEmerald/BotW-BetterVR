@@ -505,7 +505,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
         ImGui::SetNextWindowBgAlpha(0.8f);
         ImGui::SetNextWindowPos(ImVec2(20.0f, 20.0f), ImGuiCond_Always);
         if (ImGui::Begin("HelpNotify", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoInputs)) {
-            ImGui::TextColored(ImVec4(1.0, 1.0, 1.0, 1.0), "Long-Press The Inventory Button (Right Thumbstick By Default) To Open BetterVR Help & Settings");
+            ImGui::TextColored(ImVec4(1.0, 1.0, 1.0, 1.0), "Press The Mod Settings Button (X/Right A By Default) To Open BetterVR Help & Settings");
         }
         ImGui::End();
     }
@@ -577,12 +577,27 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     if (cameraAnchor == static_cast<int32_t>(CameraAnchor::GROUND)) {
                         ImGui::Text("Player Height Offset");
                         float height = settings.playerHeightOffset;
-                        std::string heightOffsetValueStr = std::format("{0}{1:.02f} meters / {0}{2:.02f} feet", (height > 0.0f ? "+" : ""), height, height * 3.28084f);
+                        std::string heightOffsetValueStr;
+                        if (height < -0.01) {
+                            float heightInches = height * -39.3700787f;
+                            int32_t heightFeet = std::floor(heightInches / 12);
+                            heightInches -= heightFeet * 12;
+                            heightOffsetValueStr = std::format("-{0:.02f} meters / {1}ft {2:.02f}in", -height, heightFeet, heightInches);
+                        }
+                        else if (height > 0.01) {
+                            float heightInches = height * 39.3700787f;
+                            int32_t heightFeet = std::floor(heightInches / 12);
+                            heightInches -= heightFeet * 12;
+                            heightOffsetValueStr = std::format("+{0:.02f} meters / {1}ft {2:.02f}in", height, heightFeet, heightInches);
+                        }
+                        else {
+                            heightOffsetValueStr = "None";
+                        }
                         if (ImGui::SliderFloat("Height Offset", &height, -0.5f, 1.0f, heightOffsetValueStr.c_str())) {
                             settings.playerHeightOffset = height;
                             changed = true;
                         }
-                        if (ImGui::Button("Reset Height")) {
+                        if (ImGui::Button("Reset Height Offset")) {
                             settings.playerHeightOffset = 0.0f;
                             changed = true;
                         }
@@ -593,8 +608,12 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                         std::string heightValueStr;
                         if (height == 0.0f)
                             heightValueStr = "Automatic (Calibrates on first game load or recenter)";
-                        else
-                            heightValueStr = std::format("{0}{1:.02f} meters / {0}{2:.02f} feet", (height > 0.0f ? "+" : ""), height, height * 3.28084f);
+                        else {
+                            float heightInches = height * 39.3700787f;
+                            int32_t heightFeet = std::floor(heightInches / 12);
+                            heightInches -= heightFeet * 12;
+                            heightValueStr = std::format("{0:.02f} meters / {1}ft {2:.02f}in", height, heightFeet, heightInches);
+                        }
                         if (ImGui::SliderFloat("Eye Height", &height, 0.0f, 3.0f, heightValueStr.c_str())) {
                             settings.eyeHeight = height;
                             changed = true;
@@ -649,9 +668,14 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                 std::string worldScaleValueStr;
                 if (worldScale == 0.0f)
                     worldScaleValueStr = "Automatic (Calibrates on first game load or recenter)";
-                else
-                    worldScaleValueStr = std::format("{0}", worldScale);
-                if (ImGui::SliderFloat("World Scale", &worldScale, 0.1f, 3.0f, worldScaleValueStr.c_str())) {
+                else {
+                    float vanillaAdjustMeters = worldScale * 1.73;
+                    float vanillaAdjustInches = vanillaAdjustMeters * 39.3700787f;
+                    int32_t vanillaAdjustFeet = std::floor(vanillaAdjustInches / 12);
+                    vanillaAdjustInches -= vanillaAdjustFeet * 12;
+                    worldScaleValueStr = std::format("{0} (suitable for people {1:.02f}m/{2}ft {3:.02f}in tall with vanilla link model)", worldScale, vanillaAdjustMeters, vanillaAdjustFeet, vanillaAdjustInches);
+                }
+                if (ImGui::SliderFloat("World Scale", &worldScale, 0.25f, 2.0f, worldScaleValueStr.c_str())) {
                     settings.worldScale = worldScale;
                     changed = true;
                 }
