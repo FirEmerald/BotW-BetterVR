@@ -522,11 +522,11 @@ void CheckButtonState(bool buttonPressed, ButtonState& buttonState) {
 }
 
 std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTime, glm::fquat controllerRotation, bool inMenu) {
-    XrActiveActionSet activeActionSet = { (inMenu ? m_menuActionSet : m_gameplayActionSet), XR_NULL_PATH };
+    XrActiveActionSet activeActionSets[2] = { { m_sharedActionSet, XR_NULL_PATH }, { (inMenu ? m_menuActionSet : m_gameplayActionSet), XR_NULL_PATH } };
 
     XrActionsSyncInfo syncInfo = { XR_TYPE_ACTIONS_SYNC_INFO };
-    syncInfo.countActiveActionSets = 1;
-    syncInfo.activeActionSets = &activeActionSet;
+    syncInfo.countActiveActionSets = 2;
+    syncInfo.activeActionSets = &activeActionSets[0];
     checkXRResult(xrSyncActions(m_session, &syncInfo), "Failed to sync actions!");
 
     InputState newState = m_input.load();
