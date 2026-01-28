@@ -501,7 +501,9 @@ struct ModSettings {
     bool DoesUIFollowGaze() const { return uiFollowsGaze; }
     bool IsLeftHanded() const { return leftHanded; }
     bool InvertElbowIK() const { return invertElbowIK; }
-    bool UseDynamicEyeOffset() const { return dynamicEyeOffset; }
+    bool UseDynamicEyeOffset() const {
+        return cameraMode == CameraMode::FIRST_PERSON && cameraAnchor == CameraAnchor::EYES && dynamicEyeOffset; 
+    }
     float GetDynamicEyeOffsetSmoothing() const { return dynamicEyeOffsetSmoothing; }
     float ShouldHideHead() const { 
         if (cameraMode == CameraMode::THIRD_PERSON)
