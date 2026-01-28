@@ -505,7 +505,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
         ImGui::SetNextWindowBgAlpha(0.8f);
         ImGui::SetNextWindowPos(ImVec2(20.0f, 20.0f), ImGuiCond_Always);
         if (ImGui::Begin("HelpNotify", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoInputs)) {
-            ImGui::TextColored(ImVec4(1.0, 1.0, 1.0, 1.0), "Press The Mod Settings Button (X/Right A By Default) To Open BetterVR Help & Settings");
+            ImGui::TextColored(ImVec4(1.0, 1.0, 1.0, 1.0), "Long Press The Mod Settings Button (X/Right A By Default) To Open BetterVR Help & Settings");
         }
         ImGui::End();
     }
@@ -655,12 +655,6 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     //    settings.leftHanded = leftHanded ? 1 : 0;
                     //    changed = true;
                     //}
-
-                    bool invertElbows = settings.invertElbowIK;
-                    if (ImGui::Checkbox("Invert Elbow IK (fixes some custom models)", &invertElbows)) {
-                        settings.invertElbowIK = invertElbows ? 1 : 0;
-                        changed = true;
-                    }
                 }
 
                 ImGui::Text("World Scale");
@@ -673,7 +667,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     float vanillaAdjustInches = vanillaAdjustMeters * 39.3700787f;
                     int32_t vanillaAdjustFeet = std::floor(vanillaAdjustInches / 12);
                     vanillaAdjustInches -= vanillaAdjustFeet * 12;
-                    worldScaleValueStr = std::format("{0} (suitable for people {1:.02f}m/{2}ft {3:.02f}in tall with vanilla link model)", worldScale, vanillaAdjustMeters, vanillaAdjustFeet, vanillaAdjustInches);
+                    worldScaleValueStr = std::format("{0} ({1:.02f}m/{2}ft {3:.02f}in tall with vanilla link model)", worldScale, vanillaAdjustMeters, vanillaAdjustFeet, vanillaAdjustInches);
                 }
                 if (ImGui::SliderFloat("World Scale", &worldScale, 0.25f, 2.0f, worldScaleValueStr.c_str())) {
                     settings.worldScale = worldScale;

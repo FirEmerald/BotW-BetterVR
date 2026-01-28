@@ -1,7 +1,7 @@
 ﻿using RulesGenerator;
 using RulesGenerator.Options;
 
-Rules rules = new Rules("Better VR", "\"The Legend of Zelda: Breath of the Wild/Better VR\"", "Used to enable BetterVR.||||Most settings will be found inside the in-game menu by pressing the mod menu button (X on Touch/Right A on Index).||Made by Crementif.", true)
+Rules rules = new Rules("Better VR", "\"The Legend of Zelda: Breath of the Wild/Better VR\"", "Used to enable BetterVR.||||Most settings will be found inside the in-game menu by long pressing the mod menu button (X on Touch/Right A on Index).||Made by Crementif.", true)
     .AddTitle(0x00050000101C9300UL)
     .AddTitle(0x00050000101C9400UL)
     .AddTitle(0x00050000101C9500UL);

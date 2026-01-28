@@ -23,11 +23,9 @@ static std::pair<glm::quat, glm::quat> swingTwistY(const glm::quat& q) {
     return { swing, twist };
 }
 
-const float hardcodedSwimGroundOffset = 0;
-const float hardcodedSwimEyesOffset = 0;
-const float hardcodedRidingGroundOffset = -0.65;
-const float hardcodedRidingEyesOffset = 0.95;
-float hardcodedCrouchOffset = 0.3f;
+const float hardcodedSwimOffset = 0;
+const float hardcodedRidingOffset = -0.65;
+const float hardcodedCrouchOffset = -0.8f;
 
 glm::fvec3 s_wsCameraPosition = glm::fvec3();
 glm::fquat s_wsCameraRotation = glm::identity<glm::fquat>();
@@ -59,15 +57,16 @@ void CemuHooks::ApplyCameraOffsets(glm::fvec3* playerPos, bool isRenderCamera) {
             //perform camera offset
             playerPos->y += (GetSettings().GetPlayerHeightOffset() * WorldScaleInverse());
             if (s_isRiding) {
-                //move camera by hardcodedRidingGroundOffset
-                playerPos->y += hardcodedRidingGroundOffset;
+                //move camera by hardcodedRidingOffset, scaled by model eye height
+                playerPos->y += GetModelEyeHeight() * (hardcodedRidingOffset / 1.6);
             }
             else if (s_isSwimming) {
-                //move camera by hardcodedSwimGroundOffset
-                playerPos->y += hardcodedSwimGroundOffset;
+                //move camera by hardcodedSwimOffset, scaled by model eye height
+                playerPos->y += GetModelEyeHeight() * (hardcodedSwimOffset / 1.6);
             }
             else {
-                playerPos->y += actualCrouchOffset;
+                //move camera by actualCrouchOffset, scaled by model eye height
+                playerPos->y += GetModelEyeHeight() * (actualCrouchOffset / 1.6);
             }
         }
         else {
@@ -79,22 +78,20 @@ void CemuHooks::ApplyCameraOffsets(glm::fvec3* playerPos, bool isRenderCamera) {
     else {
         //move camera so that player eye height is origin.
         playerPos->y -= GetPlayerEyeHeight() * WorldScaleInverse();
-        if (GetSettings().UseDynamicEyeOffset()) {
-            //move camera by render offset, which in this case is the current eye position
-            playerPos->y += GetRenderOffset();
-        }
-        else {
+        //move camera by render offset
+        playerPos->y += GetRenderOffset();
+        if (!GetSettings().UseDynamicEyeOffset()) {
             if (s_isRiding) {
-                //move camera by hardcodedRidingEyesOffset
-                playerPos->y += hardcodedRidingEyesOffset;
+                //move camera by hardcodedRidingEyesOffset, scaled by model eye height
+                playerPos->y += GetModelEyeHeight() * (hardcodedRidingOffset / 1.6);
             }
             else if (s_isSwimming) {
-                //move camera by hardcodedSwimEyesOffset
-                playerPos->y += hardcodedSwimEyesOffset;
+                //move camera by hardcodedSwimEyesOffset, scaled by model eye height
+                playerPos->y += GetModelEyeHeight() * (hardcodedSwimOffset / 1.6);
             }
             else {
-                //move camera by render offset, which in this case is the original eye offset
-                playerPos->y += GetRenderOffset();
+                //move camera by actualCrouchOffset, scaled by model eye height
+                playerPos->y += GetModelEyeHeight() * (actualCrouchOffset / 1.6);
             }
         }
     }
@@ -165,7 +162,7 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
         {
             crouch_state_change_time = now;
         }
-        auto test = 0.8f;
+        auto test = hardcodedCrouchOffset;
         if (now <= crouch_state_change_time + crouchLerpDuration)
         {
             auto elapsed = std::chrono::duration<float>(now - crouch_state_change_time);
