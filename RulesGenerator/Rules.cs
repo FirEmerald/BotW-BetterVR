@@ -55,6 +55,7 @@ namespace RulesGenerator
             {
                 compiled += option.GetDefaultString() + "\n";
             }
+            compiled += "\n";
             foreach (var presetCategory in PresetCategories)
             {
                 compiled += presetCategory.Compile();
