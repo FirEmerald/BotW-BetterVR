@@ -665,15 +665,10 @@ void handleMenuInput(
     buttonHold |= mapButton(inputs.inMenu.leftTrigger, VPAD_BUTTON_L);
     buttonHold |= mapButton(inputs.inMenu.rightTrigger, VPAD_BUTTON_R);
 
-    // handle optional quick rune menu
-    if (gameState.rune_menu_open) {
-        if (inputs.inMenu.sort.currentState)
-            buttonHold |= VPAD_BUTTON_UP;
-        else
-            gameState.rune_menu_open = false;
-    }
-    else
-        buttonHold |= mapButton(inputs.inMenu.sort, VPAD_BUTTON_Y);
+    if (inputs.inMenu.holdState.lastEvent == ButtonState::Event::ShortPress)
+        buttonHold |= VPAD_BUTTON_X;
+
+    buttonHold |= mapButton(inputs.inMenu.sort, VPAD_BUTTON_Y);
 
 }
 
