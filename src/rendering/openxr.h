@@ -99,6 +99,7 @@ public:
             XrActionStateBoolean back;
             XrActionStateBoolean sort;
             XrActionStateBoolean hold;
+            ButtonState holdState;
 
             XrActionStateBoolean leftGrip;
             XrActionStateBoolean rightGrip;

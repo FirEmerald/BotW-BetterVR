@@ -65,7 +65,7 @@ HandGestureState calculateHandGesture(
     glm::vec3 flatForward = glm::normalize(glm::vec3(headsetForward.x, 0.0f, headsetForward.z));
     glm::vec3 flatHandOffset = glm::vec3(headToHand.x, 0.0f, headToHand.z);
     
-    constexpr float WAIST_BEHIND_OFFSET = 0.0f; //0.15f
+    constexpr float WAIST_BEHIND_OFFSET = -0.05f; //0.15f
     float flatForwardDot = glm::dot(flatForward, flatHandOffset) + WAIST_BEHIND_OFFSET;
     gesture.isBehindHeadWithWaistOffset = (flatForwardDot < 0.0f);
     
@@ -84,7 +84,7 @@ HandGestureState calculateHandGesture(
     gesture.isCloseToMouth = (glm::length2(headToHand) < MOUTH_RADIUS_SQ);
     
     // Check distance from waist (rough estimate)
-    glm::fvec3 waistPos = headsetPos - glm::fvec3(0.0f, 0.5f, 0.0f);
+    glm::fvec3 waistPos = headsetPos - glm::fvec3(0.0f, 0.45f, 0.0f);
     gesture.isCloseToWaist = (handPos.y < waistPos.y);
 
     // Check hand height for shield (rough estimate)
@@ -168,6 +168,10 @@ void openDpadMenu(uint32_t& buttonHold, OpenXR::GameState& gameState, OpenXR::Qu
     gameState.current_quick_menu_button = button;
 }
 
+bool isHandNotOverAnySlot(const HandGestureState& gesture) {
+    return !gesture.isBehindHead && !gesture.isBehindHeadWithWaistOffset && !gesture.isCloseToMouth;
+}
+
 bool handleDpadMenu(ButtonState::Event lastEvent, HandGestureState handGesture, uint32_t& buttonHold, OpenXR::GameState& gameState, bool (*quickMenuButton)(OpenXR::InputState) ) {
     if (lastEvent == ButtonState::Event::LongPress) {
         //Inverse the menu side for bows, so the menu corresponds to the hand side holding the weapon
@@ -211,6 +215,7 @@ void handleLeftHandInGameInput(
     
     auto* rumbleMgr = VRManager::instance().XR->GetRumbleManager();
     bool isInteractPressed = inputs.inGame.interactState[0].lastEvent == ButtonState::Event::ShortPress;
+    bool isInteractPressedLong = inputs.inGame.interactState[0].lastEvent == ButtonState::Event::LongPress;
     bool isGrabPressed = inputs.shared.grabState[0].lastEvent == ButtonState::Event::ShortPress;
     bool isGrabPressedLong = inputs.shared.grabState[0].lastEvent == ButtonState::Event::LongPress;
     bool isCurrentGrabPressed = inputs.shared.grabState[0].wasDownLastFrame;
@@ -364,6 +369,12 @@ void handleLeftHandInGameInput(
             buttonHold |= VPAD_BUTTON_A;
         }
     }
+
+    if (isHandNotOverAnySlot(leftGesture) && isInteractPressedLong) {
+        if (!gameState.prevent_grab_inputs) {
+            buttonHold |= VPAD_BUTTON_A;
+        }
+    }
 }
 
 void handleRightHandInGameInput(
@@ -382,6 +393,7 @@ void handleRightHandInGameInput(
 
     auto* rumbleMgr = VRManager::instance().XR->GetRumbleManager();
     bool isInteractPressed = inputs.inGame.interactState[1].lastEvent == ButtonState::Event::ShortPress;
+    bool isInteractPressedLong = inputs.inGame.interactState[1].lastEvent == ButtonState::Event::LongPress;
     bool isGrabPressedShort = inputs.shared.grabState[1].lastEvent == ButtonState::Event::ShortPress;
     bool isGrabPressedLong = inputs.shared.grabState[1].lastEvent == ButtonState::Event::LongPress;
     bool isCurrentGrabPressed = inputs.shared.grabState[1].wasDownLastFrame;
@@ -525,6 +537,12 @@ void handleRightHandInGameInput(
             buttonHold |= VPAD_BUTTON_A;
         }
     }
+
+    if (isHandNotOverAnySlot(rightGesture) && isInteractPressedLong) {
+        if (!gameState.prevent_grab_inputs) {
+            buttonHold |= VPAD_BUTTON_A;
+        }
+    }
 }
 
 void handleLeftTriggerBindings(
@@ -644,10 +662,18 @@ void handleMenuInput(
     }
 
     buttonHold |= mapButton(inputs.inMenu.select, VPAD_BUTTON_A);
-    buttonHold |= mapButton(inputs.inMenu.hold, VPAD_BUTTON_X);
     buttonHold |= mapButton(inputs.inMenu.leftTrigger, VPAD_BUTTON_L);
     buttonHold |= mapButton(inputs.inMenu.rightTrigger, VPAD_BUTTON_R);
-    buttonHold |= mapButton(inputs.inMenu.sort, VPAD_BUTTON_Y);
+
+    // handle optional quick rune menu
+    if (gameState.rune_menu_open) {
+        if (inputs.inMenu.sort.currentState)
+            buttonHold |= VPAD_BUTTON_UP;
+        else
+            gameState.rune_menu_open = false;
+    }
+    else
+        buttonHold |= mapButton(inputs.inMenu.sort, VPAD_BUTTON_Y);
 
 }
 
@@ -724,8 +750,9 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     // toggleable help menu
     auto& isMenuOpen = VRManager::instance().XR->m_isMenuOpen;
 
-    if (inputs.shared.modMenuState.lastEvent == ButtonState::Event::ShortPress) {
+    if (inputs.shared.modMenuState.lastEvent == ButtonState::Event::LongPress && inputs.shared.modMenuState.longFired_actedUpon) {
         isMenuOpen = !isMenuOpen;
+        inputs.shared.modMenuState.longFired_actedUpon = false;
     }
 
     // allow the gamepad inputs to control the imgui overlay

@@ -27,10 +27,16 @@ const float hardcodedSwimGroundOffset = 0;
 const float hardcodedSwimEyesOffset = 0;
 const float hardcodedRidingGroundOffset = -0.65;
 const float hardcodedRidingEyesOffset = 0.95;
+float hardcodedCrouchOffset = 0.3f;
 
 glm::fvec3 s_wsCameraPosition = glm::fvec3();
 glm::fquat s_wsCameraRotation = glm::identity<glm::fquat>();
 bool s_isSwimming = false;
+bool s_isCrouching = false;
+bool s_wasCrouching = false;
+float actualCrouchOffset = 0.0f;
+std::chrono::steady_clock::time_point crouch_state_change_time;
+
 uint32_t s_isLadderClimbing = 0;
 uint32_t s_isRiding = 0;
 
@@ -59,6 +65,9 @@ void CemuHooks::ApplyCameraOffsets(glm::fvec3* playerPos, bool isRenderCamera) {
             else if (s_isSwimming) {
                 //move camera by hardcodedSwimGroundOffset
                 playerPos->y += hardcodedSwimGroundOffset;
+            }
+            else {
+                playerPos->y += actualCrouchOffset;
             }
         }
         else {
@@ -139,6 +148,7 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
 
         PlayerMoveBitFlags moveBits = actor.moveBitFlags.getLE();
         s_isSwimming = (std::to_underlying(moveBits) & swimmingFlags) == swimmingFlags;
+        s_isCrouching = (std::to_underlying(moveBits) & std::to_underlying(PlayerMoveBitFlags::IS_CROUCHING)) != 0;
 
         // Todo: move those and their hooks in controls.cpp ?
         auto gameState = VRManager::instance().XR->m_gameState.load();
@@ -148,6 +158,32 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
         gameState.is_riding_mount = s_isRiding == 2 ? true : false;
         gameState.is_paragliding = (std::to_underlying(moveBits) & std::to_underlying(PlayerMoveBitFlags::IS_GLIDER_ACTIVE)) != 0;
         VRManager::instance().XR->m_gameState.store(gameState);
+
+        auto now = std::chrono::steady_clock::now();
+        std::chrono::milliseconds crouchLerpDuration{ 150 };
+        if (s_isCrouching != s_wasCrouching)
+        {
+            crouch_state_change_time = now;
+        }
+        auto test = 0.8f;
+        if (now <= crouch_state_change_time + crouchLerpDuration)
+        {
+            auto elapsed = std::chrono::duration<float>(now - crouch_state_change_time);
+            auto duration = std::chrono::duration<float>(crouchLerpDuration);
+            float t = elapsed.count() / duration.count();
+            t = glm::clamp(t, 0.0f, 1.0f);
+            if (s_isCrouching)
+            {
+                actualCrouchOffset = glm::mix(0.0f, test, t);
+            }
+            else
+            {
+                actualCrouchOffset = glm::mix(test, 0.0f, t);
+            }
+        }
+        else {
+            actualCrouchOffset = s_isCrouching ? test : 0.0f;
+        }
 
         // read player MTX
         BEMatrix34& mtx = actor.mtx;
@@ -176,6 +212,7 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
             s_isRiding--;
         }
 
+        s_wasCrouching = s_isCrouching;
         glm::mat4 playerMtx4 = glm::inverse(glm::scale(glm::translate(glm::identity<glm::mat4>(), playerPos), glm::vec3(WorldScaleInverse())) * glm::mat4(s_wsCameraRotation));
         existingGameMtx = playerMtx4;
     }
@@ -259,10 +296,6 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
                 baseYawWithoutClimbingFix = yaw * glm::angleAxis(glm::radians(180.0f), glm::fvec3(0.0f, 1.0f, 0.0f));
             }
         }
-    }
-    else {
-        //perform camera offset
-        basePos.y += (GetSettings().GetPlayerHeightOffset() * WorldScaleInverse());
     }
 
     s_lastCameraMtx = glm::fmat4x3(glm::scale(glm::translate(glm::identity<glm::fmat4>(), basePos), glm::vec3(WorldScaleInverse())) * glm::mat4(baseYawWithoutClimbingFix));

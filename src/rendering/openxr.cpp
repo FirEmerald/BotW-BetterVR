@@ -653,6 +653,12 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
         newState.inMenu.hold = { XR_TYPE_ACTION_STATE_BOOLEAN };
         checkXRResult(xrGetActionStateBoolean(m_session, &getHoldInfo, &newState.inMenu.hold), "Failed to get hold action value!");
 
+        auto& holdButtonState = newState.inMenu.holdState;
+        if (newState.inMenu.hold.isActive == XR_TRUE) {
+            auto buttonPressed = newState.inMenu.hold.currentState == XR_TRUE;
+            CheckButtonState(buttonPressed, holdButtonState);
+        }
+
         XrActionStateGetInfo getLeftGripInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
         getLeftGripInfo.action = m_leftGripAction;
         newState.inMenu.leftGrip = { XR_TYPE_ACTION_STATE_BOOLEAN };
