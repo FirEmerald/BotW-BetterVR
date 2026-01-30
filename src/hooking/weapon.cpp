@@ -212,7 +212,6 @@ void CemuHooks::hook_ChangeWeaponMtx(PPCInterpreter_t* hCPU) {
 
         //Fetch data for inputs handling
         auto gameState = VRManager::instance().XR->m_gameState.load();
-        gameState.has_something_in_hand = true;
         gameState.is_throwable_object_held = ObjectCanBeThrown(targetActor.flags2.getLE());
         auto equipType = EquipType::None;
         switch (targetActor.type.getLE()) {
@@ -236,17 +235,21 @@ void CemuHooks::hook_ChangeWeaponMtx(PPCInterpreter_t* hCPU) {
         //Log::print<INFO>("Equipped weapon {} with type of {} on side {}", targetActor.name.getLE().c_str(), (uint32_t)targetActor.type.getLE(), (uint32_t)side);
 
         if (isRightHandWeapon) {
+            gameState.has_something_in_right_hand = true;
+            
             if (targetActor.name.getLE() == "Item_Magnetglove")
-            equipType = EquipType::MagnetGlove;
+                equipType = EquipType::MagnetGlove;
+
+            if (gameState.left_equip_type == EquipType::Bow)
+                equipType = EquipType::Arrow;
 
             gameState.right_equip_type = equipType;
-            if (gameState.left_equip_type == EquipType::Bow)
-                gameState.right_equip_type = EquipType::Arrow;
             gameState.right_equip_type_set_this_frame = true;
         }
         else {
+            gameState.has_something_in_left_hand = true;
             if (targetActor.name.getLE() == "Item_Conductor")
-            equipType = EquipType::SheikahSlate;
+                equipType = EquipType::SheikahSlate;
 
             gameState.left_equip_type = equipType;
             gameState.left_equip_type_set_this_frame = true;
@@ -260,7 +263,7 @@ void CemuHooks::hook_ChangeWeaponMtx(PPCInterpreter_t* hCPU) {
         auto dropSide = input.inGame.drop_weapon[side];
 
         if (input.shared.in_game && dropSide && isDroppable(targetActor.name.getLE())) {
-            Log::print<INFO>("Dropping weapon {} with type of {} due to double press on grab button", targetActor.name.getLE().c_str(), (uint32_t)targetActor.type.getLE());
+            Log::print<INFO>("Dropping weapon {} with type of {} due to long press on right waist body slot", targetActor.name.getLE().c_str(), (uint32_t)targetActor.type.getLE());
             hCPU->gpr[11] = 1;
             hCPU->gpr[9] = 1;
             hCPU->gpr[13] = isLeftHandWeapon ? 1 : 0; // set the hand index to 0 for left hand, 1 for right hand

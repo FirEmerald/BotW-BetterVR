@@ -605,7 +605,7 @@ void handleRightTriggerBindings(
     constexpr RumbleParameters rightRumbleFiniteRaise = { true, 1, RumbleType::Raising, 0.5f, false, 0.25, 1.0f, 1.0f };
     
     
-    if (gameState.has_something_in_hand) {
+    if (gameState.has_something_in_left_hand || gameState.has_something_in_right_hand) {
         if (gameState.is_throwable_object_held) {
             rumbleMgr->enqueueInputsRumbleCommand(rightRumbleFixed);
             buttonHold |= VPAD_BUTTON_R;  // Throw object
@@ -707,13 +707,35 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     auto gameState = VRManager::instance().XR->m_gameState.load(); 
     gameState.in_game = inputs.shared.in_game;
 
-    // use the previous values if no new values are written from hook_ChangeWeaponMtx this frame
-    if (gameState.has_something_in_hand)
+    // Spread the weapon detection from link's attachement bones over several frames.
+    // Each bone isn't necessarily checked each frames which can give wrong results sometimes
+    constexpr uint8_t REQUIRED_FRAMES = 3;
+    if (gameState.right_equip_type != gameState.previous_right_equip_type)
     {
-        if (!gameState.left_equip_type_set_this_frame) gameState.left_equip_type = gameState.previous_left_equip_type;
-        if (!gameState.right_equip_type_set_this_frame) gameState.right_equip_type = gameState.previous_right_equip_type;
+        gameState.right_hand_equip_type_change_requested_over_frames++;
+        if (gameState.right_hand_equip_type_change_requested_over_frames > REQUIRED_FRAMES) {
+            gameState.right_hand_equip_type_change_requested_over_frames = 0;
+        }
+        else
+            gameState.right_equip_type = gameState.previous_right_equip_type;
     }
-  
+    else {
+        gameState.right_hand_equip_type_change_requested_over_frames = 0;
+    }
+
+    if (gameState.left_equip_type != gameState.previous_left_equip_type)
+    {
+        gameState.left_hand_equip_type_change_requested_over_frames++;
+        if (gameState.left_hand_equip_type_change_requested_over_frames > REQUIRED_FRAMES) {
+            gameState.left_hand_equip_type_change_requested_over_frames = 0;
+        }
+        else
+            gameState.left_equip_type = gameState.previous_left_equip_type;
+    }
+    else {
+        gameState.left_hand_equip_type_change_requested_over_frames = 0;
+    }
+
     // buttons
     static uint32_t oldCombinedHold = 0; 
     uint32_t newXRBtnHold = 0;
@@ -760,11 +782,6 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         leftJoystickDir = Direction::None;
         rightJoystickDir = Direction::None;
     }
-
-    //Log::print<INFO>("last_weapon_held_hand : {}", gameState.last_weapon_held_hand);
-    //Log::print<INFO>("Is weapon held : {}", gameState.is_weapon_or_object_held);
-    //Log::print<INFO>("Weapon Type : {}", (int)gameState.left_weapon_type);
-    //Log::print<INFO>("Weapon Type : {}", (int)gameState.right_weapon_type);
 
     // Calculate hand gestures
     HandGestureState leftGesture = {};
@@ -866,14 +883,6 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         // Trigger handling
         handleLeftTriggerBindings(newXRBtnHold, inputs, gameState, leftGesture);
         handleRightTriggerBindings(newXRBtnHold, inputs, gameState, rightGesture);
-        
-        //// Rune cancel with left trigger
-        //if (inputs.inGame.leftTrigger.currentState && 
-        //    gameState.left_equip_type == EquipType::Rune) {
-        //    RumbleParameters rumble = { true, 1, 0.5f, false, 0.25, 0.3f, 0.3f };
-        //    rumbleMgr->enqueueInputsRumbleCommand(rumble);
-        //    newXRBtnHold |= VPAD_BUTTON_B;
-        //}
     }
     else {
         handleMenuInput(newXRBtnHold, inputs, gameState, leftJoystickDir);
@@ -883,8 +892,8 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     rumbleMgr->updateHaptics();
 
     // sticks
-    static uint32_t oldXRStickHold = 0;
-    uint32_t newXRStickHold = 0;
+    static VPADButtons oldXRStickHold = VPAD_BUTTON_NONE;
+    VPADButtons newXRStickHold = VPAD_BUTTON_NONE;
 
     // movement/navigation stick
     vpadStatus.leftStick = { leftStickSource.currentState.x + vpadStatus.leftStick.x.getLE(), leftStickSource.currentState.y + vpadStatus.leftStick.y.getLE() };
@@ -940,7 +949,8 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     // (re)set values for next frame
     gameState.previous_button_hold = newXRBtnHold;
     gameState.was_in_game = gameState.in_game;
-    gameState.has_something_in_hand = false; // updated in hook_ChangeWeaponMtx
+    gameState.has_something_in_right_hand = false; // updated in hook_ChangeWeaponMtx
+    gameState.has_something_in_left_hand = false; // updated in hook_ChangeWeaponMtx
     gameState.is_throwable_object_held = false; // updated in hook_ChangeWeaponMtx
     gameState.previous_left_equip_type = gameState.left_equip_type; // use the previous values if no new values are written from hook_ChangeWeaponMtx this frame
     gameState.previous_right_equip_type = gameState.right_equip_type; // use the previous values if no new values are written from hook_ChangeWeaponMtx this frame

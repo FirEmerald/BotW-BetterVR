@@ -175,7 +175,7 @@ public:
     std::atomic<glm::fquat> m_inputCameraRotation = glm::identity<glm::fquat>();
 
     enum QuickMenu : uint32_t {
-        QM_NONE = (uint32_t)0,
+        QM_NONE = (uint32_t)VPAD_BUTTON_NONE,
         QM_WEAPON = (uint32_t)VPAD_BUTTON_RIGHT,
         QM_SHIELD = (uint32_t)VPAD_BUTTON_LEFT,
         QM_BOW = (uint32_t)VPAD_BUTTON_RIGHT,
@@ -228,7 +228,10 @@ public:
         EquipType previous_right_equip_type = EquipType::None;
         EquipType previous_left_equip_type = EquipType::None;
         EquipType last_item_held = EquipType::None;
-        bool has_something_in_hand = false; // true if either a weapon or a throwable object is held
+        int right_hand_equip_type_change_requested_over_frames = 0;
+        int left_hand_equip_type_change_requested_over_frames = 0;
+        bool has_something_in_left_hand = false;
+        bool has_something_in_right_hand = false;
         bool is_throwable_object_held = false; // true if a throwable object is held
 
         bool is_locking_on_target = false;
