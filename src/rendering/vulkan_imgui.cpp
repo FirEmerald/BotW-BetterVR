@@ -655,6 +655,12 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     //    settings.leftHanded = leftHanded ? 1 : 0;
                     //    changed = true;
                     //}
+
+                    bool alternateArmIK = settings.alternateArmIK;
+                    if (ImGui::Checkbox("Use Alternate Arm IK Solution", &alternateArmIK)) {
+                        settings.alternateArmIK = alternateArmIK ? 1 : 0;
+                        changed = true;
+                    }
                 }
 
                 ImGui::Text("World Scale");
