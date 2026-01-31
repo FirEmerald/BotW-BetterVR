@@ -331,6 +331,7 @@ void OpenXR::CreateActions() {
         createAction(m_menuActionSet, "right_grip", "Switch To Right Tab (R Button)", XR_ACTION_TYPE_BOOLEAN_INPUT, m_rightGripAction);
         createAction(m_menuActionSet, "lefttrigger", "Left Trigger", XR_ACTION_TYPE_BOOLEAN_INPUT, m_leftTriggerAction);
         createAction(m_menuActionSet, "righttrigger", "Right Trigger", XR_ACTION_TYPE_BOOLEAN_INPUT, m_rightTriggerAction);
+        createAction(m_menuActionSet, "rotate", "Rotate (In inventory) (Right Thumbstick Click)", XR_ACTION_TYPE_BOOLEAN_INPUT, m_rotateAction);
 
     }
 
@@ -399,6 +400,7 @@ void OpenXR::CreateActions() {
             XrActionSuggestedBinding{ .action = m_rightGripAction, .binding = GetXRPath("/user/hand/right/input/squeeze/value") },
             XrActionSuggestedBinding{ .action = m_leftTriggerAction, .binding = GetXRPath("/user/hand/left/input/trigger/value") },
             XrActionSuggestedBinding{ .action = m_rightTriggerAction, .binding = GetXRPath("/user/hand/right/input/trigger/value") },
+            XrActionSuggestedBinding{ .action = m_rotateAction, .binding = GetXRPath("/user/hand/left/input/thumbstick/click") },
         };
         XrInteractionProfileSuggestedBinding suggestedBindingsInfo = { XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING };
         suggestedBindingsInfo.interactionProfile = GetXRPath("/interaction_profiles/oculus/touch_controller");
@@ -450,6 +452,7 @@ void OpenXR::CreateActions() {
             XrActionSuggestedBinding{ .action = m_rightGripAction, .binding = GetXRPath("/user/hand/right/input/squeeze/force") },
             XrActionSuggestedBinding{ .action = m_leftTriggerAction, .binding = GetXRPath("/user/hand/left/input/trigger/value") },
             XrActionSuggestedBinding{ .action = m_rightTriggerAction, .binding = GetXRPath("/user/hand/right/input/trigger/value") },
+            XrActionSuggestedBinding{ .action = m_rotateAction, .binding = GetXRPath("/user/hand/left/input/thumbstick/click") },
         };
         XrInteractionProfileSuggestedBinding suggestedBindingsInfo = { XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING };
         suggestedBindingsInfo.interactionProfile = GetXRPath("/interaction_profiles/valve/index_controller");
@@ -688,6 +691,12 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
         getRightTriggerInfo.subactionPath = XR_NULL_PATH;
         newState.inMenu.rightTrigger = { XR_TYPE_ACTION_STATE_BOOLEAN };
         checkXRResult(xrGetActionStateBoolean(m_session, &getRightTriggerInfo, &newState.inMenu.rightTrigger), "Failed to get right trigger action value!");
+
+        XrActionStateGetInfo getRotateInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
+        getRotateInfo.action = m_rotateAction;
+        getRotateInfo.subactionPath = XR_NULL_PATH;
+        newState.inMenu.rotate = { XR_TYPE_ACTION_STATE_BOOLEAN };
+        checkXRResult(xrGetActionStateBoolean(m_session, &getRotateInfo, &newState.inMenu.rotate), "Failed to get rotate action value!");
     }
     else {
         for (EyeSide side : { EyeSide::LEFT, EyeSide::RIGHT }) {
