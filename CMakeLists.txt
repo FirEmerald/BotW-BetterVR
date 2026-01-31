@@ -67,6 +67,8 @@ target_sources(BetterVR_Layer PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/update_checker.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/update_checker.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/controller_image.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/game_options.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/game_options.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/hooking/framebuffer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/hooking/framebuffer.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/hooking/layer.cpp
