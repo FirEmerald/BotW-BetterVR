@@ -606,7 +606,7 @@ void handleRightTriggerBindings(
             rumbleMgr->enqueueInputsRumbleCommand(rightRumbleFixed);
             buttonHold |= VPAD_BUTTON_R;  // Throw object
         }
-        else if (gameState.left_equip_type == EquipType::Bow) {
+        else if (gameState.left_equip_type == EquipType::Bow || gameState.last_item_held == EquipType::Bow) {
             rumbleMgr->enqueueInputsRumbleCommand(rightRumbleInfiniteRaiseBow);
             buttonHold |= VPAD_BUTTON_ZR;  // Shoot bow
         }
