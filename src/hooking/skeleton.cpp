@@ -102,126 +102,6 @@ public:
         return glm::inverse(parentWorldMatrix) * targetWorldMatrix;
     }
 
-    //alternate IK method, keeps arm in-line with palms. Only keeping this because I spent too many hours on it.
-    void SolveTwoBoneIK(int rootIdx, int midIdx, int endIdx, const glm::mat4& targetEnd, bool isLeft) {
-        if (rootIdx < 0 || rootIdx >= m_bones.size() ||
-            midIdx < 0 || midIdx >= m_bones.size() ||
-            endIdx < 0 || endIdx >= m_bones.size()) {
-            return;
-        }
-
-        Bone& rootBone = m_bones[rootIdx];
-        Bone& midBone = m_bones[midIdx];
-        Bone& endBone = m_bones[endIdx];
-        glm::vec3 targetPos = glm::vec3(targetEnd[3]);
-        glm::mat3 targetRot = glm::mat3(targetEnd);
-
-        // get parent world matrix (clavicle)
-        glm::mat4 parentWorld = glm::identity<glm::mat4>();
-        if (rootBone.parentIndex != -1) {
-            parentWorld = m_bones[rootBone.parentIndex].worldMatrix;
-        }
-
-        glm::vec3 rootPos = glm::vec3(parentWorld * glm::vec4(rootBone.localPos, 1.0f));
-
-        // get lengths
-        // store lengths immediately and never compute them again as they might get modified later, either through this code or an animation
-        static std::map<int, float> lengths;
-        float lUpper = lengths.try_emplace(midIdx, glm::length(midBone.localPos)).first->second;
-        float lLower = lengths.try_emplace(endIdx, glm::length(endBone.localPos)).first->second;
-        glm::vec3 dir = targetPos - rootPos;
-        float lTarget = glm::length(dir);
-
-        //directions
-        const glm::vec3 dirRight = glm::vec3(0, 0, isLeft ? 1 : -1);
-        const glm::vec3 dirUp = glm::vec3(0, 1, 0);
-        //const glm::vec3 dirForward = glm::vec3(isLeft ? 1 : -1, 0, 0); unused
-
-        /*
-        * 
-        * right X forward = up
-        * forward X up = right
-        * up X right = forward
-        */
-        //get local directions
-        glm::vec3 forward = glm::normalize(dir);
-        glm::vec3 up = glm::cross(targetRot * dirRight, forward); //maintain RIGHT vector of target
-        glm::vec3 right;
-        if (std::abs(up.x) <= 0.001 && std::abs(up.y) <= 0.001 && std::abs(up.z) <= 0.001) { //RIGHT vector too close to FORWARD vector
-            right = glm::normalize(glm::cross(forward, targetRot * dirUp)); //maintain UP vector of target as fallback
-            up = glm::cross(right, forward);
-        }
-        else {
-            up = glm::normalize(up);
-            right = glm::cross(forward, up);
-        }
-
-        //get target rotations and midpoint position
-        glm::mat3 rootRotWorld, midRotWorld;
-        glm::vec3 midPosWorld;
-        if (lTarget >= (lUpper + lLower)) { //straight
-            float partUpper = (lUpper / (lUpper + lLower)); //portion of length that is upper
-            rootRotWorld = glm::mat3(isLeft ? forward : -forward, up, isLeft ? right : -right); //construct rotation matrix from look axis
-            midRotWorld = rootRotWorld;
-            midPosWorld = rootPos + partUpper * lTarget * forward;
-        }
-        else if (lTarget <= (lLower - lUpper)) { //180 bend from back - root is flipped
-            rootRotWorld = glm::mat3(isLeft ? -forward : forward, up, isLeft ? -right : right); //construct rotation matrix from look axis
-            midRotWorld = glm::mat3(isLeft ? forward : -forward, up, isLeft ? right : -right); //construct rotation matrix from look axis
-            midPosWorld = rootPos + lUpper * forward;
-        }
-        else if (lTarget <= (lUpper - lLower)) { //180 bend from front - midpoint is flipped
-            rootRotWorld = glm::mat3(isLeft ? forward : -forward, up, isLeft ? right : -right); //construct rotation matrix from look axis
-            midRotWorld = glm::mat3(isLeft ? -forward : forward, up, isLeft ? -right : right);  //construct rotation matrix from look axis
-            midPosWorld = rootPos + lUpper * forward;
-        }
-        else { //hinge midpoint
-            /*
-            * intersection of circles method:
-            * x is forward part of upper
-            * d is lTarget
-            * R is lUpper
-            * r = lLower
-            * x = (d^2 - r^2 + R^2) / (2d)
-            */
-            float lUpperSqr = lUpper * lUpper;
-            float lLowerSqr = lLower * lLower;
-            float lTargetSqr = lTarget * lTarget;
-            float hUpper = (lTargetSqr + lUpperSqr - lLowerSqr) / (2 * lTarget); //horizontal part of upper
-            float hLower = lTarget - hUpper; //horizontal part of lower; because hUpper + hLower = lTarget
-            float vUpper = std::sqrtf(lUpperSqr - (hUpper * hUpper)); //vertical part of upper
-            float vLower = -vUpper; //vertical part of lower, because vUpper + vLower = 0
-
-            float cosUpper = hUpper / lUpper;
-            float sinUpper = vUpper / lUpper;
-
-            float cosLower = hLower / lLower;
-            float sinLower = vLower / lLower;
-
-            rootRotWorld = glm::mat3((isLeft ? forward : -forward) * cosUpper - up * sinUpper, up * cosUpper + (isLeft ? forward : -forward) * sinUpper, isLeft ? right : -right); //construct rotation matrix from look axis
-            midRotWorld = glm::mat3((isLeft ? forward : -forward) * cosLower - up * sinLower, up * cosLower + (isLeft ? forward : -forward) * sinLower, isLeft ? right : -right);  //construct rotation matrix from look axis
-            midPosWorld = rootPos + (isLeft ? lUpper : -lUpper) * rootRotWorld[0];
-        }
-
-        // convert to local space
-        glm::mat4 rootLocal = glm::inverse(parentWorld) * glm::mat4(rootRotWorld); //set local rotation
-        rootLocal[3] = glm::vec4(rootBone.localPos, 1.0f); // restore local translation
-        glm::mat4 rootWorld = parentWorld * rootLocal; //get world from local
-
-        glm::mat4 midWorld = glm::mat4(midRotWorld); //set world rotation
-        midWorld[3] = glm::vec4(midPosWorld, 1.0f); // set world translation
-        glm::mat4 midLocal = glm::inverse(rootWorld) * midWorld; //get local from world
-
-        // update skeleton
-        rootBone.localMatrix = rootLocal;
-        rootBone.localPos = glm::vec3(rootLocal[3]);
-        rootBone.worldMatrix = rootWorld;
-        midBone.localMatrix = midLocal;
-        midBone.localPos = glm::vec3(midLocal[3]);
-        midBone.worldMatrix = midWorld;
-        UpdateWorldMatrices();
-    }
-
     void SolveTwoBoneIK(int rootIdx, int midIdx, int endIdx, const glm::vec3& targetPos, const glm::vec3& poleVector, float boneForwardSign) {
         if (rootIdx < 0 || rootIdx >= m_bones.size() ||
             midIdx < 0 || midIdx >= m_bones.size() ||
@@ -254,8 +134,8 @@ public:
         dist = glm::clamp(dist, epsilon, l1 + l2 - epsilon);
 
         // law of cosines for angle at shoulder (alpha)
-        float cosAlpha = (l1 * l1 + dist * dist - l2 * l2) / (2 * l1 * dist);
-        float alpha = glm::acos(glm::clamp(cosAlpha, -1.0f, 1.0f));
+        float cosAlpha = std::clamp((l1 * l1 + dist * dist - l2 * l2) / (2 * l1 * dist), -1.0f, 1.0f);
+        float sinAlpha = std::sqrt(1 - cosAlpha * cosAlpha);
 
         // plane construction
         glm::vec3 dirNorm = glm::normalize(dir);
@@ -263,7 +143,7 @@ public:
         glm::vec3 ortho = glm::normalize(glm::cross(planeNormal, dirNorm));
 
         // arm 1 direction (world)
-        glm::vec3 arm1Dir = glm::normalize(dirNorm * cos(alpha) + ortho * sin(alpha));
+        glm::vec3 arm1Dir = glm::normalize(dirNorm * cosAlpha + ortho * sinAlpha);
 
         // arm 2 direction (world)
         glm::vec3 elbowPos = rootPos + arm1Dir * l1;
@@ -618,26 +498,21 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
 
             // convert targetWorld to model space
             glm::mat4 targetModel = glm::inverse(playerMtx4) * targetWorld;
-            if (GetSettings().UseAlternateArmIK()) {
-                s_skeleton.SolveTwoBoneIK(arm1Index, arm2Index, wristIndex, targetModel, isLeft);
+            glm::vec3 targetPos = glm::vec3(targetModel[3]);
+
+            // pole vector (elbow direction)
+            // left: left-down-back, right: right-down-back
+            glm::vec3 poleDir = isLeft ? glm::vec3(1.0f, -1.0f, -0.5f) : glm::vec3(-1.0f, -1.0f, -0.5f);
+
+            // rotate pole vector by body rotation (Skl_Root)
+            if (Bone* rootBone = s_skeleton.GetBone("Skl_Root")) {
+                glm::quat rootRot = glm::quat_cast(rootBone->localMatrix);
+                poleDir = rootRot * poleDir;
             }
-            else {
-                glm::vec3 targetPos = glm::vec3(targetModel[3]);
 
-                // pole vector (elbow direction)
-                // left: left-down-back, right: right-down-back
-                glm::vec3 poleDir = isLeft ? glm::vec3(1.0f, -1.0f, -0.5f) : glm::vec3(-1.0f, -1.0f, -0.5f);
+            float forwardSign = isLeft ? 1.0f : -1.0f;
 
-                // rotate pole vector by body rotation (Skl_Root)
-                if (Bone* rootBone = s_skeleton.GetBone("Skl_Root")) {
-                    glm::quat rootRot = glm::quat_cast(rootBone->localMatrix);
-                    poleDir = rootRot * poleDir;
-                }
-
-                float forwardSign = isLeft ? 1.0f : -1.0f;
-
-                s_skeleton.SolveTwoBoneIK(arm1Index, arm2Index, wristIndex, targetPos, poleDir, forwardSign);
-            }
+            s_skeleton.SolveTwoBoneIK(arm1Index, arm2Index, wristIndex, targetPos, poleDir, forwardSign);
 
             calculatedLocalMat = s_skeleton.GetBone(boneIndex)->localMatrix;
         }
