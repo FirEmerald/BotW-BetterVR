@@ -505,7 +505,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
         ImGui::SetNextWindowBgAlpha(0.8f);
         ImGui::SetNextWindowPos(ImVec2(20.0f, 20.0f), ImGuiCond_Always);
         if (ImGui::Begin("HelpNotify", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoInputs)) {
-            ImGui::TextColored(ImVec4(1.0, 1.0, 1.0, 1.0), "Long Press The Mod Settings Button (X/Left A By Default) To Open BetterVR Help & Settings");
+            ImGui::TextColored(ImVec4(1.0, 1.0, 1.0, 1.0), "Long-Press The X Button (or A button on left controller for Valve hmd) To Open BetterVR Help & Settings");
         }
         ImGui::End();
     }
@@ -531,7 +531,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
     ImGui::SetNextWindowSize(windowWidth, ImGuiCond_Always);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 
-    if (ImGui::Begin("BetterVR Settings & Help | Long-Press Right Thumbstick To Exit Or Press B##Settings", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove)) {
+    if (ImGui::Begin("BetterVR Settings & Help | Long-Press The X Button (or A button on left controller for Valve hmd) To Exit Or Press B##Settings", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove)) {
         bool changed = false;
 
         if (ImGui::BeginTabBar("HelpMenuTabs")) {
