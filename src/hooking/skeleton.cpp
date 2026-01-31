@@ -134,8 +134,8 @@ public:
         dist = glm::clamp(dist, epsilon, l1 + l2 - epsilon);
 
         // law of cosines for angle at shoulder (alpha)
-        float cosAlpha = (l1 * l1 + dist * dist - l2 * l2) / (2 * l1 * dist);
-        float alpha = glm::acos(glm::clamp(cosAlpha, -1.0f, 1.0f));
+        float cosAlpha = std::clamp((l1 * l1 + dist * dist - l2 * l2) / (2 * l1 * dist), -1.0f, 1.0f);
+        float sinAlpha = std::sqrt(1.0 - cosAlpha * cosAlpha);
 
         // plane construction
         glm::vec3 dirNorm = glm::normalize(dir);
@@ -143,7 +143,7 @@ public:
         glm::vec3 ortho = glm::normalize(glm::cross(planeNormal, dirNorm));
 
         // arm 1 direction (world)
-        glm::vec3 arm1Dir = glm::normalize(dirNorm * cos(alpha) + ortho * sin(alpha));
+        glm::vec3 arm1Dir = glm::normalize(dirNorm * cosAlpha + ortho * sinAlpha);
 
         // arm 2 direction (world)
         glm::vec3 elbowPos = rootPos + arm1Dir * l1;
