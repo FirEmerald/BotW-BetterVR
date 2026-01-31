@@ -135,7 +135,7 @@ public:
 
         // law of cosines for angle at shoulder (alpha)
         float cosAlpha = std::clamp((l1 * l1 + dist * dist - l2 * l2) / (2 * l1 * dist), -1.0f, 1.0f);
-        float sinAlpha = std::sqrt(1 - cosAlpha * cosAlpha);
+        float sinAlpha = -std::sqrt(1 - cosAlpha * cosAlpha);
 
         // plane construction
         glm::vec3 dirNorm = glm::normalize(dir);
@@ -153,12 +153,12 @@ public:
         glm::vec3 x1 = arm1Dir * boneForwardSign;
         glm::vec3 z1 = planeNormal;
         glm::vec3 y1 = glm::cross(z1, x1);
-        glm::mat3 rot1World = glm::mat3(x1, -y1, -z1);
+        glm::mat3 rot1World = glm::mat3(x1, y1, z1);
 
         glm::vec3 x2 = arm2Dir * boneForwardSign;
         glm::vec3 z2 = planeNormal;
         glm::vec3 y2 = glm::cross(z2, x2);
-        glm::mat3 rot2World = glm::mat3(x2, -y2, -z2);
+        glm::mat3 rot2World = glm::mat3(x2, y2, z2);
 
         // convert to local space
         glm::mat4 arm1Local = glm::inverse(parentWorld) * glm::mat4(rot1World);
@@ -501,8 +501,8 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
             glm::vec3 targetPos = glm::vec3(targetModel[3]);
 
             // pole vector (elbow direction)
-            // left: left-down-back, right: right-down-back
-            glm::vec3 poleDir = isLeft ? glm::vec3(1.0f, -1.0f, -0.5f) : glm::vec3(-1.0f, -1.0f, -0.5f);
+            // left: right-up-front, right: left-up-front
+            glm::vec3 poleDir = isLeft ? glm::vec3(-1.0f, 1.0f, 0.5f) : glm::vec3(1.0f, 1.0f, 0.5f);
 
             // rotate pole vector by body rotation (Skl_Root)
             if (Bone* rootBone = s_skeleton.GetBone("Skl_Root")) {
