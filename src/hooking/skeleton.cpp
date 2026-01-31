@@ -464,7 +464,7 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
             glm::vec3 targetPos = glm::vec3(targetModel[3]);
 
             // pole vector (elbow direction)
-            // left: left-down-back, right: right-down-back
+            // left: right-up-front, right: left-up-front
             glm::vec3 poleDir = isLeft ? glm::vec3(-1.0f, 1.0f, 0.5f) : glm::vec3(1.0f, 1.0f, 0.5f);
 
             // rotate pole vector by body rotation (Skl_Root)
