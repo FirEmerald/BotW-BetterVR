@@ -159,17 +159,18 @@ bool isHandFarEnoughFromStoredPosition(const HandGestureState& gesture) {
     return gesture.isFarEnoughFromStoredPosition;
 }
 
-void openDpadMenu(uint32_t& buttonHold, OpenXR::GameState& gameState, OpenXR::QuickMenu menu, std::function<bool(OpenXR::InputState)> button) {
+void openDpadMenu(uint32_t& buttonHold, OpenXR::GameState& gameState, OpenXR::QuickMenu menu, bool (*button)(OpenXR::InputState)) {
     buttonHold |= menu.button;
     gameState.current_quick_menu = &menu;
-    gameState.current_quick_menu_button = &button;
+    gameState.current_quick_menu_button = button;
+    gameState.quick_menu_open = true;
 }
 
 bool isHandNotOverAnySlot(const HandGestureState& gesture) {
     return !gesture.isBehindHead && !gesture.isBehindHeadWithWaistOffset && !gesture.isCloseToMouth;
 }
 
-bool handleDpadMenu(ButtonState::Event lastEvent, HandGestureState handGesture, uint32_t& buttonHold, OpenXR::GameState& gameState, std::function<bool(OpenXR::InputState)> quickMenuButton) {
+bool handleDpadMenu(ButtonState::Event lastEvent, HandGestureState handGesture, uint32_t& buttonHold, OpenXR::GameState& gameState, bool (*quickMenuButton)(OpenXR::InputState)) {
     if (lastEvent == ButtonState::Event::LongPress) {
         //Inverse the menu side for bows, so the menu corresponds to the hand side holding the weapon
         //eg : left hands hold bow, open bow menu with left shoulder, arrow menu with right shoulder
@@ -190,7 +191,6 @@ bool handleDpadMenu(ButtonState::Event lastEvent, HandGestureState handGesture, 
         else {
             openDpadMenu(buttonHold, gameState, OpenXR::QuickMenu::QM_RUNE, quickMenuButton);
         }
-        gameState.quick_menu_open = true;
         return true;
     }
     return false;
@@ -659,8 +659,7 @@ void handleMenuInput(
     };
 
     if (gameState.quick_menu_open) {
-        const std::function<bool(OpenXR::InputState)> quickMenuButton = *gameState.current_quick_menu_button;
-        if (!quickMenuButton(inputs)) {
+        if (!gameState.current_quick_menu_button(inputs)) {
             gameState.quick_menu_open = false;
             gameState.quick_menu_closed = true;
         }
@@ -806,7 +805,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     }
 
     // dpad menu toggle
-    if (gameState.current_quick_menu != nullptr) {
+    if (gameState.quick_menu_open) {
         newXRBtnHold |= gameState.current_quick_menu->button;
     }
 
@@ -846,15 +845,16 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
 
         // if dpad menu was just closed, equip the weapon/item from the last dpad menu opened
         if (gameState.quick_menu_closed) {
-            EquipType* equipMember = (EquipType*)(&gameState + gameState.current_quick_menu->equipHandOffset);
-            if (*equipMember != gameState.current_quick_menu->equipType) {
+            EquipType* equipMember = gameState.current_quick_menu->isLeftHand ? &gameState.left_equip_type : &gameState.right_equip_type;
+            EquipType equpeType = gameState.current_quick_menu->equipType;
+            if (*equipMember != equpeType) {
                 newXRBtnHold |= gameState.current_quick_menu->equip;
-                gameState.last_item_held = gameState.current_quick_menu->equipType;
-                *equipMember = gameState.current_quick_menu->equipType;
+                gameState.last_item_held = equpeType;
+                *equipMember = equpeType;
             }
             gameState.quick_menu_closed = false;
-            gameState.current_quick_menu = nullptr;
-            gameState.current_quick_menu_button = nullptr;
+            gameState.current_quick_menu = &OpenXR::QuickMenu::QM_NONE;
+            gameState.current_quick_menu_button = OpenXR::QuickMenuButton::None;
         }
 
 

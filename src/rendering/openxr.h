@@ -177,8 +177,9 @@ public:
     std::atomic<InputState> m_input = InputState{};
     std::atomic<glm::fquat> m_inputCameraRotation = glm::identity<glm::fquat>();
 
-    class QuickMenu {
+    struct QuickMenu {
     public:
+        static const QuickMenu QM_NONE;
         static const QuickMenu QM_WEAPON;
         static const QuickMenu QM_SHIELD;
         static const QuickMenu QM_BOW;
@@ -188,16 +189,25 @@ public:
         const VPADButtons button;
         const VPADButtons equip;
         const EquipType equipType;
-        const size_t equipHandOffset;
+        const bool isLeftHand;
 
-        QuickMenu(const VPADButtons button, VPADButtons equip, EquipType equipType, bool isLeftHand): button(button), equip(equip), equipType(equipType), equipHandOffset(isLeftHand ? offsetof(GameState, GameState::left_equip_type) : offsetof(GameState, GameState::right_equip_type)) {}
+        QuickMenu(const VPADButtons button, VPADButtons equip, EquipType equipType, bool isLeftHand): button(button), equip(equip), equipType(equipType), isLeftHand(isLeftHand) {}
     };
 
     class QuickMenuButton {
     public:
-        static const std::function<bool(InputState)> LGrab;
-        static const std::function<bool(InputState)> RGrab;
-        static const std::function<bool(InputState)> Rune;
+        static bool None(InputState inputState) {
+            return false;
+        };
+        static bool LGrab(InputState inputState) {
+            return inputState.shared.grabState[0].wasDownLastFrame;
+        };
+        static bool RGrab(InputState inputState) {
+            return inputState.shared.grabState[1].wasDownLastFrame;
+        };
+        static bool Rune(InputState inputState) {
+            return inputState.shared.useRune_runeMenuState.wasDownLastFrame;
+        };
     };
 
     struct GameState {
@@ -211,8 +221,8 @@ public:
         bool map_open = false; // map = true, inventory = false
         bool quick_menu_open = false;
         bool quick_menu_closed = false;
-        const QuickMenu* current_quick_menu = nullptr;
-        const std::function<bool(InputState)>* current_quick_menu_button = nullptr;
+        const QuickMenu* current_quick_menu = &QuickMenu::QM_NONE;
+        bool (*current_quick_menu_button)(InputState) = QuickMenuButton::None;
 
         bool prevent_inputs = false;
         std::chrono::steady_clock::time_point prevent_inputs_time;
