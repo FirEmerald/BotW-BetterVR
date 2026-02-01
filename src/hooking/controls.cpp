@@ -705,8 +705,29 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     }
 
     // todo: revert this to unblock gamepad input
-    if (!imguiOverlay->ShouldBlockGameInput()) {
-        readMemory(vpadStatusOffset, &vpadStatus);
+    readMemory(vpadStatusOffset, &vpadStatus);
+
+    static auto startBtnLastTime = std::chrono::steady_clock::now();
+    static bool startBtnWasDown = false;
+    static bool startBtnActionConsumed = false;
+
+    if ((vpadStatus.hold.getLE() & VPAD_BUTTON_PLUS) != 0) {
+        if (!startBtnWasDown) {
+            startBtnLastTime = std::chrono::steady_clock::now();
+            startBtnActionConsumed = false;
+        }
+        else if (!startBtnActionConsumed && std::chrono::steady_clock::now() - startBtnLastTime > std::chrono::milliseconds(500)) {
+            VRManager::instance().XR->m_isMenuOpen = !VRManager::instance().XR->m_isMenuOpen;
+            startBtnActionConsumed = true;
+        }
+        startBtnWasDown = true;
+    }
+    else {
+        startBtnWasDown = false;
+    }
+
+    if (imguiOverlay->ShouldBlockGameInput()) {
+        vpadStatus = {};
     }
 
     auto* rumbleMgr = VRManager::instance().XR->GetRumbleManager();
