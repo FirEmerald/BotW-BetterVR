@@ -85,10 +85,12 @@ void NumberOption<T>::deserializeValue(const char* string, std::function<T(const
     }
 }
 
+template<>
 void NumberOption<float>::deserializeValue(const char* string) {
     return this->deserializeValue(string, std::atof);
 }
 
+template <>
 void NumberOption<float>::addToMenu(boolean& changed, float minValue, float maxValue, std::function<const char*(float)> getDisplayString) {
     assert(minValue < maxValue);
     assert(minValue >= this->minValue && maxValue <= this->maxValue);
@@ -99,10 +101,12 @@ void NumberOption<float>::addToMenu(boolean& changed, float minValue, float maxV
     }
 }
 
+template <>
 void NumberOption<int32_t>::deserializeValue(const char* string) {
     return this->deserializeValue(string, std::atoi);
 }
 
+template <>
 void NumberOption<int32_t>::addToMenu(boolean& changed, int32_t minValue, int32_t maxValue, std::function<const char*(int32_t)> getDisplayString) {
     assert(minValue < maxValue);
     assert(minValue >= this->minValue && maxValue <= this->maxValue);
