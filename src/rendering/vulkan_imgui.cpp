@@ -737,13 +737,26 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     ImGui::Separator();
                     int cameraMode = (int)settings.cameraMode.load();
                     DrawSettingRow("Camera Mode", [&]() {
-                        if (ImGui::RadioButton("First Person (Recommended)", &cameraMode, 1)) {
+                        if (ImGui::RadioButton("First Person (Recommended)", &cameraMode, static_cast<int32_t>(CameraMode::FIRST_PERSON))) {
                             settings.cameraMode = CameraMode::FIRST_PERSON;
                             changed = true;
                         }
                         ImGui::SameLine();
-                        if (ImGui::RadioButton("Third Person", &cameraMode, 0)) {
+                        if (ImGui::RadioButton("Third Person", &cameraMode, static_cast<int32_t>(CameraMode::THIRD_PERSON))) {
                             settings.cameraMode = CameraMode::THIRD_PERSON;
+                            changed = true;
+                        }
+                    });
+                    ImGui::Separator();
+                    int playMode = (int)settings.playMode.load();
+                    DrawSettingRow("Play Mode", [&]() {
+                        if (ImGui::RadioButton("Standing", &playMode, static_cast<int32_t>(PlayMode::STANDING))) {
+                            settings.playMode = PlayMode::STANDING;
+                            changed = true;
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::RadioButton("Seated", &playMode, static_cast<int32_t>(PlayMode::SEATED))) {
+                            settings.playMode = PlayMode::SEATED;
                             changed = true;
                         }
                     });
@@ -753,7 +766,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_HeaderActive));
                     ImGui::Text("Camera / Player Options");
                     ImGui::PopStyleColor();
-                    if (cameraMode == 0) {
+                    if (cameraMode == static_cast<int32_t>(CameraMode::THIRD_PERSON)) {
                         float distance = settings.thirdPlayerDistance;
                         DrawSettingRow("Camera Distance", [&]() {
                             if (ImGui::SliderFloat("##CameraDistance", &distance, 0.4f, 1.1f, "%.2f")) {
@@ -763,27 +776,145 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                         });
                     }
                     else {
-                        float height = settings.playerHeightOffset;
-                        std::string heightOffsetValueStr = std::format("{0}{1:.02f} meters / {0}{2:.02f} feet", (height > 0.0f ? "+" : ""), height, height * 3.28084f);
-                        DrawSettingRow("Height Offset", [&]() {
-                            ImGui::PushItemWidth(windowWidth.x * 0.35f);
-                            if (ImGui::SliderFloat("##HeightOffset", &height, -0.5f, 1.0f, heightOffsetValueStr.c_str())) {
-                                settings.playerHeightOffset = height;
+                        int cameraAnchor = (int)settings.cameraAnchor.load();
+                        DrawSettingRow("Camera Anchor", [&]() {
+                            if (ImGui::RadioButton("Eyes", &cameraAnchor, static_cast<int32_t>(CameraAnchor::EYES))) {
+                                settings.cameraAnchor = CameraAnchor::EYES;
                                 changed = true;
                             }
-                            ImGui::PopItemWidth();
                             ImGui::SameLine();
-                            if (ImGui::Button("Reset")) {
-                                settings.playerHeightOffset = 0.0f;
+                            if (ImGui::RadioButton("Ground", &cameraAnchor, static_cast<int32_t>(CameraAnchor::GROUND))) {
+                                settings.cameraAnchor = CameraAnchor::GROUND;
                                 changed = true;
                             }
                         });
+
+                        if (cameraAnchor == static_cast<int32_t>(CameraAnchor::GROUND)) {
+                            float height = settings.playerHeightOffset;
+                            std::string heightOffsetValueStr;
+                            if (height < -0.01) {
+                                float heightInches = height * -39.3700787f;
+                                int32_t heightFeet = std::floor(heightInches / 12);
+                                heightInches -= heightFeet * 12;
+                                heightOffsetValueStr = std::format("-{0:.02f} meters / {1}ft {2:.02f}in", -height, heightFeet, heightInches);
+                            }
+                            else if (height > 0.01) {
+                                float heightInches = height * 39.3700787f;
+                                int32_t heightFeet = std::floor(heightInches / 12);
+                                heightInches -= heightFeet * 12;
+                                heightOffsetValueStr = std::format("+{0:.02f} meters / {1}ft {2:.02f}in", height, heightFeet, heightInches);
+                            }
+                            else {
+                                heightOffsetValueStr = "None";
+                            }
+                            DrawSettingRow("Player Height Offset", [&]() {
+                                ImGui::PushItemWidth(windowWidth.x * 0.35f);
+                                if (ImGui::SliderFloat("##HeightOffset", &height, -0.5f, 1.0f, heightOffsetValueStr.c_str())) {
+                                    settings.playerHeightOffset = height;
+                                    changed = true;
+                                }
+                                ImGui::PopItemWidth();
+                                ImGui::SameLine();
+                                if (ImGui::Button("Reset")) {
+                                    settings.playerHeightOffset = 0.0f;
+                                    changed = true;
+                                }
+                            });
+                        }
+                        else {
+                            float height = settings.eyeHeight;
+                            std::string heightValueStr;
+                            if (height == 0.0f)
+                                heightValueStr = "Automatic (Calibrates on first game load or recenter)";
+                            else {
+                                float heightInches = height * 39.3700787f;
+                                int32_t heightFeet = std::floor(heightInches / 12);
+                                heightInches -= heightFeet * 12;
+                                heightValueStr = std::format("{0:.02f} meters / {1}ft {2:.02f}in", height, heightFeet, heightInches);
+                            }
+
+
+                            DrawSettingRow("Player Eye Height", [&]() {
+                                ImGui::PushItemWidth(windowWidth.x * 0.35f);
+                                if (ImGui::SliderFloat("##EyeHeight", &height, 0.0f, 3.0f, heightValueStr.c_str())) {
+                                    settings.eyeHeight = height;
+                                    changed = true;
+                                }
+                                ImGui::PopItemWidth();
+                                ImGui::SameLine();
+                                if (ImGui::Button("Set Eye Height To Automatic")) {
+                                    settings.eyeHeight = 0.0f;
+                                    changed = true;
+                                }
+                            });
+
+                            bool dynamicCameraOffset = settings.dynamicEyeOffset;
+                            DrawSettingRow("Use dynamic camera offset", [&]() {
+                                if (ImGui::Checkbox("##DynamicCameraOffset", &dynamicCameraOffset)) {
+                                    settings.dynamicEyeOffset = dynamicCameraOffset;
+                                    changed = true;
+                                }
+                            });
+
+                            if (dynamicCameraOffset) {
+                                float smoothingFactor = settings.dynamicEyeOffsetSmoothing;
+                                std::string smoothingFactorStr = std::format("{0}", smoothingFactor);
+                                DrawSettingRow("Dynamic Camera Offset Smoothing Factor (lower values mean more smoothing)", [&]() {
+                                    ImGui::PushItemWidth(windowWidth.x * 0.35f);
+                                    if (ImGui::SliderFloat("##SmoothingFactor", &smoothingFactor, 0.01f, 1.0f, smoothingFactorStr.c_str())) {
+                                        settings.dynamicEyeOffsetSmoothing = smoothingFactor;
+                                        changed = true;
+                                    }
+                                    ImGui::PopItemWidth();
+                                    ImGui::SameLine();
+                                    if (ImGui::Button("Reset Smoothing Factor")) {
+                                        settings.dynamicEyeOffsetSmoothing = 0.1f;
+                                        changed = true;
+                                    }
+                                });
+
+                                bool hideHead = settings.hideHead;
+                                DrawSettingRow("Hide Player Head", [&]() {
+                                    if (ImGui::Checkbox("##HidePlayerHead", &hideHead)) {
+                                        settings.hideHead = hideHead;
+                                        changed = true;
+                                    }
+                                });
+                            }
+
+                        }
+
 
                         //bool leftHanded = settings.leftHanded;
                         //if (ImGui::Checkbox("Left Handed Mode", &leftHanded)) {
                         //    settings.leftHanded = leftHanded ? 1 : 0;
                         //    changed = true;
                         //}
+
+                        float worldScale = settings.worldScale;
+                        std::string worldScaleValueStr;
+                        if (worldScale == 0.0f)
+                            worldScaleValueStr = "Automatic (Calibrates on first game load or recenter)";
+                        else {
+                            float vanillaAdjustMeters = worldScale * 1.73;
+                            float vanillaAdjustInches = vanillaAdjustMeters * 39.3700787f;
+                            int32_t vanillaAdjustFeet = std::floor(vanillaAdjustInches / 12);
+                            vanillaAdjustInches -= vanillaAdjustFeet * 12;
+                            worldScaleValueStr = std::format("{0} ({1:.02f}m/{2}ft {3:.02f}in tall with vanilla link model)", worldScale, vanillaAdjustMeters, vanillaAdjustFeet, vanillaAdjustInches);
+                        }
+                        DrawSettingRow("World Scale", [&]() {
+                            ImGui::PushItemWidth(windowWidth.x * 0.35f);
+                            if (ImGui::SliderFloat("##WorldScale", &worldScale, 0.25f, 2.0f, worldScaleValueStr.c_str())) {
+                                settings.worldScale = worldScale;
+                                changed = true;
+                            }
+                            ImGui::PopItemWidth();
+                            ImGui::SameLine();
+                            if (ImGui::Button("Set World Scale To Automatic")) {
+                                settings.worldScale = 0.0f;
+                                changed = true;
+                            }
+                        });
                     }
 
                     ImGui::Spacing();

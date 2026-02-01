@@ -174,32 +174,31 @@ public:
     std::atomic<InputState> m_input = InputState{};
     std::atomic<glm::fquat> m_inputCameraRotation = glm::identity<glm::fquat>();
 
-    enum QuickMenu : uint32_t {
-        QM_NONE = (uint32_t)VPAD_BUTTON_NONE,
-        QM_WEAPON = (uint32_t)VPAD_BUTTON_RIGHT,
-        QM_SHIELD = (uint32_t)VPAD_BUTTON_LEFT,
-        QM_BOW = (uint32_t)VPAD_BUTTON_RIGHT,
-        QM_ARROW = (uint32_t)VPAD_BUTTON_LEFT,
-        QM_RUNE = (uint32_t)VPAD_BUTTON_UP
+    class QuickMenu {
+    public:
+        static const QuickMenu QM_WEAPON;
+        static const QuickMenu QM_SHIELD;
+        static const QuickMenu QM_BOW;
+        static const QuickMenu QM_ARROW;
+        static const QuickMenu QM_RUNE;
+
+        const VPADButtons button;
+        const VPADButtons equip;
+        const EquipType equipType;
+        const size_t equipHandOffset;
+
+        QuickMenu(const VPADButtons button, VPADButtons equip, EquipType equipType, bool isLeftHand): button(button), equip(equip), equipType(equipType), equipHandOffset(isLeftHand ? offsetof(GameState, GameState::left_equip_type) : offsetof(GameState, GameState::right_equip_type)) {}
     };
 
     class QuickMenuButton {
     public:
-        static bool None(InputState inputState) {
-            return false;
-        };
-        static bool LGrab(InputState inputState) {
-            return inputState.shared.grabState[0].wasDownLastFrame;
-        };
-        static bool RGrab(InputState inputState) {
-            return inputState.shared.grabState[1].wasDownLastFrame;
-        };
-        static bool Rune(InputState inputState) {
-            return inputState.shared.useRune_runeMenuState.wasDownLastFrame;
-        };
+        static const std::function<bool(InputState)> LGrab;
+        static const std::function<bool(InputState)> RGrab;
+        static const std::function<bool(InputState)> Rune;
     };
 
     struct GameState {
+
         bool left_equip_type_set_this_frame = false;
         bool right_equip_type_set_this_frame = false;
 
@@ -207,8 +206,10 @@ public:
         bool in_game = false;
         bool was_in_game = false;
         bool map_open = false; // map = true, inventory = false
-        QuickMenu current_quick_menu = QuickMenu::QM_NONE;
-        bool (*current_quick_menu_button)(InputState) = QuickMenuButton::None;
+        bool quick_menu_open = false;
+        bool quick_menu_closed = false;
+        const QuickMenu* current_quick_menu = nullptr;
+        const std::function<bool(InputState)>* current_quick_menu_button = nullptr;
 
         bool prevent_inputs = false;
         std::chrono::steady_clock::time_point prevent_inputs_time;

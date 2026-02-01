@@ -2,6 +2,22 @@
 #include "instance.h"
 
 
+const OpenXR::QuickMenu OpenXR::QuickMenu::QM_WEAPON = OpenXR::QuickMenu(VPAD_BUTTON_RIGHT, VPAD_BUTTON_Y, EquipType::Melee, false);
+const OpenXR::QuickMenu OpenXR::QuickMenu::QM_SHIELD = OpenXR::QuickMenu(VPAD_BUTTON_LEFT, VPAD_BUTTON_Y, EquipType::Shield, true);
+const OpenXR::QuickMenu OpenXR::QuickMenu::QM_BOW = OpenXR::QuickMenu(VPAD_BUTTON_RIGHT, VPAD_BUTTON_ZR, EquipType::Bow, true);
+const OpenXR::QuickMenu OpenXR::QuickMenu::QM_ARROW = OpenXR::QuickMenu(VPAD_BUTTON_LEFT, VPAD_BUTTON_ZR, EquipType::Arrow, false);
+const OpenXR::QuickMenu OpenXR::QuickMenu::QM_RUNE = OpenXR::QuickMenu(VPAD_BUTTON_UP, VPAD_BUTTON_L, EquipType::SheikahSlate, false);
+
+const std::function<bool(OpenXR::InputState)> OpenXR::QuickMenuButton::LGrab = [](OpenXR::InputState inputState) {
+    return inputState.shared.grabState[0].wasDownLastFrame;
+};
+const std::function<bool(OpenXR::InputState)> OpenXR::QuickMenuButton::RGrab = [](OpenXR::InputState inputState) {
+    return inputState.shared.grabState[1].wasDownLastFrame;
+};
+const std::function<bool(OpenXR::InputState)> OpenXR::QuickMenuButton::Rune = [](OpenXR::InputState inputState) {
+    return inputState.shared.useRune_runeMenuState.wasDownLastFrame;
+};
+
 static std::string GetActiveRuntimePath() {
     auto getKey = [](HKEY hKeyRoot, const char* subKey) -> std::string {
         HKEY hKey;
