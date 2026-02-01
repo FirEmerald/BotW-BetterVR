@@ -1,6 +1,7 @@
-#include "game_options.h"
 #include <cassert>
 #include <cstdlib>
+#include "game_options.h"
+#include "logger.h"
 
 
 template <typename T>
@@ -60,9 +61,9 @@ const char* NumberOption<T>::serializeValue() {
 }
 
 template <typename T>
-void NumberOption<T>::deserializeValue(const char* string, std::function<T(const char*)> parse) {
+void NumberOption<T>::deserializeValue(const char* string, std::function<T(const char*)> fromString) {
     try {
-        T deserialized = parse(string);
+        T deserialized = fromString(string);
         if (deserialized < this->minValue) {
             Log::print<ERROR>("{} had too low value {}, minimum is {}, setting to minimum.", this->name, deserialized, this->minValue);
             this->setValueSilently(this->minValue);
@@ -175,7 +176,7 @@ void EnumOption<T>::deserializeValue(const char* string) {
             possibleValues += "\", \"";
             possibleValues += this->values[i].name;
         }
-        Log::print<ERROR>("{} had invalid value {}, valid values are {\"{}\"}, setting to default value {}.", this->name, string, this->getName(this->defaultValue));
+        Log::print<ERROR>("{} had invalid value {}, valid values are {\"{}\"}, setting to default value {}.", this->GameOption<T>::name, string, this->getName(this->GameOption<T>::defaultValue));
         this->setValueSilently(this->defaultValue);
     }
 }

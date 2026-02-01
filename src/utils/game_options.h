@@ -22,9 +22,9 @@ public:
 
     void setValue(T value);
 
-    virtual const char* serializeValue();
+    virtual const char* serializeValue() = 0;
 
-    virtual void deserializeValue(const char* string);
+    virtual void deserializeValue(const char* string) = 0;
 
     operator T() {
         return this->getValue();
@@ -63,7 +63,7 @@ public:
 template <typename T>
 class NumberOption : public GameOption<T> {
 private:
-    void deserializeValue(const char* string, std::function<T(const char*)> parse);
+    void deserializeValue(const char* string, std::function<T(const char*)> fromString);
 
 public:
     const T minValue;

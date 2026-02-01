@@ -79,6 +79,9 @@ using Microsoft::WRL::ComPtr;
 #include <algorithm>
 #include <cctype>
 
+#include "utils/game_options.h"
+#include "utils/game_options.cpp"
+
 inline glm::fvec2 ToGLM(const XrVector2f& vec) {
     return glm::make_vec2(&vec.x);
 }
@@ -506,6 +509,11 @@ enum class AngularVelocityFixerMode : int32_t {
 
 struct ModSettings {
     // playing mode settings
+    EnumOption<CameraMode> cameraModeA = EnumOption<CameraMode>("CameraMode", "Camera Mode", CameraMode::FIRST_PERSON, new EnumOption<CameraMode>::Value[2]{ 
+        { "THIRD_PERSON", "Third Person", CameraMode::THIRD_PERSON }, 
+        { "FIRST_PERSON", "First Person", CameraMode::FIRST_PERSON } 
+        }, 2);
+
     std::atomic<CameraMode> cameraMode = CameraMode::FIRST_PERSON;
     std::atomic<PlayMode> playMode = PlayMode::STANDING;
     std::atomic<float> thirdPlayerDistance = 0.5f;
