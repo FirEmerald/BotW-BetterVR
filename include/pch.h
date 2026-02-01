@@ -526,7 +526,6 @@ struct ModSettings {
     std::atomic<float> eyeHeight = 0.0f;
     std::atomic<float> worldScale = 0.0f;
     std::atomic_bool leftHanded = false;
-    std::atomic_bool alternateArmIK = false;
     std::atomic_bool uiFollowsGaze = true;
     std::atomic_bool cropFlatTo16x9 = true;
 
@@ -545,7 +544,6 @@ struct ModSettings {
 
     bool DoesUIFollowGaze() const { return uiFollowsGaze; }
     bool IsLeftHanded() const { return leftHanded; }
-    bool UseAlternateArmIK() const { return alternateArmIK; }
     bool UseDynamicEyeOffset() const {
         return cameraMode == CameraMode::FIRST_PERSON && cameraAnchor == CameraAnchor::EYES && dynamicEyeOffset; 
     }

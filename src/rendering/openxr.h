@@ -106,6 +106,8 @@ public:
 
             XrActionStateBoolean leftTrigger;
             XrActionStateBoolean rightTrigger;
+
+            XrActionStateBoolean rotate;
         } inMenu;
 
         const std::string debug() {
@@ -135,7 +137,8 @@ public:
                    debug("leftGrip", inMenu.leftGrip) +
                    debug("rightGrip", inMenu.rightGrip) +
                    debug("leftTrigger", inMenu.leftTrigger) +
-                   debug("rightTrigger", inMenu.rightTrigger);
+                   debug("rightTrigger", inMenu.rightTrigger) +
+                   debug("rotate", inMenu.rotate);
         }
 
         const std::string debug(std::string name, XrActionStateBoolean action) {
@@ -332,6 +335,8 @@ private:
 
     XrAction m_leftTriggerAction= XR_NULL_HANDLE;
     XrAction m_rightTriggerAction = XR_NULL_HANDLE;
+
+    XrAction m_rotateAction = XR_NULL_HANDLE; //right stick click
 
     std::unique_ptr<RND_Renderer> m_renderer;
     std::unique_ptr<RumbleManager> m_rumbleManager;

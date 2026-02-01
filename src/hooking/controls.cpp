@@ -677,6 +677,7 @@ void handleMenuInput(
     buttonHold |= mapButton(inputs.inMenu.select, VPAD_BUTTON_A);
     buttonHold |= mapButton(inputs.inMenu.leftTrigger, VPAD_BUTTON_L);
     buttonHold |= mapButton(inputs.inMenu.rightTrigger, VPAD_BUTTON_R);
+    buttonHold |= mapButton(inputs.inMenu.rotate, VPAD_BUTTON_STICK_R);
 
     if (inputs.inMenu.holdState.lastEvent == ButtonState::Event::ShortPress)
         buttonHold |= VPAD_BUTTON_X;
