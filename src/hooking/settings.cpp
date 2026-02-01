@@ -32,6 +32,7 @@ static void Settings_ReadLine(ImGuiContext*, ImGuiSettingsHandler*, void* entry,
     if (sscanf(line, "BuggyAngularVelocity=%d", &i_val) == 1) { s->buggyAngularVelocity.store((AngularVelocityFixerMode)i_val); return; }
     if (sscanf(line, "PerformanceOverlay=%d", &i_val) == 1) { s->performanceOverlay.store(i_val); return; }
     if (sscanf(line, "PerformanceOverlayFrequency=%d", &i_val) == 1) { s->performanceOverlayFrequency.store(i_val); return; }
+    if (sscanf(line, "TutorialPromptShown=%d", &i_val) == 1) { s->tutorialPromptShown.store(i_val); return; }
 }
 
 static void Settings_WriteAll(ImGuiContext* ctx, ImGuiSettingsHandler* handler, ImGuiTextBuffer* buf) {
@@ -50,7 +51,8 @@ static void Settings_WriteAll(ImGuiContext* ctx, ImGuiSettingsHandler* handler, 
     buf->appendf("EnableDebugOverlay=%d\n", (int)s.enableDebugOverlay.load());
     buf->appendf("BuggyAngularVelocity=%d\n", (int)s.buggyAngularVelocity.load());
     buf->appendf("PerformanceOverlay=%d\n", (int)s.performanceOverlay.load());
-    buf->appendf("PerformanceOverlayFrequency=%d\n", (int)s.performanceOverlayFrequency.load());
+    buf->appendf("PerformanceOverlayFrequency=%d\n", s.performanceOverlayFrequency.load());
+    buf->appendf("TutorialPromptShown=%d\n", (int)s.tutorialPromptShown.load());
     buf->appendf("\n");
 }
 

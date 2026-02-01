@@ -522,7 +522,8 @@ struct ModSettings {
     std::atomic_bool enableDebugOverlay = false;
     std::atomic<AngularVelocityFixerMode> buggyAngularVelocity = AngularVelocityFixerMode::AUTO;
     std::atomic_uint32_t performanceOverlay = 0;
-    std::atomic_uint32_t performanceOverlayFrequency = 60;
+    std::atomic_uint32_t performanceOverlayFrequency = 90;
+    std::atomic_bool tutorialPromptShown = false;
 
     CameraMode GetCameraMode() const { return cameraMode; }
 

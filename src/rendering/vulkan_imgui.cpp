@@ -41,8 +41,8 @@ void SetupImGuiStyle() {
     style.ScrollbarRounding = 9.0f;
     style.GrabMinSize = 10.0f;
     style.GrabRounding = 4.0f;
-    style.TabRounding = 1.0f;
-    style.TabBorderSize = 0.2f;
+    style.TabRounding = 4.0f;
+    style.TabBorderSize = 0.5f;
     //style.TabMinWidthForCloseButton = 0.0f;
     style.ColorButtonPosition = ImGuiDir_Right;
     style.ButtonTextAlign = ImVec2(0.5f, 0.5f);
@@ -113,20 +113,18 @@ RND_Renderer::ImGuiOverlay::ImGuiOverlay(VkCommandBuffer cb, VkExtent2D fbRes, V
     ImFontConfig fontCfg{};
     fontCfg.OversampleH = 8;
     fontCfg.OversampleV = 8;
-    fontCfg.RasterizerMultiply = 1.0f;
     fontCfg.FontDataOwnedByAtlas = false;
-    ImFont* textFont = ImGui::GetIO().Fonts->AddFontFromMemoryCompressedTTF(roboto_compressed_data, roboto_compressed_size, 15.0f, &fontCfg);
+    ImFont* textFont = ImGui::GetIO().Fonts->AddFontFromMemoryCompressedTTF(roboto_compressed_data, roboto_compressed_size, 16.0f, &fontCfg);
 
     ImFontConfig iconCfg{};
     iconCfg.MergeMode = true;
-    iconCfg.GlyphMinAdvanceX = 14.0f;
+    iconCfg.GlyphMinAdvanceX = 16.0f;
     iconCfg.OversampleH = 8;
     iconCfg.OversampleV = 8;
-    iconCfg.RasterizerMultiply = 1.0f;
     iconCfg.FontDataOwnedByAtlas = false;
     static const ImWchar icon_ranges[] = { ICON_MIN_KI, ICON_MAX_KI, 0 };
     iconCfg.GlyphRanges = icon_ranges;
-    ImFont* iconFont = ImGui::GetIO().Fonts->AddFontFromMemoryCompressedTTF(kenney_compressed_data, kenney_compressed_size, 12.0f, &iconCfg);
+    ImFont* iconFont = ImGui::GetIO().Fonts->AddFontFromMemoryCompressedTTF(kenney_compressed_data, kenney_compressed_size, 16.0f, &iconCfg);
     if (iconFont == nullptr || textFont == nullptr) {
         Log::print<ERROR>("Failed to load custom fonts for ImGui overlay, using default font");
     }
@@ -521,6 +519,7 @@ void RND_Renderer::ImGuiOverlay::Render(long frameIdx, bool renderBackground) {
     DrawHelpMenu();
 }
 
+constexpr uint8_t TOTAL_TABS = 4;
 void RND_Renderer::ImGuiOverlay::ProcessInputs(OpenXR::InputState& inputs) {
     auto& isMenuOpen = VRManager::instance().XR->m_isMenuOpen;
     if (!isMenuOpen)
@@ -531,22 +530,46 @@ void RND_Renderer::ImGuiOverlay::ProcessInputs(OpenXR::InputState& inputs) {
 
     bool backDown;
     bool confirmDown;
+    bool pageLeft;
+    bool pageRight;
     XrActionStateVector2f stick;
     if (inputs.shared.in_game) {
         stick = inputs.inGame.move;
         backDown = inputs.inGame.jump_cancel.currentState;
         confirmDown = inputs.inGame.run_interact.currentState;
+        pageLeft = inputs.inGame.useLeftItem.currentState && inputs.inGame.useLeftItem.changedSinceLastSync;
+        pageRight = inputs.inGame.useRightItem.currentState && inputs.inGame.useRightItem.changedSinceLastSync;
+
     }
     else {
         stick = inputs.inMenu.navigate;
         backDown = inputs.inMenu.back.currentState;
         confirmDown = inputs.inMenu.select.currentState;
+        pageLeft = inputs.inMenu.leftTrigger.currentState && inputs.inMenu.leftTrigger.changedSinceLastSync;
+        pageRight = inputs.inMenu.rightTrigger.currentState && inputs.inMenu.rightTrigger.changedSinceLastSync;
+    }
+
+    VRManager::instance().XR->m_forceTabChange = false;
+    if (pageLeft || pageRight) {
+        auto& currTab = VRManager::instance().XR->m_currMenuTab;
+        uint8_t prevTab = currTab;
+        if (pageLeft) {
+            currTab = (currTab - 1 + TOTAL_TABS) % TOTAL_TABS;
+        }
+        if (pageRight) {
+            currTab = (currTab + 1) % TOTAL_TABS;
+        }
+
+        if (prevTab != currTab) {
+            VRManager::instance().XR->m_forceTabChange = true;
+        }
     }
 
     // imgui wants us to only have state changes, and we also want to refiring DPAD inputs (used for moving the menu cursor) when held down
     constexpr float THRESHOLD_PRESS = 0.5f;
     constexpr float THRESHOLD_RELEASE = 0.3f;
-    constexpr double REFIRE_DELAY = 0.4f;
+    constexpr double HORIZONTAL_REFIRE_DELAY = 0.5f;
+    constexpr double VERTICAL_REFIRE_DELAY = 1.0f;
 
     static bool dpadState[4] = { false };
     static double lastRefireTime[8] = { 0.0 }; // 0-3 Dpad, 4 B, 5 A, 6 LB, 7 RB
@@ -568,9 +591,9 @@ void RND_Renderer::ImGuiOverlay::ProcessInputs(OpenXR::InputState& inputs) {
         return isPressed;
     };
 
-    auto applyInput = [&](ImGuiKey key, bool isPressed, int idx) {
+    auto applyInput = [&](ImGuiKey key, bool isPressed, float refireDelay, int idx) {
         if (isPressed) {
-            if (currentTime - lastRefireTime[idx] >= REFIRE_DELAY || lastRefireTime[idx] == 0.0) {
+            if (currentTime - lastRefireTime[idx] >= refireDelay || lastRefireTime[idx] == 0.0) {
                 io.AddKeyEvent(key, true);
                 lastRefireTime[idx] = currentTime;
             }
@@ -584,18 +607,18 @@ void RND_Renderer::ImGuiOverlay::ProcessInputs(OpenXR::InputState& inputs) {
         }
     };
 
-    applyInput(ImGuiKey_GamepadDpadUp, updateDpadState(0, stick.currentState.y, true), 0);
-    applyInput(ImGuiKey_GamepadDpadDown, updateDpadState(1, stick.currentState.y, false), 1);
-    applyInput(ImGuiKey_GamepadDpadLeft, updateDpadState(2, stick.currentState.x, false), 2);
-    applyInput(ImGuiKey_GamepadDpadRight, updateDpadState(3, stick.currentState.x, true), 3);
+    applyInput(ImGuiKey_GamepadDpadUp, updateDpadState(0, stick.currentState.y, true), VERTICAL_REFIRE_DELAY, 0);
+    applyInput(ImGuiKey_GamepadDpadDown, updateDpadState(1, stick.currentState.y, false), VERTICAL_REFIRE_DELAY, 1);
+    applyInput(ImGuiKey_GamepadDpadLeft, updateDpadState(2, stick.currentState.x, false), HORIZONTAL_REFIRE_DELAY, 2);
+    applyInput(ImGuiKey_GamepadDpadRight, updateDpadState(3, stick.currentState.x, true), HORIZONTAL_REFIRE_DELAY, 3);
 
     // convert B/A to ImGui gamepad face buttons
-    applyInput(ImGuiKey_GamepadFaceRight, backDown, 4);
-    applyInput(ImGuiKey_GamepadFaceDown, confirmDown, 5);
+    applyInput(ImGuiKey_GamepadFaceRight, backDown, VERTICAL_REFIRE_DELAY, 4);
+    applyInput(ImGuiKey_GamepadFaceDown, confirmDown, VERTICAL_REFIRE_DELAY, 5);
 
     // triggers for tab switching
-    applyInput(ImGuiKey_GamepadL1, inputs.inMenu.leftTrigger.currentState, 6);
-    applyInput(ImGuiKey_GamepadR1, inputs.inMenu.rightTrigger.currentState, 7);
+    applyInput(ImGuiKey_GamepadL1, pageLeft, VERTICAL_REFIRE_DELAY, 6);
+    applyInput(ImGuiKey_GamepadR1, pageRight, VERTICAL_REFIRE_DELAY, 7);
 
     // prevent exiting menu if a popup or field is being edited
     if (ImGui::IsAnyItemActive() && ImGui::IsPopupOpen(NULL, ImGuiPopupFlags_AnyPopupId + ImGuiPopupFlags_AnyPopupLevel)) {
@@ -623,12 +646,37 @@ void RND_Renderer::ImGuiOverlay::ProcessInputs(OpenXR::InputState& inputs) {
 
 void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
     auto& isMenuOpen = VRManager::instance().XR->m_isMenuOpen;
+    auto& settings = GetSettings();
 
-    if (ImGui::GetTime() < 10.0f && !isMenuOpen) {
-        ImGui::SetNextWindowBgAlpha(0.8f);
-        ImGui::SetNextWindowPos(ImVec2(20.0f, 20.0f), ImGuiCond_Always);
+    float alphaForNotify = settings.tutorialPromptShown ? 0.9f : 0.98f;
+    float timeLimit = settings.tutorialPromptShown ? 14.0f : 60.0f;
+
+    if (!settings.tutorialPromptShown) {
+        if (isMenuOpen || ImGui::GetTime() > timeLimit) {
+            settings.tutorialPromptShown = true;
+            ImGui::SaveIniSettingsToDisk("BetterVR_settings.ini");
+        }
+    }
+
+    if (!isMenuOpen && ImGui::GetTime() < timeLimit) {
+        ImVec2 fullWindowWidth = ImVec2(ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y);
+        ImGui::SetNextWindowBgAlpha(alphaForNotify);
+        ImGui::SetNextWindowPos(fullWindowWidth * 0.5f, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
         if (ImGui::Begin("HelpNotify", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoInputs)) {
-            ImGui::TextColored(ImVec4(1.0, 1.0, 1.0, 1.0), "Long-Press The X Button (or A button on left controller for Valve hmd) To Open BetterVR Help & Settings");
+            if (!settings.tutorialPromptShown) {
+                ImGui::Text("First-Time Setup:");
+                ImGui::Separator();
+                ImGui::Text("To get started, open the BetterVR menu to configure various settings and to see the controller guide.");
+                ImGui::Text("This is where you can adjust the camera mode, player height, and other options to suit your preferences.");
+                ImGui::Spacing();
+                ImGui::Text("You can always access this menu by holding the " ICON_KI_BUTTON_X " for 1 second.");
+                ImGui::Text("(Alternatively, for Valve Index Controllers, hold " ICON_KI_BUTTON_A ". For regular game controllers, hold " ICON_KI_BUTTON_START " instead)");
+                ImGui::Text("");
+                ImGui::Text("TO CONTINUE: Try holding the button and open the menu");
+            }
+            else {
+                ImGui::Text("Hold " ICON_KI_BUTTON_X " (or " ICON_KI_BUTTON_A " for Valve Index Controllers or " ICON_KI_BUTTON_START " for Xbox/Playstation etc. controllers) To Open Mod Settings");
+            }
         }
         ImGui::End();
     }
@@ -669,7 +717,9 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
     ImGui::SetNextWindowSize(windowWidth, ImGuiCond_Always);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 
-    if (ImGui::Begin("BetterVR Settings & Help##Settings", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove)) {
+    bool shouldStayOpen = true;
+
+    if (ImGui::Begin("BetterVR Settings & Help##Settings", &shouldStayOpen, ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove)) {
         bool changed = false;
 
         ImGui::Indent(10.0f);
@@ -677,8 +727,11 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
 
         float footerHeight = ImGui::GetFrameHeight() * 1.5f;
         if (ImGui::BeginChild("Content", ImVec2(0, -footerHeight), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground)) {
+            bool setTab = VRManager::instance().XR->m_forceTabChange;
+            uint8_t selectedTab = VRManager::instance().XR->m_currMenuTab;
+
             if (ImGui::BeginTabBar("HelpMenuTabs")) {
-                if (ImGui::BeginTabItem("Settings", nullptr, 0)) {
+                if (ImGui::BeginTabItem(ICON_KI_COG "Settings", nullptr, (setTab && selectedTab == 0) ? ImGuiTabItemFlags_SetSelected : 0)) {
                     auto& settings = GetSettings();
 
                     ImGui::Separator();
@@ -751,7 +804,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     });
 
                     bool blackBars = settings.useBlackBarsForCutscenes;
-                    DrawSettingRow("Cinematic Black Bars", [&]() {
+                    DrawSettingRow("Black Bars In Third-Person Cutscenes", [&]() {
                         if (ImGui::Checkbox("##BlackBars", &blackBars)) {
                             settings.useBlackBarsForCutscenes = blackBars ? 1 : 0;
                             changed = true;
@@ -765,7 +818,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     ImGui::PopStyleColor();
                     if (cameraMode == 1) {
                         bool guiFollow = settings.uiFollowsGaze;
-                        DrawSettingRow("UI Follows View", [&]() {
+                        DrawSettingRow("UI Follows Where You Look", [&]() {
                             if (ImGui::Checkbox("##UIFollow", &guiFollow)) {
                                 settings.uiFollowsGaze = guiFollow ? 1 : 0;
                                 changed = true;
@@ -775,7 +828,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
 
                     if (ImGui::CollapsingHeader("Advanced Settings")) {
                         bool crop16x9 = settings.cropFlatTo16x9;
-                        DrawSettingRow("Crop VR Image To 16:9", [&]() {
+                        DrawSettingRow("Crop VR Image To 16:9 For Cemu Window", [&]() {
                             if (ImGui::Checkbox("##Crop16x9", &crop16x9)) {
                                 settings.cropFlatTo16x9 = crop16x9 ? 1 : 0;
                                 changed = true;
@@ -783,7 +836,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                         });
 
                         bool debugOverlay = settings.ShowDebugOverlay();
-                        DrawSettingRow("Show Debug Overlay", [&]() {
+                        DrawSettingRow("Show Debugging Overlays (for developers)", [&]() {
                             if (ImGui::Checkbox("##DebugOverlay", &debugOverlay)) {
                                 settings.enableDebugOverlay = debugOverlay ? 1 : 0;
                                 changed = true;
@@ -810,7 +863,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     ImGui::EndTabItem();
                 }
 
-                if (ImGui::BeginTabItem("Control Scheme Guide/Help", nullptr, 0)) {
+                if (ImGui::BeginTabItem(ICON_KI_INFO_CIRCLE " Help & Controller Guide", nullptr, (setTab && selectedTab == 1) ? ImGuiTabItemFlags_SetSelected : 0)) {
                     ImGui::PushItemWidth(windowWidth.x * 0.5f);
 
                     for (const auto& imagePage : m_helpImagePages) {
@@ -830,8 +883,8 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     ImGui::PopItemWidth();
                     ImGui::EndTabItem();
                 }
-                
-                if (ImGui::BeginTabItem("FPS Overlay", nullptr, 0)) {
+
+                if (ImGui::BeginTabItem(ICON_KI_PODIUM " FPS Overlay", nullptr, (setTab && selectedTab == 2) ? ImGuiTabItemFlags_SetSelected : 0)) {
                     ImGui::Dummy(ImVec2(0.0f, 10.0f));
 
                     auto& settings = GetSettings();
@@ -873,6 +926,36 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     ImGui::EndTabItem();
                 }
 
+                if (ImGui::BeginTabItem(ICON_KI_HEART " Credits", nullptr, (setTab && selectedTab == 3) ? ImGuiTabItemFlags_SetSelected : 0)) {
+                    ImGui::SeparatorText("Project Links");
+                    ImGui::TextLinkOpenURL(ICON_KI_GITHUB " https://github.com/Crementif/BotW-BetterVR");
+                    ImGui::Text("");
+
+                    ImGui::SeparatorText("Credits");
+                    ImGui::Text("Crementif: Main Developer");
+                    ImGui::Text("Holydh: Inputs And Gestures");
+                    ImGui::Text("Acudofy: Sword & Stab Analysis System");
+                    ImGui::Text("leoetlino: Made the BotW Decomp project, which was useful while reverse engineering");
+                    ImGui::Text("Exzap: Technical support and optimization help");
+                    ImGui::Text("Mako Marci: Made Logo, Controller Guide And Trailer");
+                    ImGui::Text("Tim, Mako Marci, Solarwolf07, Elliott Tate & Derra: Helped with QA testing, recording, feedback and support");
+                    ImGui::Text("");
+
+                    ImGui::SeparatorText("Donate To Support Development");
+                    ImGui::TextWrapped("Hey there!");
+                    ImGui::Text("");
+                    ImGui::TextWrapped("This mod is free and open-source, but it took a lot of late nights to create.");
+                    ImGui::TextWrapped("If you're enjoying the mod and want to vote on new features, you can donate here. Thanks!");
+                    ImGui::TextLinkOpenURL("https://github.com/sponsors/Crementif/");
+
+                    ImGui::Text("");
+                    ImGui::Text("- Crementif");
+
+                    ImGui::Dummy(ImVec2(0.0f, 10.0f));
+                    
+                    ImGui::EndTabItem();
+                }
+
                 ImGui::EndTabBar();
             }
             ImGui::EndChild();
@@ -895,6 +978,10 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
         }
         ImGui::End();
         ImGui::PopStyleVar();
+    }
+
+    if (!shouldStayOpen) {
+        isMenuOpen = false;
     }
 }
 
