@@ -179,19 +179,34 @@ public:
 
     struct QuickMenu {
     public:
-        static const QuickMenu QM_NONE;
-        static const QuickMenu QM_WEAPON;
-        static const QuickMenu QM_SHIELD;
-        static const QuickMenu QM_BOW;
-        static const QuickMenu QM_ARROW;
-        static const QuickMenu QM_RUNE;
+        VPADButtons button = VPAD_BUTTON_NONE;
+        VPADButtons equip = VPAD_BUTTON_NONE;
+        EquipType equipType = EquipType::None;
+        bool isLeftHand = false;
 
-        const VPADButtons button;
-        const VPADButtons equip;
-        const EquipType equipType;
-        const bool isLeftHand;
+        static QuickMenu None() {
+            return { VPAD_BUTTON_NONE, VPAD_BUTTON_NONE, EquipType::None, false };
+        }
 
-        QuickMenu(const VPADButtons button, VPADButtons equip, EquipType equipType, bool isLeftHand): button(button), equip(equip), equipType(equipType), isLeftHand(isLeftHand) {}
+        static QuickMenu Weapon() {
+            return { VPAD_BUTTON_RIGHT, VPAD_BUTTON_Y, EquipType::Melee, false };
+        }
+
+        static QuickMenu Shield() {
+            return { VPAD_BUTTON_LEFT, VPAD_BUTTON_Y, EquipType::Shield, true };
+        }
+
+        static QuickMenu Bow() {
+            return { VPAD_BUTTON_RIGHT, VPAD_BUTTON_ZR, EquipType::Bow, true };
+        }
+
+        static QuickMenu Arrow() {
+            return { VPAD_BUTTON_LEFT, VPAD_BUTTON_ZR, EquipType::Arrow, false };
+        }
+
+        static QuickMenu Rune() {
+            return { VPAD_BUTTON_UP, VPAD_BUTTON_L, EquipType::SheikahSlate, false };
+        }
     };
 
     class QuickMenuButton {
@@ -221,7 +236,7 @@ public:
         bool map_open = false; // map = true, inventory = false
         bool quick_menu_open = false;
         bool quick_menu_closed = false;
-        const QuickMenu* current_quick_menu = &QuickMenu::QM_NONE;
+        QuickMenu current_quick_menu;
         bool (*current_quick_menu_button)(InputState) = QuickMenuButton::None;
 
         bool prevent_inputs = false;

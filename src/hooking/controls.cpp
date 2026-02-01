@@ -161,7 +161,7 @@ bool isHandFarEnoughFromStoredPosition(const HandGestureState& gesture) {
 
 void openDpadMenu(uint32_t& buttonHold, OpenXR::GameState& gameState, OpenXR::QuickMenu menu, bool (*button)(OpenXR::InputState)) {
     buttonHold |= menu.button;
-    gameState.current_quick_menu = &menu;
+    gameState.current_quick_menu = menu;
     gameState.current_quick_menu_button = button;
     gameState.quick_menu_open = true;
 }
@@ -177,19 +177,19 @@ bool handleDpadMenu(ButtonState::Event lastEvent, HandGestureState handGesture, 
         bool isBowEquipped = gameState.last_item_held == EquipType::Bow;
         bool doesBowJustBroke = isBowEquipped && gameState.left_equip_type != EquipType::Bow;
         if (isHandOverRightShoulderSlot(handGesture)) {
-            openDpadMenu(buttonHold, gameState, isBowEquipped ? OpenXR::QuickMenu::QM_ARROW : OpenXR::QuickMenu::QM_WEAPON, quickMenuButton);
+            openDpadMenu(buttonHold, gameState, isBowEquipped ? OpenXR::QuickMenu::Arrow() : OpenXR::QuickMenu::Weapon(), quickMenuButton);
             if (doesBowJustBroke)
                 buttonHold |= VPAD_BUTTON_ZR;
         }
         else if (isHandOverLeftShoulderSlot(handGesture)) {
-            openDpadMenu(buttonHold, gameState, isBowEquipped ? OpenXR::QuickMenu::QM_BOW : OpenXR::QuickMenu::QM_SHIELD, quickMenuButton);
+            openDpadMenu(buttonHold, gameState, isBowEquipped ? OpenXR::QuickMenu::Bow() : OpenXR::QuickMenu::Shield(), quickMenuButton);
             // Force a bow equip so the correct menu spawns even when the bow broke.
             if (doesBowJustBroke)
                 buttonHold |= VPAD_BUTTON_ZR;
         }
         // if not over shoulders slots, then it's over waist
         else {
-            openDpadMenu(buttonHold, gameState, OpenXR::QuickMenu::QM_RUNE, quickMenuButton);
+            openDpadMenu(buttonHold, gameState, OpenXR::QuickMenu::Rune(), quickMenuButton);
         }
         return true;
     }
@@ -806,7 +806,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
 
     // dpad menu toggle
     if (gameState.quick_menu_open) {
-        newXRBtnHold |= gameState.current_quick_menu->button;
+        newXRBtnHold |= gameState.current_quick_menu.button;
     }
 
 
@@ -845,15 +845,15 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
 
         // if dpad menu was just closed, equip the weapon/item from the last dpad menu opened
         if (gameState.quick_menu_closed) {
-            EquipType* equipMember = gameState.current_quick_menu->isLeftHand ? &gameState.left_equip_type : &gameState.right_equip_type;
-            EquipType equpeType = gameState.current_quick_menu->equipType;
-            if (*equipMember != equpeType) {
-                newXRBtnHold |= gameState.current_quick_menu->equip;
-                gameState.last_item_held = equpeType;
-                *equipMember = equpeType;
+            EquipType* equipMember = gameState.current_quick_menu.isLeftHand ? &gameState.left_equip_type : &gameState.right_equip_type;
+            EquipType equipType = gameState.current_quick_menu.equipType;
+            if (*equipMember != equipType) {
+                newXRBtnHold |= gameState.current_quick_menu.equip;
+                gameState.last_item_held = equipType;
+                *equipMember = equipType;
             }
             gameState.quick_menu_closed = false;
-            gameState.current_quick_menu = &OpenXR::QuickMenu::QM_NONE;
+            gameState.current_quick_menu = OpenXR::QuickMenu::None();
             gameState.current_quick_menu_button = OpenXR::QuickMenuButton::None;
         }
 
@@ -884,7 +884,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
 
         // Optional rune inputs (for seated players)
         if (inputs.shared.useRune_runeMenuState.lastEvent == ButtonState::Event::LongPress) {
-            openDpadMenu(newXRBtnHold, gameState, OpenXR::QuickMenu::QM_RUNE, OpenXR::QuickMenuButton::Rune); // Rune quick menu
+            openDpadMenu(newXRBtnHold, gameState, OpenXR::QuickMenu::Rune(), OpenXR::QuickMenuButton::Rune); // Rune quick menu
         }
         if (inputs.shared.useRune_runeMenuState.lastEvent == ButtonState::Event::ShortPress) {
             newXRBtnHold |= VPAD_BUTTON_L; // Use rune
