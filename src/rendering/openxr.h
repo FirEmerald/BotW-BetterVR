@@ -205,7 +205,7 @@ public:
         }
 
         static QuickMenu Rune() {
-            return { VPAD_BUTTON_UP, VPAD_BUTTON_L, EquipType::SheikahSlate, false };
+            return { VPAD_BUTTON_UP, VPAD_BUTTON_L, EquipType::SheikahSlate, true };
         }
     };
 
