@@ -845,12 +845,10 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
 
         // if dpad menu was just closed, equip the weapon/item from the last dpad menu opened
         if (gameState.quick_menu_closed) {
-            EquipType* equipMember = gameState.current_quick_menu.isLeftHand ? &gameState.left_equip_type : &gameState.right_equip_type;
             EquipType equipType = gameState.current_quick_menu.equipType;
-            if (*equipMember != equipType) {
+            if ((gameState.current_quick_menu.isLeftHand ? gameState.left_equip_type : gameState.right_equip_type) != equipType) {
                 newXRBtnHold |= gameState.current_quick_menu.equip;
                 gameState.last_item_held = equipType;
-                *equipMember = equipType;
             }
             gameState.quick_menu_closed = false;
             gameState.current_quick_menu = OpenXR::QuickMenu::None();
