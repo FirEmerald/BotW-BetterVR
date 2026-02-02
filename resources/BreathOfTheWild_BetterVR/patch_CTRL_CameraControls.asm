@@ -86,7 +86,7 @@ useCameraFinder:
 mflr r0
 stwu r1, -0x20(r1)
 stw r0, 0x24(r1)
-;stw r3, 0x1C(r1)
+stw r3, 0x1C(r1)
 stw r4, 0x18(r1)
 stw r5, 0x14(r1)
 

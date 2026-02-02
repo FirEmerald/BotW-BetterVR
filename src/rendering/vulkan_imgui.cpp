@@ -769,7 +769,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     if (cameraMode == static_cast<int32_t>(CameraMode::THIRD_PERSON)) {
                         float distance = settings.thirdPlayerDistance;
                         DrawSettingRow("Camera Distance", [&]() {
-                            if (ImGui::SliderFloat("##CameraDistance", &distance, 0.4f, 1.1f, "%.2f")) {
+                            if (ImGui::SliderFloat("##CameraDistance", &distance, 0.5f, 0.65f, "%.2f")) {
                                 settings.thirdPlayerDistance = distance;
                                 changed = true;
                             }
@@ -927,12 +927,14 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     int currentCutsceneModeIdx = cutsceneMode - 1;
                     if (currentCutsceneModeIdx < 0) currentCutsceneModeIdx = 1;
 
-                    DrawSettingRow("Camera In Cutscenes", [&]() {
-                        if (ImGui::Combo("##CutsceneCamera", &currentCutsceneModeIdx, "First Person (Always)\0Optimal Settings (Mix Of Third/First)\0Third Person (Always)\0\0")) {
-                            settings.cutsceneCameraMode = (EventMode)(currentCutsceneModeIdx + 1);
-                            changed = true;
-                        }
-                    });
+                    if (settings.GetCameraMode() != CameraMode::THIRD_PERSON) {
+                        DrawSettingRow("Camera In Cutscenes", [&]() {
+                            if (ImGui::Combo("##CutsceneCamera", &currentCutsceneModeIdx, "First Person (Always)\0Optimal Settings (Mix Of Third/First)\0Third Person (Always)\0\0")) {
+                                settings.cutsceneCameraMode = (EventMode)(currentCutsceneModeIdx + 1);
+                                changed = true;
+                            }
+                        });
+                    }
 
                     bool blackBars = settings.useBlackBarsForCutscenes;
                     DrawSettingRow("Black Bars In Third-Person Cutscenes", [&]() {
@@ -955,6 +957,9 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                                 changed = true;
                             }
                         });
+                    }
+                    else {
+                        ImGui::Text("");
                     }
 
                     if (ImGui::CollapsingHeader("Advanced Settings")) {
