@@ -155,14 +155,24 @@ public:
     }
 
     static bool IsFirstPerson() {
-        if (auto settings = GetFirstPersonSettingsForActiveEvent(); settings.has_value()) {
-            // there's an active event
-            auto mode = GetEventModeWithOverride();
-            if (mode == EventMode::FOLLOW_DEFAULT_EVENT_SETTINGS && !settings->firstPerson) {
+        if (HasActiveCutscene()) {
+            // always third-person
+            if (GetSettings().GetCutsceneCameraMode() == EventMode::ALWAYS_THIRD_PERSON) {
                 return false;
             }
-            // cutscene with first-person settings
-            return true;
+
+            // check settings
+            if (auto settings = GetFirstPersonSettingsForActiveEvent(); settings.has_value()) {
+                // there's an active event
+
+                auto mode = GetEventModeWithOverride();
+                if (mode == EventMode::FOLLOW_DEFAULT_EVENT_SETTINGS && !settings->firstPerson) {
+                    return false;
+                }
+
+                // cutscene with first-person settings
+                return true;
+            }
         }
         else {
             // no event. Check if gameplay is in first-person mode

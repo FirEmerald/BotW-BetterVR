@@ -721,43 +721,17 @@ void CemuHooks::hook_EndCameraSide(PPCInterpreter_t* hCPU) {
     Log::print<RENDERING>("");
 }
 
-void CemuHooks::hook_ReplaceCameraMode(PPCInterpreter_t* hCPU) {
-    hCPU->instructionPointer = hCPU->sprNew.LR;
-
-    uint32_t currentCameraMode = hCPU->gpr[3];
-    uint32_t cameraChaseMode = hCPU->gpr[4]; // this is currently a pointer to the regular camera mode (CameraChase)
-    uint32_t currentCameraVtbl = hCPU->gpr[5];
-
-    constexpr uint32_t kCameraChaseVtbl = 0x101B34F4;
-    constexpr uint32_t kCameraTailVtbl = 0x101BC278;
-    constexpr uint32_t kCameraAiming2Vtbl = 0X101B2EB4;
-    constexpr uint32_t kCameraMagneCatchVtbl = 0x101BAB4C;
-
-    if (hCPU->gpr[5] == kCameraMagneCatchVtbl) {
-        if (IsFirstPerson()) {
-            //hCPU->gpr[3] = cameraChaseMode;
-        }
-    }
-
-    if (hCPU->gpr[5] == kCameraTailVtbl) {
-        //Log::print<RENDERING>("Current camera mode: {:#X}, tail mode: {:#X}, vtbl: {:#X}", currentCameraMode, cameraTailMode, currentCameraVtbl);
-        if (IsFirstPerson()) {
-            // overwrite to tail mode
-            //hCPU->gpr[3] = cameraTailMode;
-        }
-    }
-
-    //Log::print<INFO>("Camera mode: {:#X}, tail mode: {:#X}, vtbl: {:#X}", currentCameraMode, cameraTailMode, currentCameraVtbl);
-}
-
 void CemuHooks::hook_UseCameraDistance(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
 
     if (IsFirstPerson()) {
         hCPU->fpr[13].fp0 = 0.0f;
     }
-    else {
+    else if (GetSettings().GetCameraMode() == CameraMode::THIRD_PERSON) {
         hCPU->fpr[13].fp0 = GetSettings().thirdPlayerDistance;
+    }
+    else {
+        hCPU->fpr[13].fp0 = 0.5f; // use default distance when using the first-person camera
     }
 }
 
@@ -908,28 +882,104 @@ void CemuHooks::hook_GetEventName(PPCInterpreter_t* hCPU) {
     }
 }
 
+struct CameraParamValueOffset {
+    std::string name;
+    uint32_t offsetInsideCamera;
+    bool storedOriginalValue = false;
+    float originalValue;
+};
+
+// key = vtable address, value = list of parameter names and their offsets inside the camera object
+std::mutex storedCameraParametersLock;
+std::unordered_map<uint32_t, std::vector<CameraParamValueOffset>> storedCameraParameters;
+
+
+void CemuHooks::hook_ReplaceCameraMode(PPCInterpreter_t* hCPU) {
+    hCPU->instructionPointer = hCPU->sprNew.LR;
+
+    uint32_t currCameraInstance = hCPU->gpr[3];
+    uint32_t cameraChaseInstance = hCPU->gpr[4]; // this is currently a pointer to the regular camera mode (CameraChase)
+    uint32_t currentCameraVtbl = hCPU->gpr[5];
+
+
+    // check if any patched parameters exist for this camera vtbl
+    {
+        std::scoped_lock(storedCameraParametersLock);
+
+        auto it = storedCameraParameters.find(currCameraInstance);
+        if (it != storedCameraParameters.end()) {
+            for (auto& paramEntry : it->second) {
+                uint32_t originalValuePtr = getMemory<BEType<uint32_t>>(paramEntry.offsetInsideCamera).getLE();
+                BEType<float>* paramValueBE = (BEType<float>*)(s_memoryBaseAddress + originalValuePtr);
+
+                // on first patch, store original value
+                if (!paramEntry.storedOriginalValue) {
+                    paramEntry.originalValue = paramValueBE->getLE();
+                    paramEntry.storedOriginalValue = true;
+                }
+
+                if (IsFirstPerson()) {
+                    // set to zero in first person
+                    *paramValueBE = 0.0f;
+                }
+                else {
+                    // restore original value in third person
+                    *paramValueBE = paramEntry.originalValue;
+                }
+            }
+        }
+    }
+
+    constexpr uint32_t kCameraChaseVtbl = 0x101B34F4;
+    constexpr uint32_t kCameraTailVtbl = 0x101BC278;
+    constexpr uint32_t kCameraAiming2Vtbl = 0X101B2EB4;
+    constexpr uint32_t kCameraMagneCatchVtbl = 0x101BAB4C;
+
+    if (hCPU->gpr[5] == kCameraMagneCatchVtbl) {
+        if (IsFirstPerson()) {
+            //hCPU->gpr[3] = cameraChaseMode;
+        }
+    }
+
+    if (hCPU->gpr[5] == kCameraTailVtbl) {
+        //Log::print<RENDERING>("Current camera mode: {:#X}, tail mode: {:#X}, vtbl: {:#X}", currentCameraMode, cameraTailMode, currentCameraVtbl);
+        if (IsFirstPerson()) {
+            // overwrite to tail mode
+            //hCPU->gpr[3] = cameraTailMode;
+        }
+    }
+
+    //Log::print<INFO>("Camera mode: {:#X}, tail mode: {:#X}, vtbl: {:#X}", currentCameraMode, cameraTailMode, currentCameraVtbl);
+}
+
 constexpr uint32_t orig_GetStaticParam_float_funcAddr = 0x030E9BE0;
 
 // hook for ksys::act::ai::ActionBase::getStaticParam<FLOAT> calls
 void CemuHooks::hook_OverwriteCameraParam(PPCInterpreter_t* hCPU) {
-
     uint32_t actionPtr = hCPU->gpr[3];
     uint32_t destFloatPtr = hCPU->gpr[4];
     const char* paramName = (const char*)(s_memoryBaseAddress + getMemory<BEType<uint32_t>>(hCPU->gpr[5]).getLE());
-
     if (actionPtr == 0 || destFloatPtr == 0 || paramName == nullptr) {
         hCPU->instructionPointer = orig_GetStaticParam_float_funcAddr;
         return;
     }
-    
     std::string paramNameStr = paramName;
+    
+    {
+        std::scoped_lock(storedCameraParametersLock);
 
-    hCPU->instructionPointer = hCPU->sprNew.LR;
+        auto& paramList = storedCameraParameters[actionPtr];
+        // store parameter offset if not already stored
+        auto it = std::find_if(paramList.begin(), paramList.end(), [&paramNameStr](const CameraParamValueOffset& entry) {
+                return entry.name == paramNameStr;
+        });
+        if (it == paramList.end()) {
+            // get offset by calling original function first
+            hCPU->instructionPointer = orig_GetStaticParam_float_funcAddr;
 
-    if (GetSettings().GetCameraMode() == CameraMode::THIRD_PERSON) {
-        uint32_t superLowAddress = 0x102B3150; // points to 0.0000011920929
-        writeMemoryBE(hCPU->gpr[4], &superLowAddress);
-        return;
+            Log::print<PPC>("Storing camera param '{}' offset {:08X} for camera action at {:08X}", paramNameStr, destFloatPtr, actionPtr);
+            paramList.push_back({ paramNameStr, destFloatPtr });
+        }
     }
 
     hCPU->instructionPointer = orig_GetStaticParam_float_funcAddr;
