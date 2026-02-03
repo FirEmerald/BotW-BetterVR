@@ -896,7 +896,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                         if (worldScale == 0.0f)
                             worldScaleValueStr = "Automatic (Calibrates on first game load or recenter)";
                         else {
-                            float vanillaAdjustMeters = worldScale * 1.73;
+                            float vanillaAdjustMeters = worldScale * 1.73442;
                             float vanillaAdjustInches = vanillaAdjustMeters * 39.3700787f;
                             int32_t vanillaAdjustFeet = std::floor(vanillaAdjustInches / 12);
                             vanillaAdjustInches -= vanillaAdjustFeet * 12;
