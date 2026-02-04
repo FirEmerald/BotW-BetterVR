@@ -777,7 +777,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     }
                     else {
                         int cameraAnchor = (int)settings.cameraAnchor.load();
-                        DrawSettingRow("Camera Anchor", [&]() {
+                        DrawSettingRow("View Relative To", [&]() {
                             if (ImGui::RadioButton("Eyes", &cameraAnchor, static_cast<int32_t>(CameraAnchor::EYES))) {
                                 settings.cameraAnchor = CameraAnchor::EYES;
                                 changed = true;
@@ -825,7 +825,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                             float height = settings.eyeHeight;
                             std::string heightValueStr;
                             if (height == 0.0f)
-                                heightValueStr = "Automatic (Calibrates on first game load or recenter)";
+                                heightValueStr = "Automatic (Calibrates on recenter)";
                             else {
                                 float heightInches = height * 39.3700787f;
                                 int32_t heightFeet = std::floor(heightInches / 12);
@@ -859,7 +859,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                             if (dynamicCameraOffset) {
                                 float smoothingFactor = settings.dynamicEyeOffsetSmoothing;
                                 std::string smoothingFactorStr = std::format("{0}", smoothingFactor);
-                                DrawSettingRow("Dynamic Camera Offset Smoothing Factor (lower values mean more smoothing)", [&]() {
+                                DrawSettingRow("Dynamic Camera Offset Smoothing Factor (lower values are smoother)", [&]() {
                                     ImGui::PushItemWidth(windowWidth.x * 0.35f);
                                     if (ImGui::SliderFloat("##SmoothingFactor", &smoothingFactor, 0.01f, 1.0f, smoothingFactorStr.c_str())) {
                                         settings.dynamicEyeOffsetSmoothing = smoothingFactor;
@@ -894,13 +894,13 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                         float worldScale = settings.worldScale;
                         std::string worldScaleValueStr;
                         if (worldScale == 0.0f)
-                            worldScaleValueStr = "Automatic (Calibrates on first game load or recenter)";
+                            worldScaleValueStr = "Automatic (Calibrates on recenter)";
                         else {
                             float vanillaAdjustMeters = worldScale * 1.73442;
                             float vanillaAdjustInches = vanillaAdjustMeters * 39.3700787f;
                             int32_t vanillaAdjustFeet = std::floor(vanillaAdjustInches / 12);
                             vanillaAdjustInches -= vanillaAdjustFeet * 12;
-                            worldScaleValueStr = std::format("{0} ({1:.02f}m/{2}ft {3:.02f}in tall with vanilla link model)", worldScale, vanillaAdjustMeters, vanillaAdjustFeet, vanillaAdjustInches);
+                            worldScaleValueStr = std::format("{0:.03f} ({1:.02f}m/{2}ft {3:.02f}in tall unmodded)", worldScale, vanillaAdjustMeters, vanillaAdjustFeet, vanillaAdjustInches);
                         }
                         DrawSettingRow("World Scale", [&]() {
                             ImGui::PushItemWidth(windowWidth.x * 0.35f);
