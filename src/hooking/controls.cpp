@@ -188,14 +188,13 @@ bool isHandFarEnoughFromStoredPosition(const HandGestureState& gesture) {
     return gesture.isFarEnoughFromStoredPosition;
 }
 
-void openDpadMenu(uint32_t& buttonHold, OpenXR::GameState& gameState, OpenXR::QuickMenu menu, bool (*button)(OpenXR::InputState)) {
-    buttonHold |= menu.button;
+void openQuickMenu(uint32_t& buttonHold, OpenXR::GameState& gameState, OpenXR::QuickMenu menu, bool (*button)(OpenXR::InputState)) {
+    buttonHold |= menu.menuButton;
     gameState.current_quick_menu = menu;
     gameState.current_quick_menu_button = button;
     gameState.quick_menu_open = true;
-    if (menu.isMainEquip && (menu.isLeftHand ? gameState.left_hand_current_equip_type : gameState.right_hand_current_equip_type) != menu.equipType) {
-        gameState.quick_menu_selection_already_equipped = false;
-        buttonHold |= menu.equip;
+    if (menu.equipButton != VPAD_BUTTON_NONE && (menu.isLeftHand ? gameState.left_hand_current_equip_type : gameState.right_hand_current_equip_type) != menu.equipType) {
+        buttonHold |= menu.equipButton;
     }
     else {
         gameState.quick_menu_selection_already_equipped = true;
@@ -209,66 +208,60 @@ bool isHandNotOverAnySlot(const HandGestureState& gesture) {
     return !gesture.isBehindHead && !gesture.isBehindHeadWithWaistOffset && !gesture.isCloseToMouth;
 }
 
-bool openDpadMenuRuneButton(ButtonState::Event lastEvent, uint32_t& buttonHold, OpenXR::GameState& gameState) {
+bool openQuickMenuRuneButton(ButtonState::Event lastEvent, uint32_t& buttonHold, OpenXR::GameState& gameState) {
     if (lastEvent == ButtonState::Event::LongPress) {
-        openDpadMenu(buttonHold, gameState, OpenXR::QuickMenu::Rune(), OpenXR::QuickMenuButton::Rune);
+        openQuickMenu(buttonHold, gameState, OpenXR::QuickMenu::Rune(), OpenXR::QuickMenuButton::Rune);
         return true;
     }
     return false;
 }
 
-bool openDpadMenuBodySlots(ButtonState::Event lastEvent, HandGestureState handGesture, uint32_t& buttonHold, OpenXR::GameState& gameState, bool (*quickMenuButton)(OpenXR::InputState)) {
+bool openQuickMenuBodySlots(ButtonState::Event lastEvent, HandGestureState handGesture, uint32_t& buttonHold, OpenXR::GameState& gameState, bool (*quickMenuButton)(OpenXR::InputState)) {
     if (lastEvent == ButtonState::Event::LongPress && !gameState.quick_menu_open) {
+        OpenXR::QuickMenu menu;
         if (isHandOverRightShoulderSlot(handGesture)) {
             //open arrow menu if bow is equipped in left hand
-            if (gameState.left_hand_current_equip_type == EquipType::Bow) {
-                openDpadMenu(buttonHold, gameState, OpenXR::QuickMenu::Arrow(), quickMenuButton);
-            }
+            if (gameState.left_hand_current_equip_type == EquipType::Bow)
+                menu = OpenXR::QuickMenu::Arrow();
             //else open melee weapon menu
-            else {
-                openDpadMenu(buttonHold, gameState, OpenXR::QuickMenu::Weapon(), quickMenuButton);
-            }
+            else
+                menu = OpenXR::QuickMenu::Melee();
         }
         else if (isHandOverLeftShoulderSlot(handGesture)) {
             //open shield menu if melee is equipped in right hand
-            if (gameState.right_hand_current_equip_type == EquipType::Melee) {
-                openDpadMenu(buttonHold, gameState, OpenXR::QuickMenu::Shield(), quickMenuButton);
-            }
+            if (gameState.right_hand_current_equip_type == EquipType::Melee)
+                menu = OpenXR::QuickMenu::Shield();
             //else open bow menu
-            else {
-                openDpadMenu(buttonHold, gameState, OpenXR::QuickMenu::Bow(), quickMenuButton);
-            }
+            else
+                menu = OpenXR::QuickMenu::Bow();
         }
         // if not over shoulders slots, then it's over waist
-        else {
-            openDpadMenu(buttonHold, gameState, OpenXR::QuickMenu::Rune(), quickMenuButton);
-        }
+        else
+            menu = OpenXR::QuickMenu::Rune();
+        openQuickMenu(buttonHold, gameState, menu, quickMenuButton);
         return true;
     }
     return false;
 }
 
-void keepDpadMenuOpen(uint32_t& buttonHold, OpenXR::GameState& gameState) {
-    if (gameState.quick_menu_open)
-        buttonHold |= gameState.current_quick_menu.button;
-}
-
-void closeDpadMenu(OpenXR::InputState& inputs, uint32_t& buttonHold, OpenXR::GameState& gameState) {
-    if (!gameState.quick_menu_open)
-        return false;
-    if (!gameState.current_quick_menu_button(inputs)) {
-        gameState.quick_menu_open = false;
-        gameState.quick_menu_closed = true;
+void handleQuickMenu(OpenXR::InputState& inputs, uint32_t& buttonHold, OpenXR::GameState& gameState) {
+    if (gameState.quick_menu_open) {
+        if (gameState.current_quick_menu_button(inputs)) {
+            buttonHold |= gameState.current_quick_menu.menuButton;
+        }
+        else {
+            gameState.quick_menu_open = false;
+            gameState.quick_menu_closing = true;
+        }
     }
-    return true;
 }
 
-void equipWeaponOnDpadMenuExit(uint32_t& buttonHold, OpenXR::GameState& gameState, float dt) {
-    // if dpad menu was just closed, equip the weapon/item from the last dpad menu opened if not already equipped
+void equipWeaponOnQuickMenuExit(uint32_t& buttonHold, OpenXR::GameState& gameState, float dt) {
+    // if quick menu was just closed, equip the weapon/item from the last quick menu opened if not already equipped
     if (gameState.rune_need_reequip) {
         constexpr float RUNE_REEQUIP_TIME = 0.5f;
         if (gameState.rune_reequip_timer >= RUNE_REEQUIP_TIME) {
-            // If rune selected in dpad menu is not the same as the one already in hand -> reequip
+            // If rune selected in quick menu is not the same as the one already in hand -> reequip
             if (gameState.left_hand_current_equip_type != EquipType::SheikahSlate)
                 buttonHold |= VPAD_BUTTON_L;
             gameState.rune_need_reequip = false;
@@ -278,19 +271,22 @@ void equipWeaponOnDpadMenuExit(uint32_t& buttonHold, OpenXR::GameState& gameStat
             gameState.rune_reequip_timer += dt;
     }
 
-    if (!gameState.quick_menu_closed) 
-        return;
-
-    if (!gameState.quick_menu_selection_already_equipped) {
-        buttonHold |= gameState.current_quick_menu.equip;
-        gameState.last_equip_type_held = gameState.current_quick_menu.equipType;
+    //if quick menu has just been closed
+    if (gameState.quick_menu_closing) {
+        //reset quick_menu_selection_already_equipped if it was set
+        if (gameState.quick_menu_selection_already_equipped) {
+            gameState.quick_menu_selection_already_equipped = false;
+        }
+        //otherwise, equip
+        else {
+            buttonHold |= gameState.current_quick_menu.equipButton;
+            gameState.last_equip_type_held = gameState.current_quick_menu.equipType;
+        }
+        //reset quick menu state
+        gameState.quick_menu_closing = false;
+        gameState.current_quick_menu = OpenXR::QuickMenu::None();
+        gameState.current_quick_menu_button = OpenXR::QuickMenuButton::None;
     }
-    else
-        gameState.quick_menu_selection_already_equipped = false;
-
-    gameState.quick_menu_closed = false;
-    gameState.current_quick_menu = OpenXR::QuickMenu::None();
-    gameState.current_quick_menu_button = OpenXR::QuickMenuButton::None;
 }
 
 // Input handling functions
@@ -351,8 +347,8 @@ void processLeftHandInGameInput(
 
     // Handle shoulder slot interactions
     if (isHandOverLeftShoulderSlot(leftGesture) || isHandOverRightShoulderSlot(leftGesture)) {
-        if (openDpadMenuBodySlots(inputs.shared.grabState[0].lastEvent, leftGesture, buttonHold, gameState, OpenXR::QuickMenuButton::LGrab))
-            // Don't process normal input when opening dpad menu
+        if (openQuickMenuBodySlots(inputs.shared.grabState[0].lastEvent, leftGesture, buttonHold, gameState, OpenXR::QuickMenuButton::LGrab))
+            // Don't process normal input when opening quick menu
             return;
 
         // Handle equip/unequip
@@ -385,9 +381,9 @@ void processLeftHandInGameInput(
     
     // Handle waist slot interaction (Rune)
     if (isHandOverLeftWaistSlot(leftGesture)) {    
-        // Handle dpad menu
-        if (openDpadMenuBodySlots(inputs.shared.grabState[0].lastEvent, leftGesture, buttonHold, gameState, OpenXR::QuickMenuButton::LGrab))
-            // Don't process normal input when opening dpad menu
+        // Handle quick menu
+        if (openQuickMenuBodySlots(inputs.shared.grabState[0].lastEvent, leftGesture, buttonHold, gameState, OpenXR::QuickMenuButton::LGrab))
+            // Don't process normal input when opening quick menu
             return;
 
         if (!gameState.prevent_grab_inputs && isGrabPressed) {
@@ -503,9 +499,9 @@ void processRightHandInGameInput(
     
     // Handle shoulder slot interactions
     if (isHandOverLeftShoulderSlot(rightGesture) || isHandOverRightShoulderSlot(rightGesture)) {
-        // Handle dpad menu
-        if (openDpadMenuBodySlots(inputs.shared.grabState[1].lastEvent, rightGesture, buttonHold, gameState, OpenXR::QuickMenuButton::RGrab))
-            // Don't process normal input when opening dpad menu
+        // Handle quick menu
+        if (openQuickMenuBodySlots(inputs.shared.grabState[1].lastEvent, rightGesture, buttonHold, gameState, OpenXR::QuickMenuButton::RGrab))
+            // Don't process normal input when opening quick menu
             return;
 
         // Handle equip/unequip
@@ -554,9 +550,9 @@ void processRightHandInGameInput(
 
     // Handle waist slot interaction (Rune)
     if (isHandOverLeftWaistSlot(rightGesture)) {   
-        // Handle dpad menu
-        if (openDpadMenuBodySlots(inputs.shared.grabState[1].lastEvent, rightGesture, buttonHold, gameState, OpenXR::QuickMenuButton::RGrab))
-            // Don't process normal input when opening dpad menu
+        // Handle quick menu
+        if (openQuickMenuBodySlots(inputs.shared.grabState[1].lastEvent, rightGesture, buttonHold, gameState, OpenXR::QuickMenuButton::RGrab))
+            // Don't process normal input when opening quick menu
             return;
 
         if (!gameState.prevent_grab_inputs && isGrabPressedShort) {
@@ -755,8 +751,6 @@ void processMenuInput(
     auto mapButton = [](XrActionStateBoolean& state, VPADButtons btn) -> uint32_t { 
         return state.currentState ? btn : 0;
     };
-
-    closeDpadMenu(inputs, buttonHold, gameState);
 
     if (!gameState.prevent_inputs) {
         buttonHold |= mapButton(inputs.inMenu.back, VPAD_BUTTON_B);
@@ -967,7 +961,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     HandGestureState rightGesture = {};
     processHandGesture(renderer, inputs, leftGesture, rightGesture, gameState);
 
-    keepDpadMenuOpen(newXRBtnHold, gameState);
+    handleQuickMenu(inputs, newXRBtnHold, gameState);
 
     // Process inputs
     if (isMenuOpen) {
@@ -976,7 +970,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     else if (gameState.in_game) {
         spreadWeaponDetectionOverFrames(gameState);
 
-        equipWeaponOnDpadMenuExit(newXRBtnHold, gameState, dt);
+        equipWeaponOnQuickMenuExit(newXRBtnHold, gameState, dt);
 
         if (!gameState.prevent_inputs) {
             // prevent jump when exiting menus with B button
@@ -1003,7 +997,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         }
         
         // Optional rune inputs (for seated players)
-        openDpadMenuRuneButton(inputs.shared.useRune_runeMenuState.lastEvent, newXRBtnHold, gameState);
+        openQuickMenuRuneButton(inputs.shared.useRune_runeMenuState.lastEvent, newXRBtnHold, gameState);
         if (inputs.shared.useRune_runeMenuState.lastEvent == ButtonState::Event::ShortPress) {
             newXRBtnHold |= VPAD_BUTTON_L;  // Equip rune
             gameState.last_equip_type_held = EquipType::SheikahSlate;
@@ -1095,7 +1089,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
 // some ideas:
 // - quickly pressing the grip button without a weapon while there's a nearby weapon and there's enough slots = pick up weapon
 // - holding the grip button without a weapon while there's a nearby weapon = temporarily hold weapon
-// - holding the grip button a weapon equipped = opens weapon dpad menu
+// - holding the grip button a weapon equipped = opens weapon quick menu
 // - quickly press the grip button while holding a weapon = drops current weapon
 
 void CemuHooks::hook_CreateNewActor(PPCInterpreter_t* hCPU) {
