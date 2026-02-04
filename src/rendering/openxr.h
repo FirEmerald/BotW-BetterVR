@@ -183,29 +183,30 @@ public:
         VPADButtons equip = VPAD_BUTTON_NONE;
         EquipType equipType = EquipType::None;
         bool isLeftHand = false;
+        bool isMainEquip = false;
 
         static QuickMenu None() {
-            return { VPAD_BUTTON_NONE, VPAD_BUTTON_NONE, EquipType::None, false };
+            return { VPAD_BUTTON_NONE, VPAD_BUTTON_NONE, EquipType::None, false, false };
         }
 
         static QuickMenu Weapon() {
-            return { VPAD_BUTTON_RIGHT, VPAD_BUTTON_Y, EquipType::Melee, false };
+            return { VPAD_BUTTON_RIGHT, VPAD_BUTTON_Y, EquipType::Melee, false, true };
         }
 
         static QuickMenu Shield() {
-            return { VPAD_BUTTON_LEFT, VPAD_BUTTON_Y, EquipType::Shield, true };
+            return { VPAD_BUTTON_LEFT, VPAD_BUTTON_Y, EquipType::Shield, true,  false };
         }
 
         static QuickMenu Bow() {
-            return { VPAD_BUTTON_RIGHT, VPAD_BUTTON_ZR, EquipType::Bow, true };
+            return { VPAD_BUTTON_RIGHT, VPAD_BUTTON_ZR, EquipType::Bow, true, true };
         }
 
         static QuickMenu Arrow() {
-            return { VPAD_BUTTON_LEFT, VPAD_BUTTON_ZR, EquipType::Arrow, false };
+            return { VPAD_BUTTON_LEFT, VPAD_BUTTON_ZR, EquipType::Arrow, false, false };
         }
 
         static QuickMenu Rune() {
-            return { VPAD_BUTTON_UP, VPAD_BUTTON_L, EquipType::SheikahSlate, true };
+            return { VPAD_BUTTON_UP, VPAD_BUTTON_L, EquipType::SheikahSlate, true, true };
         }
     };
 
@@ -226,10 +227,6 @@ public:
     };
 
     struct GameState {
-
-        bool left_equip_type_set_this_frame = false;
-        bool right_equip_type_set_this_frame = false;
-
         uint32_t previous_button_hold;
         bool in_game = false;
         bool was_in_game = false;
@@ -252,11 +249,14 @@ public:
         bool left_hand_was_over_right_shoulder_slot = false;
         bool left_hand_was_over_left_waist_slot = false;
 
-        EquipType right_equip_type = EquipType::None;
-        EquipType left_equip_type = EquipType::None;
-        EquipType previous_right_equip_type = EquipType::None;
-        EquipType previous_left_equip_type = EquipType::None;
-        EquipType last_item_held = EquipType::None;
+        EquipType right_hand_current_equip_type = EquipType::None;
+        EquipType left_hand_current_equip_type = EquipType::None;
+        EquipType right_hand_previous_frame_equip_type = EquipType::None;
+        EquipType left_hand_previous_frame_equip_type = EquipType::None;
+        EquipType last_equip_type_held = EquipType::None;
+        bool quick_menu_selection_already_equipped = false;
+        bool rune_need_reequip = false;
+        float rune_reequip_timer = 0.0f;
         int right_hand_equip_type_change_requested_over_frames = 0;
         int left_hand_equip_type_change_requested_over_frames = 0;
         bool has_something_in_left_hand = false;
@@ -269,7 +269,7 @@ public:
         bool is_climbing = false;
         bool is_paragliding = false;
 
-        float left_hand_velocity = 0.0f;
+        float previous_left_hand_velocity = 0.0f;
         glm::fvec3 stored_left_hand_position = glm::fvec3(0.0f, 0.0f, 0.0f);
         bool left_hand_position_stored = false;
         glm::fvec3 stored_right_hand_position = glm::fvec3(0.0f, 0.0f, 0.0f);

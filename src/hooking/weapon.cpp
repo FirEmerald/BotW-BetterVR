@@ -240,19 +240,17 @@ void CemuHooks::hook_ChangeWeaponMtx(PPCInterpreter_t* hCPU) {
             if (targetActor.name.getLE() == "Item_Magnetglove")
                 equipType = EquipType::MagnetGlove;
 
-            if (gameState.left_equip_type == EquipType::Bow)
+            if (gameState.left_hand_current_equip_type == EquipType::Bow)
                 equipType = EquipType::Arrow;
 
-            gameState.right_equip_type = equipType;
-            gameState.right_equip_type_set_this_frame = true;
+            gameState.right_hand_current_equip_type = equipType;
         }
         else {
             gameState.has_something_in_left_hand = true;
             if (targetActor.name.getLE() == "Item_Conductor")
                 equipType = EquipType::SheikahSlate;
 
-            gameState.left_equip_type = equipType;
-            gameState.left_equip_type_set_this_frame = true;
+            gameState.left_hand_current_equip_type = equipType;
         }
         VRManager::instance().XR->m_gameState.store(gameState);
 

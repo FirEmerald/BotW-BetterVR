@@ -1,19 +1,48 @@
-#include "../instance.h"
 #include "cemu_hooks.h"
+#include "../instance.h"
 #include "openxr_motion_bridge.h"
 
 constexpr float AXIS_THRESHOLD = 0.5f;
 constexpr float HOLD_THRESHOLD = 0.1f;
 
 Direction getJoystickDirection(const XrVector2f& stick) {
-    if (stick.y >= AXIS_THRESHOLD) return Direction::Up;
-    if (stick.y <= -AXIS_THRESHOLD) return Direction::Down;
-    if (stick.x <= -AXIS_THRESHOLD) return Direction::Left;
-    if (stick.x >= AXIS_THRESHOLD) return Direction::Right;
+    if (stick.y >= AXIS_THRESHOLD)       return Direction::Up;
+    if (stick.y <= -AXIS_THRESHOLD)      return Direction::Down;
+    if (stick.x <= -AXIS_THRESHOLD)      return Direction::Left;
+    if (stick.x >= AXIS_THRESHOLD)       return Direction::Right;
 
     return Direction::None;
 }
 
+void spreadWeaponDetectionOverFrames(OpenXR::GameState& gameState) {
+    // Spread the weapon detection from link's attachement bones over several frames.
+    // Each bone isn't necessarily checked each frames which can give wrong results sometimes
+    // Also, some animations seem to make the weapon not detected correctly (shooting arrow)
+    constexpr uint8_t REQUIRED_FRAMES = 5;
+    if (gameState.right_hand_current_equip_type != gameState.right_hand_previous_frame_equip_type) {
+        gameState.right_hand_equip_type_change_requested_over_frames++;
+        if (gameState.right_hand_equip_type_change_requested_over_frames > REQUIRED_FRAMES) {
+            gameState.right_hand_equip_type_change_requested_over_frames = 0;
+        }
+        else
+            gameState.right_hand_current_equip_type = gameState.right_hand_previous_frame_equip_type;
+    }
+    else {
+        gameState.right_hand_equip_type_change_requested_over_frames = 0;
+    }
+
+    if (gameState.left_hand_current_equip_type != gameState.left_hand_previous_frame_equip_type) {
+        gameState.left_hand_equip_type_change_requested_over_frames++;
+        if (gameState.left_hand_equip_type_change_requested_over_frames > REQUIRED_FRAMES) {
+            gameState.left_hand_equip_type_change_requested_over_frames = 0;
+        }
+        else
+            gameState.left_hand_current_equip_type = gameState.left_hand_previous_frame_equip_type;
+    }
+    else {
+        gameState.left_hand_equip_type_change_requested_over_frames = 0;
+    }
+}
 
 struct HandGestureState {
     bool isBehindHead;
@@ -164,28 +193,51 @@ void openDpadMenu(uint32_t& buttonHold, OpenXR::GameState& gameState, OpenXR::Qu
     gameState.current_quick_menu = menu;
     gameState.current_quick_menu_button = button;
     gameState.quick_menu_open = true;
+    if (menu.isMainEquip && (menu.isLeftHand ? gameState.left_hand_current_equip_type : gameState.right_hand_current_equip_type) != menu.equipType) {
+        gameState.quick_menu_selection_already_equipped = false;
+        buttonHold |= menu.equip;
+    }
+    else {
+        gameState.quick_menu_selection_already_equipped = true;
+        if (menu.equipType == EquipType::SheikahSlate) {
+            gameState.rune_need_reequip = true;
+        }
+    }
 }
 
 bool isHandNotOverAnySlot(const HandGestureState& gesture) {
     return !gesture.isBehindHead && !gesture.isBehindHeadWithWaistOffset && !gesture.isCloseToMouth;
 }
 
-bool handleDpadMenu(ButtonState::Event lastEvent, HandGestureState handGesture, uint32_t& buttonHold, OpenXR::GameState& gameState, bool (*quickMenuButton)(OpenXR::InputState)) {
+bool openDpadMenuRuneButton(ButtonState::Event lastEvent, uint32_t& buttonHold, OpenXR::GameState& gameState) {
     if (lastEvent == ButtonState::Event::LongPress) {
-        //Inverse the menu side for bows, so the menu corresponds to the hand side holding the weapon
-        //eg : left hands hold bow, open bow menu with left shoulder, arrow menu with right shoulder
-        bool isBowEquipped = gameState.last_item_held == EquipType::Bow;
-        bool doesBowJustBroke = isBowEquipped && gameState.left_equip_type != EquipType::Bow;
+        openDpadMenu(buttonHold, gameState, OpenXR::QuickMenu::Rune(), OpenXR::QuickMenuButton::Rune);
+        return true;
+    }
+    return false;
+}
+
+bool openDpadMenuBodySlots(ButtonState::Event lastEvent, HandGestureState handGesture, uint32_t& buttonHold, OpenXR::GameState& gameState, bool (*quickMenuButton)(OpenXR::InputState)) {
+    if (lastEvent == ButtonState::Event::LongPress && !gameState.quick_menu_open) {
         if (isHandOverRightShoulderSlot(handGesture)) {
-            openDpadMenu(buttonHold, gameState, isBowEquipped ? OpenXR::QuickMenu::Arrow() : OpenXR::QuickMenu::Weapon(), quickMenuButton);
-            if (doesBowJustBroke)
-                buttonHold |= VPAD_BUTTON_ZR;
+            //open arrow menu if bow is equipped in left hand
+            if (gameState.left_hand_current_equip_type == EquipType::Bow) {
+                openDpadMenu(buttonHold, gameState, OpenXR::QuickMenu::Arrow(), quickMenuButton);
+            }
+            //else open melee weapon menu
+            else {
+                openDpadMenu(buttonHold, gameState, OpenXR::QuickMenu::Weapon(), quickMenuButton);
+            }
         }
         else if (isHandOverLeftShoulderSlot(handGesture)) {
-            openDpadMenu(buttonHold, gameState, isBowEquipped ? OpenXR::QuickMenu::Bow() : OpenXR::QuickMenu::Shield(), quickMenuButton);
-            // Force a bow equip so the correct menu spawns even when the bow broke.
-            if (doesBowJustBroke)
-                buttonHold |= VPAD_BUTTON_ZR;
+            //open shield menu if melee is equipped in right hand
+            if (gameState.right_hand_current_equip_type == EquipType::Melee) {
+                openDpadMenu(buttonHold, gameState, OpenXR::QuickMenu::Shield(), quickMenuButton);
+            }
+            //else open bow menu
+            else {
+                openDpadMenu(buttonHold, gameState, OpenXR::QuickMenu::Bow(), quickMenuButton);
+            }
         }
         // if not over shoulders slots, then it's over waist
         else {
@@ -196,8 +248,53 @@ bool handleDpadMenu(ButtonState::Event lastEvent, HandGestureState handGesture, 
     return false;
 }
 
+void keepDpadMenuOpen(uint32_t& buttonHold, OpenXR::GameState& gameState) {
+    if (gameState.quick_menu_open)
+        buttonHold |= gameState.current_quick_menu.button;
+}
+
+void closeDpadMenu(OpenXR::InputState& inputs, uint32_t& buttonHold, OpenXR::GameState& gameState) {
+    if (!gameState.quick_menu_open)
+        return false;
+    if (!gameState.current_quick_menu_button(inputs)) {
+        gameState.quick_menu_open = false;
+        gameState.quick_menu_closed = true;
+    }
+    return true;
+}
+
+void equipWeaponOnDpadMenuExit(uint32_t& buttonHold, OpenXR::GameState& gameState, float dt) {
+    // if dpad menu was just closed, equip the weapon/item from the last dpad menu opened if not already equipped
+    if (gameState.rune_need_reequip) {
+        constexpr float RUNE_REEQUIP_TIME = 0.5f;
+        if (gameState.rune_reequip_timer >= RUNE_REEQUIP_TIME) {
+            // If rune selected in dpad menu is not the same as the one already in hand -> reequip
+            if (gameState.left_hand_current_equip_type != EquipType::SheikahSlate)
+                buttonHold |= VPAD_BUTTON_L;
+            gameState.rune_need_reequip = false;
+            gameState.rune_reequip_timer = 0.0f;
+        }
+        else
+            gameState.rune_reequip_timer += dt;
+    }
+
+    if (!gameState.quick_menu_closed) 
+        return;
+
+    if (!gameState.quick_menu_selection_already_equipped) {
+        buttonHold |= gameState.current_quick_menu.equip;
+        gameState.last_equip_type_held = gameState.current_quick_menu.equipType;
+    }
+    else
+        gameState.quick_menu_selection_already_equipped = false;
+
+    gameState.quick_menu_closed = false;
+    gameState.current_quick_menu = OpenXR::QuickMenu::None();
+    gameState.current_quick_menu_button = OpenXR::QuickMenuButton::None;
+}
+
 // Input handling functions
-void handleLeftHandInGameInput(
+void processLeftHandInGameInput(
     uint32_t& buttonHold,
     OpenXR::InputState& inputs,
     OpenXR::GameState& gameState,
@@ -205,14 +302,15 @@ void handleLeftHandInGameInput(
     Direction leftStickDir,
     XrActionStateVector2f& leftStickSource,
     XrActionStateVector2f& rightStickSource,
-    const std::chrono::steady_clock::time_point& now
+    const std::chrono::steady_clock::time_point& now,
+    float dt
 ) {
     constexpr std::chrono::milliseconds INPUT_DELAY(400);
-
+    
     constexpr RumbleParameters leftRumbleRaise = { true, 0, RumbleType::Raising, 0.5f, false, 0.2, 1.0f, 1.0f };
     constexpr RumbleParameters leftRumbleFall = { true, 0, RumbleType::Falling, 0.5f, false, 0.3, 0.1f, 0.75f };
     constexpr RumbleParameters RuneRumble = { true, 0, RumbleType::OscillationSmooth, 1.0f, false, 1.0, 0.25f, 0.25f };
-
+    
     auto* rumbleMgr = VRManager::instance().XR->GetRumbleManager();
     bool isInteractPressed = inputs.inGame.interactState[0].lastEvent == ButtonState::Event::ShortPress;
     bool isInteractPressedLong = inputs.inGame.interactState[0].lastEvent == ButtonState::Event::LongPress;
@@ -221,14 +319,14 @@ void handleLeftHandInGameInput(
     bool isCurrentGrabPressed = inputs.shared.grabState[0].wasDownLastFrame;
 
     // Rune rumbles
-    if (gameState.left_equip_type == EquipType::SheikahSlate)
+    if (gameState.left_hand_current_equip_type == EquipType::SheikahSlate)
         rumbleMgr->enqueueInputsRumbleCommand(RuneRumble);
 
     // Handle shield
     // if shield with lock on isn't already being used with left trigger, use gesture to guard without lock on instead.
-    // Gesture enabled only when both melee weapon and shield are in hands to prevent 2 handed weapons and quick drawing shield
+    // Gesture enabled only when both melee weapon and shield are in hands to prevent 2 handed weapons and quick drawing shield 
     // alone with Left Trigger to trigger it. So people can still move hands freely without the shield appearing when not wanted.
-    if (!inputs.inGame.useLeftItem.currentState && gameState.left_equip_type == EquipType::Shield && gameState.right_equip_type == EquipType::Melee && (leftGesture.isNearChestHeight)) {
+    if (!inputs.inGame.useLeftItem.currentState && gameState.left_hand_current_equip_type == EquipType::Shield && gameState.right_hand_current_equip_type == EquipType::Melee && (leftGesture.isNearChestHeight)) {
         buttonHold |= VPAD_BUTTON_ZL;
         rightStickSource.currentState.y = 0.2f; // Force disable the lock on view when holding shield
         gameState.is_shield_guarding = true;
@@ -242,15 +340,18 @@ void handleLeftHandInGameInput(
         rumbleMgr->enqueueInputsRumbleCommand(leftRumbleFall);
 
     // Handle Parry gesture
+    float ACCELERATION_THRESHOLD = 35.0f;
     auto handVelocity = glm::length(ToGLM(inputs.shared.poseVelocity[0].linearVelocity));
-    if (handVelocity > 4.0f && gameState.left_equip_type == EquipType::Shield && leftGesture.isNearChestHeight) {
+    float acceleration = (handVelocity - gameState.previous_left_hand_velocity) / dt;
+    gameState.previous_left_hand_velocity = handVelocity;
+    if (acceleration > ACCELERATION_THRESHOLD && gameState.left_hand_current_equip_type == EquipType::Shield && gameState.is_shield_guarding) {
         buttonHold |= VPAD_BUTTON_A;
         rumbleMgr->enqueueInputsRumbleCommand(leftRumbleFall);
     }
 
     // Handle shoulder slot interactions
     if (isHandOverLeftShoulderSlot(leftGesture) || isHandOverRightShoulderSlot(leftGesture)) {
-        if (handleDpadMenu(inputs.shared.grabState[0].lastEvent, leftGesture, buttonHold, gameState, OpenXR::QuickMenuButton::LGrab))
+        if (openDpadMenuBodySlots(inputs.shared.grabState[0].lastEvent, leftGesture, buttonHold, gameState, OpenXR::QuickMenuButton::LGrab))
             // Don't process normal input when opening dpad menu
             return;
 
@@ -259,48 +360,45 @@ void handleLeftHandInGameInput(
             rumbleMgr->enqueueInputsRumbleCommand(leftRumbleFall);
             if (isHandOverLeftShoulderSlot(leftGesture)) {
                 // Left shoulder = Bow
-                if (gameState.left_equip_type != EquipType::Bow) {
+                if (gameState.left_hand_current_equip_type != EquipType::Bow) {
                     buttonHold |= VPAD_BUTTON_ZR;
-                    gameState.last_item_held = EquipType::Bow;
-                }
-                else {
-                    buttonHold |= VPAD_BUTTON_B; // Unequip
+                    gameState.last_equip_type_held = EquipType::Bow;
+                } else {
+                    buttonHold |= VPAD_BUTTON_B;  // Unequip
                 }
             }
             else {
                 // Right shoulder = Melee weapon
-                if (gameState.right_equip_type != EquipType::Melee) {
+                if (gameState.right_hand_current_equip_type != EquipType::Melee) {
                     buttonHold |= VPAD_BUTTON_Y;
-                    gameState.last_item_held = EquipType::Melee;
-                }
-                else {
-                    buttonHold |= VPAD_BUTTON_B; // Unequip
+                    gameState.last_equip_type_held = EquipType::Melee;
+                } else {
+                    buttonHold |= VPAD_BUTTON_B;  // Unequip
                 }
             }
-
+            
             gameState.prevent_grab_inputs = true;
             gameState.prevent_grab_time = now;
         }
-        return; // Don't process normal input when over slots
+        return;  // Don't process normal input when over slots
     }
-
+    
     // Handle waist slot interaction (Rune)
-    if (isHandOverLeftWaistSlot(leftGesture)) {
+    if (isHandOverLeftWaistSlot(leftGesture)) {    
         // Handle dpad menu
-        if (handleDpadMenu(inputs.shared.grabState[0].lastEvent, leftGesture, buttonHold, gameState, OpenXR::QuickMenuButton::LGrab))
+        if (openDpadMenuBodySlots(inputs.shared.grabState[0].lastEvent, leftGesture, buttonHold, gameState, OpenXR::QuickMenuButton::LGrab))
             // Don't process normal input when opening dpad menu
             return;
 
         if (!gameState.prevent_grab_inputs && isGrabPressed) {
             rumbleMgr->enqueueInputsRumbleCommand(leftRumbleFall);
-            if (gameState.left_equip_type != EquipType::SheikahSlate) {
+            if (gameState.left_hand_current_equip_type != EquipType::SheikahSlate) {
                 buttonHold |= VPAD_BUTTON_L;
-                gameState.last_item_held = EquipType::SheikahSlate;
+                gameState.last_equip_type_held = EquipType::SheikahSlate;
+            } else {
+                buttonHold |= VPAD_BUTTON_B;  // Unequip
             }
-            else {
-                buttonHold |= VPAD_BUTTON_B; // Unequip
-            }
-
+            
             gameState.prevent_grab_inputs = true;
             gameState.prevent_grab_time = now;
         }
@@ -309,7 +407,7 @@ void handleLeftHandInGameInput(
 
     if (isCurrentGrabPressed) {
         // Magnesis motion controls
-        if (gameState.right_equip_type == EquipType::MagnetGlove) {
+        if (gameState.right_hand_current_equip_type == EquipType::MagnetGlove) {
             // null right joystick Y to let the magnesis motion controls handle it.
             rightStickSource.currentState.y = 0.0f;
 
@@ -330,21 +428,21 @@ void handleLeftHandInGameInput(
 
         // Pull gesture
         if (gameState.left_hand_was_over_left_shoulder_slot) {
-            if (gameState.left_equip_type != EquipType::Bow) {
+            if (gameState.left_hand_current_equip_type != EquipType::Bow) {
                 buttonHold |= VPAD_BUTTON_ZR;
-                gameState.last_item_held = EquipType::Bow;
+                gameState.last_equip_type_held = EquipType::Bow;
             }
         }
         else if (gameState.left_hand_was_over_right_shoulder_slot) {
-            if (gameState.right_equip_type != EquipType::Melee) {
+            if (gameState.right_hand_current_equip_type != EquipType::Melee) {
                 buttonHold |= VPAD_BUTTON_Y;
-                gameState.last_item_held = EquipType::Melee;
+                gameState.last_equip_type_held = EquipType::Melee;
             }
         }
         else if (gameState.left_hand_was_over_left_waist_slot) {
-            if (gameState.left_equip_type != EquipType::SheikahSlate) {
+            if (gameState.left_hand_current_equip_type != EquipType::SheikahSlate) {
                 buttonHold |= VPAD_BUTTON_L;
-                gameState.last_item_held = EquipType::SheikahSlate;
+                gameState.last_equip_type_held = EquipType::SheikahSlate;
             }
         }
     }
@@ -365,22 +463,23 @@ void handleLeftHandInGameInput(
     //    }
     //    return;
     //}
-
-    if (isInteractPressed) {
-        // Handle grab action
-        if (!gameState.prevent_grab_inputs) {
+    
+    if (isGrabPressed) {
+        // Handle grab action. is_riding_mount check added to prevent conflict with master cycle brake function
+        if (!gameState.prevent_grab_inputs && !gameState.is_riding_mount) {
             buttonHold |= VPAD_BUTTON_A;
         }
     }
 
-    if (isHandNotOverAnySlot(leftGesture) && isInteractPressedLong) {
+    // Master Sword QTE fix. is_riding_mount check to prevent conflict with master cycle brake function
+    if (isHandNotOverAnySlot(leftGesture) && isGrabPressedLong && !gameState.is_riding_mount) {
         if (!gameState.prevent_grab_inputs) {
             buttonHold |= VPAD_BUTTON_A;
         }
     }
 }
 
-void handleRightHandInGameInput(
+void processRightHandInGameInput(
     uint32_t& buttonHold,
     OpenXR::InputState& inputs,
     OpenXR::GameState& gameState,
@@ -390,7 +489,7 @@ void handleRightHandInGameInput(
     const std::chrono::steady_clock::time_point& now
 ) {
     constexpr std::chrono::milliseconds INPUT_DELAY(400);
-
+    
     constexpr RumbleParameters rightRumbleFall = { true, 1, RumbleType::Falling, 0.5f, false, 0.3, 0.1f, 0.75f };
     constexpr RumbleParameters rightRumbleInfiniteRaise = { true, 1, RumbleType::Raising, 0.5f, true, 1.0, 0.25f, 0.25f };
 
@@ -401,38 +500,36 @@ void handleRightHandInGameInput(
     bool isGrabPressedLong = inputs.shared.grabState[1].lastEvent == ButtonState::Event::LongPress;
     bool isCurrentGrabPressed = inputs.shared.grabState[1].wasDownLastFrame;
     bool isTriggerPressed = inputs.inGame.useRightItem.currentState;
-
+    
     // Handle shoulder slot interactions
     if (isHandOverLeftShoulderSlot(rightGesture) || isHandOverRightShoulderSlot(rightGesture)) {
         // Handle dpad menu
-        if (handleDpadMenu(inputs.shared.grabState[1].lastEvent, rightGesture, buttonHold, gameState, OpenXR::QuickMenuButton::RGrab))
+        if (openDpadMenuBodySlots(inputs.shared.grabState[1].lastEvent, rightGesture, buttonHold, gameState, OpenXR::QuickMenuButton::RGrab))
             // Don't process normal input when opening dpad menu
             return;
 
         // Handle equip/unequip
-        if (!gameState.prevent_grab_inputs && isGrabPressedShort) {
+        if (!gameState.prevent_grab_inputs && isGrabPressedShort) { 
             rumbleMgr->enqueueInputsRumbleCommand(rightRumbleFall);
             if (isHandOverRightShoulderSlot(rightGesture)) {
                 // Right shoulder = Melee weapon
-                if (gameState.right_equip_type != EquipType::Melee) {
+                if (gameState.right_hand_current_equip_type != EquipType::Melee) {
                     buttonHold |= VPAD_BUTTON_Y;
-                    gameState.last_item_held = EquipType::Melee;
-                }
-                else {
+                    gameState.last_equip_type_held = EquipType::Melee;
+                } else {
                     buttonHold |= VPAD_BUTTON_B;
                 }
             }
             else {
                 // Left shoulder = Bow
-                if (gameState.left_equip_type != EquipType::Bow) {
+                if (gameState.left_hand_current_equip_type != EquipType::Bow) {
                     buttonHold |= VPAD_BUTTON_ZR;
-                    gameState.last_item_held = EquipType::Bow;
-                }
-                else {
+                    gameState.last_equip_type_held = EquipType::Bow;
+                } else {
                     buttonHold |= VPAD_BUTTON_B;
                 }
             }
-
+            
             gameState.prevent_grab_inputs = true;
             gameState.prevent_grab_time = now;
         }
@@ -447,7 +544,7 @@ void handleRightHandInGameInput(
             rumbleMgr->stopInputsRumble(1, RumbleType::Raising);
             gameState.weapon_throwed = false;
         }
-        return; // Don't process normal input when over slots
+        return;  // Don't process normal input when over slots
     }
     // if hand not on shoulder slot but trigger still pressed, stop throw rumbles
     else if (gameState.weapon_throwed) {
@@ -456,29 +553,29 @@ void handleRightHandInGameInput(
     }
 
     // Handle waist slot interaction (Rune)
-    if (isHandOverLeftWaistSlot(rightGesture)) {
+    if (isHandOverLeftWaistSlot(rightGesture)) {   
         // Handle dpad menu
-        if (handleDpadMenu(inputs.shared.grabState[1].lastEvent, rightGesture, buttonHold, gameState, OpenXR::QuickMenuButton::RGrab))
+        if (openDpadMenuBodySlots(inputs.shared.grabState[1].lastEvent, rightGesture, buttonHold, gameState, OpenXR::QuickMenuButton::RGrab))
             // Don't process normal input when opening dpad menu
             return;
 
         if (!gameState.prevent_grab_inputs && isGrabPressedShort) {
             rumbleMgr->enqueueInputsRumbleCommand(rightRumbleFall);
-            if (gameState.left_equip_type != EquipType::SheikahSlate) {
+            if (gameState.left_hand_current_equip_type != EquipType::SheikahSlate) {
                 buttonHold |= VPAD_BUTTON_L;
-                gameState.last_item_held = EquipType::SheikahSlate;
+                gameState.last_equip_type_held = EquipType::SheikahSlate;
+            } else {
+                buttonHold |= VPAD_BUTTON_B;  // Unequip
             }
-            else {
-                buttonHold |= VPAD_BUTTON_B; // Unequip
-            }
-
+            
             gameState.prevent_grab_inputs = true;
             gameState.prevent_grab_time = now;
         }
         return;
     }
 
-    if (isHandOverRightWaistSlot(rightGesture)) {
+    if (isHandOverRightWaistSlot(rightGesture))
+    {
         //Handle drop action
         if (isGrabPressedLong) {
             rumbleMgr->enqueueInputsRumbleCommand(rightRumbleFall);
@@ -488,10 +585,10 @@ void handleRightHandInGameInput(
         }
         return;
     }
-
+    
     if (isCurrentGrabPressed) {
         // Magnesis motion controls
-        if (gameState.right_equip_type == EquipType::MagnetGlove) {
+        if (gameState.right_hand_current_equip_type == EquipType::MagnetGlove) {
             // null right joystick Y to let the magnesis motion controls handle it.
             rightStickSource.currentState.y = 0.0f;
 
@@ -512,24 +609,24 @@ void handleRightHandInGameInput(
 
         // Pull gesture
         if (gameState.right_hand_was_over_left_shoulder_slot) {
-            if (gameState.left_equip_type != EquipType::Bow) {
+            if (gameState.left_hand_current_equip_type != EquipType::Bow) {
                 rumbleMgr->enqueueInputsRumbleCommand(rightRumbleFall);
                 buttonHold |= VPAD_BUTTON_ZR;
-                gameState.last_item_held = EquipType::Bow;
+                gameState.last_equip_type_held = EquipType::Bow;
             }
         }
         else if (gameState.right_hand_was_over_right_shoulder_slot) {
-            if (gameState.right_equip_type != EquipType::Melee) {
+            if (gameState.right_hand_current_equip_type != EquipType::Melee) {
                 rumbleMgr->enqueueInputsRumbleCommand(rightRumbleFall);
                 buttonHold |= VPAD_BUTTON_Y;
-                gameState.last_item_held = EquipType::Melee;
+                gameState.last_equip_type_held = EquipType::Melee;
             }
         }
         else if (gameState.right_hand_was_over_left_waist_slot) {
-            if (gameState.left_equip_type != EquipType::SheikahSlate) {
+            if (gameState.left_hand_current_equip_type != EquipType::SheikahSlate) {
                 rumbleMgr->enqueueInputsRumbleCommand(rightRumbleFall);
                 buttonHold |= VPAD_BUTTON_L;
-                gameState.last_item_held = EquipType::SheikahSlate;
+                gameState.last_equip_type_held = EquipType::SheikahSlate;
             }
         }
     }
@@ -543,14 +640,15 @@ void handleRightHandInGameInput(
         }
     }
 
-    if (isHandNotOverAnySlot(rightGesture) && isInteractPressedLong) {
+    // Master Sword QTE fix
+    if (isHandNotOverAnySlot(rightGesture) && isGrabPressedLong) {
         if (!gameState.prevent_grab_inputs) {
             buttonHold |= VPAD_BUTTON_A;
         }
     }
 }
 
-void handleLeftTriggerBindings(
+void processLeftTriggerBindings(
     uint32_t& buttonHold,
     OpenXR::InputState& inputs,
     OpenXR::GameState& gameState,
@@ -571,9 +669,9 @@ void handleLeftTriggerBindings(
     // Reset the guard state to trigger again the lock on camera
     if (!gameState.is_locking_on_target && gameState.previous_button_hold & VPAD_BUTTON_ZL) {
         // cancel rune use to let the shield guard happen
-        if (gameState.left_equip_type == EquipType::SheikahSlate) {
+        if (gameState.left_hand_current_equip_type == EquipType::SheikahSlate) {
             rumbleMgr->enqueueInputsRumbleCommand(raiseRumble);
-            buttonHold |= VPAD_BUTTON_B; // Cancel rune
+            buttonHold |= VPAD_BUTTON_B; // Cancel rune grab
         }
         buttonHold &= ~VPAD_BUTTON_ZL;
     }
@@ -584,10 +682,10 @@ void handleLeftTriggerBindings(
         buttonHold |= VPAD_BUTTON_ZL;
         gameState.is_locking_on_target = true;
         gameState.is_shield_guarding = true;
-    }
+    }    
 }
 
-void handleRightTriggerBindings(
+void processRightTriggerBindings(
     uint32_t& buttonHold,
     OpenXR::InputState& inputs,
     OpenXR::GameState& gameState,
@@ -602,43 +700,43 @@ void handleRightTriggerBindings(
         rumbleMgr->stopInputsRumble(1, RumbleType::Raising);
         return;
     }
-
+    
     constexpr RumbleParameters rightRumbleFixed = { true, 1, RumbleType::Fixed, 0.5f, false, 0.25, 0.3f, 0.3f };
     constexpr RumbleParameters leftRumbleFixed = { true, 0, RumbleType::Fixed, 0.5f, false, 0.25, 0.3f, 0.3f };
     constexpr RumbleParameters rightRumbleInfiniteRaiseBow = { true, 1, RumbleType::Raising, 0.5f, true, 1.0, 0.25f, 0.25f };
     constexpr RumbleParameters rightRumbleInfiniteRaiseWeaponThrow = { true, 1, RumbleType::Raising, 0.5f, true, 1.0, 0.25f, 0.25f };
     constexpr RumbleParameters rightRumbleFiniteRaise = { true, 1, RumbleType::Raising, 0.5f, false, 0.25, 1.0f, 1.0f };
-
-
+    
+    
     if (gameState.has_something_in_left_hand || gameState.has_something_in_right_hand) {
         if (gameState.is_throwable_object_held) {
             rumbleMgr->enqueueInputsRumbleCommand(rightRumbleFixed);
-            buttonHold |= VPAD_BUTTON_R; // Throw object
+            buttonHold |= VPAD_BUTTON_R;  // Throw object
         }
-        else if (gameState.left_equip_type == EquipType::Bow || gameState.last_item_held == EquipType::Bow) {
+        else if (gameState.left_hand_current_equip_type == EquipType::Bow || gameState.last_equip_type_held == EquipType::Bow) {
             rumbleMgr->enqueueInputsRumbleCommand(rightRumbleInfiniteRaiseBow);
-            buttonHold |= VPAD_BUTTON_ZR; // Shoot bow
+            buttonHold |= VPAD_BUTTON_ZR;  // Shoot bow
         }
-        else if (gameState.left_equip_type == EquipType::SheikahSlate) {
+        else if (gameState.left_hand_current_equip_type == EquipType::SheikahSlate) {
             buttonHold |= VPAD_BUTTON_A; // Use rune
             rumbleMgr->enqueueInputsRumbleCommand(leftRumbleFixed);
         }
         else {
             rumbleMgr->enqueueInputsRumbleCommand(rightRumbleInfiniteRaiseWeaponThrow);
-            buttonHold |= VPAD_BUTTON_Y; // Melee attack
+            buttonHold |= VPAD_BUTTON_Y;  // Melee attack
         }
     }
     else {
         // Re-equip last held weapon/item when empty-handed
-        if (gameState.last_item_held == EquipType::Melee) {
+        if (gameState.last_equip_type_held == EquipType::Melee) {
             buttonHold |= VPAD_BUTTON_Y;
             rumbleMgr->enqueueInputsRumbleCommand(rightRumbleFixed);
         }
-        else if (gameState.last_item_held == EquipType::Bow) {
+        else if (gameState.last_equip_type_held == EquipType::Bow) {
             buttonHold |= VPAD_BUTTON_ZR;
             rumbleMgr->enqueueInputsRumbleCommand(rightRumbleFixed);
         }
-        else if (gameState.last_item_held == EquipType::SheikahSlate) {
+        else if (gameState.last_equip_type_held == EquipType::SheikahSlate) {
             buttonHold |= VPAD_BUTTON_L;
             if ((gameState.previous_button_hold & VPAD_BUTTON_L) == 0) {
                 rumbleMgr->enqueueInputsRumbleCommand(rightRumbleFixed);
@@ -648,22 +746,17 @@ void handleRightTriggerBindings(
     }
 }
 
-void handleMenuInput(
+void processMenuInput(
     uint32_t& buttonHold,
     OpenXR::InputState& inputs,
     OpenXR::GameState& gameState,
     Direction leftStickDir
 ) {
-    auto mapButton = [](XrActionStateBoolean& state, VPADButtons btn) -> uint32_t {
+    auto mapButton = [](XrActionStateBoolean& state, VPADButtons btn) -> uint32_t { 
         return state.currentState ? btn : 0;
     };
 
-    if (gameState.quick_menu_open) {
-        if (!gameState.current_quick_menu_button(inputs)) {
-            gameState.quick_menu_open = false;
-            gameState.quick_menu_closed = true;
-        }
-    }
+    closeDpadMenu(inputs, buttonHold, gameState);
 
     if (!gameState.prevent_inputs) {
         buttonHold |= mapButton(inputs.inMenu.back, VPAD_BUTTON_B);
@@ -680,9 +773,115 @@ void handleMenuInput(
 
     if (inputs.inMenu.holdState.lastEvent == ButtonState::Event::ShortPress)
         buttonHold |= VPAD_BUTTON_X;
-
     buttonHold |= mapButton(inputs.inMenu.sort, VPAD_BUTTON_Y);
+}
 
+void processInputPrevention(OpenXR::GameState& gameState, std::chrono::steady_clock::time_point now, std::chrono::milliseconds delay)
+{
+    // check if we need to prevent inputs from happening
+    if (gameState.in_game != gameState.was_in_game) {
+        gameState.prevent_inputs = true;
+        gameState.prevent_inputs_time = now;
+    }
+
+    if (gameState.prevent_inputs && now >= gameState.prevent_inputs_time + delay)
+        gameState.prevent_inputs = false;
+
+    if (gameState.prevent_grab_inputs && now >= gameState.prevent_grab_time + delay)
+        gameState.prevent_grab_inputs = false;
+}
+
+void processModMenuInput(std::atomic_bool& isMenuOpen, OpenXR::InputState& inputs, RND_Renderer::ImGuiOverlay* imguiOverlay, XrActionStateVector2f& leftStickSource, XrActionStateVector2f& rightStickSource, Direction& leftJoystickDir, Direction& rightJoystickDir)
+{
+    // toggleable help menu
+    if (inputs.shared.modMenuState.lastEvent == ButtonState::Event::LongPress && inputs.shared.modMenuState.longFired_actedUpon) {
+        isMenuOpen = !isMenuOpen;
+        inputs.shared.modMenuState.longFired_actedUpon = false;
+    }
+
+    // allow the gamepad inputs to control the imgui overlay
+    imguiOverlay->ProcessInputs(inputs);
+
+    // ignore stick input when the help menu is open
+    if (isMenuOpen) {
+        leftStickSource.currentState = { 0.0f, 0.0f };
+        rightStickSource.currentState = { 0.0f, 0.0f };
+        leftJoystickDir = Direction::None;
+        rightJoystickDir = Direction::None;
+    }
+}
+
+void processHandGesture(RND_Renderer* renderer, OpenXR::InputState& inputs, HandGestureState& leftGesture, HandGestureState& rightGesture, OpenXR::GameState& gameState)
+{
+    auto headsetPose = renderer->GetMiddlePose();
+    if (headsetPose.has_value()) {
+        const auto headsetMtx = headsetPose.value();
+        const glm::fvec3 headsetPos(headsetMtx[3]);
+        
+        const auto leftHandPos = ToGLM(inputs.shared.poseLocation[0].pose.position);
+        const auto rightHandPos = ToGLM(inputs.shared.poseLocation[1].pose.position);
+        
+        leftGesture = calculateHandGesture(gameState, leftHandPos, headsetMtx, headsetPos, gameState.left_hand_position_stored, gameState.stored_left_hand_position);
+        rightGesture = calculateHandGesture(gameState, rightHandPos, headsetMtx, headsetPos, gameState.right_hand_position_stored, gameState.stored_right_hand_position);
+    }
+}
+
+void processJoystickInput(VPADButtons& oldXRStickHold, VPADButtons& newXRStickHold, VPADStatus& vpadStatus, XrActionStateVector2f& leftStickSource, XrActionStateVector2f& rightStickSource)
+{
+    // movement/navigation stick
+    vpadStatus.leftStick = { leftStickSource.currentState.x + vpadStatus.leftStick.x.getLE(), leftStickSource.currentState.y + vpadStatus.leftStick.y.getLE() };
+
+    if (leftStickSource.currentState.x <= -AXIS_THRESHOLD || (HAS_FLAG(oldXRStickHold, VPAD_STICK_L_EMULATION_LEFT) && leftStickSource.currentState.x <= -HOLD_THRESHOLD))
+        newXRStickHold |= VPAD_STICK_L_EMULATION_LEFT;
+    else if (leftStickSource.currentState.x >= AXIS_THRESHOLD || (HAS_FLAG(oldXRStickHold, VPAD_STICK_L_EMULATION_RIGHT) && leftStickSource.currentState.x >= HOLD_THRESHOLD))
+        newXRStickHold |= VPAD_STICK_L_EMULATION_RIGHT;
+
+    if (leftStickSource.currentState.y <= -AXIS_THRESHOLD || (HAS_FLAG(oldXRStickHold, VPAD_STICK_L_EMULATION_DOWN) && leftStickSource.currentState.y <= -HOLD_THRESHOLD))
+        newXRStickHold |= VPAD_STICK_L_EMULATION_DOWN;
+    else if (leftStickSource.currentState.y >= AXIS_THRESHOLD || (HAS_FLAG(oldXRStickHold, VPAD_STICK_L_EMULATION_UP) && leftStickSource.currentState.y >= HOLD_THRESHOLD))
+        newXRStickHold |= VPAD_STICK_L_EMULATION_UP;
+
+    vpadStatus.rightStick = {rightStickSource.currentState.x + vpadStatus.rightStick.x.getLE(), rightStickSource.currentState.y + vpadStatus.rightStick.y.getLE()};
+
+    if (rightStickSource.currentState.x <= -AXIS_THRESHOLD || (HAS_FLAG(oldXRStickHold, VPAD_STICK_R_EMULATION_LEFT) && rightStickSource.currentState.x <= -HOLD_THRESHOLD))
+        newXRStickHold |= VPAD_STICK_R_EMULATION_LEFT;
+    else if (rightStickSource.currentState.x >= AXIS_THRESHOLD || (HAS_FLAG(oldXRStickHold, VPAD_STICK_R_EMULATION_RIGHT) && rightStickSource.currentState.x >= HOLD_THRESHOLD))
+        newXRStickHold |= VPAD_STICK_R_EMULATION_RIGHT;
+
+    if (rightStickSource.currentState.y <= -AXIS_THRESHOLD || (HAS_FLAG(oldXRStickHold, VPAD_STICK_R_EMULATION_DOWN) && rightStickSource.currentState.y <= -HOLD_THRESHOLD))
+        newXRStickHold |= VPAD_STICK_R_EMULATION_DOWN;
+    else if (rightStickSource.currentState.y >= AXIS_THRESHOLD || (HAS_FLAG(oldXRStickHold, VPAD_STICK_R_EMULATION_UP) && rightStickSource.currentState.y >= HOLD_THRESHOLD))
+        newXRStickHold |= VPAD_STICK_R_EMULATION_UP;
+
+    oldXRStickHold = newXRStickHold;
+}
+
+XrTime prev_sample = 0;
+
+void updatePreviousValues(OpenXR::GameState& gameState, uint32_t& buttonHold, HandGestureState& leftGesture, HandGestureState& rightGesture, XrTime inputTime)
+{
+    // (re)set values for next frame
+    gameState.previous_button_hold = buttonHold;
+    gameState.was_in_game = gameState.in_game;
+    if (gameState.in_game) {
+        gameState.has_something_in_right_hand = false;                    // updated in hook_ChangeWeaponMtx
+        gameState.has_something_in_left_hand = false;                     // updated in hook_ChangeWeaponMtx
+        gameState.is_throwable_object_held = false;                       // updated in hook_ChangeWeaponMtx
+        gameState.left_hand_previous_frame_equip_type = gameState.left_hand_current_equip_type;   // use the previous values if no new values are written from hook_ChangeWeaponMtx this frame
+        gameState.right_hand_previous_frame_equip_type = gameState.right_hand_current_equip_type; // use the previous values if no new values are written from hook_ChangeWeaponMtx this frame
+        gameState.left_hand_current_equip_type = EquipType::None;                      // updated in hook_ChangeWeaponMtx
+        gameState.right_hand_current_equip_type = EquipType::None;                     // updated in hook_ChangeWeaponMtx
+    }
+    
+    // Pull gesture
+    gameState.right_hand_was_over_left_shoulder_slot = isHandOverLeftShoulderSlot(rightGesture);
+    gameState.right_hand_was_over_right_shoulder_slot = isHandOverRightShoulderSlot(rightGesture);
+    gameState.right_hand_was_over_left_waist_slot = isHandOverLeftWaistSlot(rightGesture);
+    gameState.left_hand_was_over_left_shoulder_slot = isHandOverLeftShoulderSlot(leftGesture);
+    gameState.left_hand_was_over_right_shoulder_slot = isHandOverRightShoulderSlot(leftGesture);
+    gameState.left_hand_was_over_left_waist_slot = isHandOverLeftWaistSlot(leftGesture);
+
+    prev_sample = inputTime;
 }
 
 void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
@@ -737,12 +936,14 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     OpenXR::InputState inputs = VRManager::instance().XR->m_input.load();
     inputs.inGame.drop_weapon[0] = inputs.inGame.drop_weapon[1] = false;
 
+    float dt = (float)(inputs.shared.inputTime - prev_sample) / 1000000000.0f;
+
     // fetch game state
-    auto gameState = VRManager::instance().XR->m_gameState.load();
+    auto gameState = VRManager::instance().XR->m_gameState.load(); 
     gameState.in_game = inputs.shared.in_game;
 
     // buttons
-    static uint32_t oldCombinedHold = 0;
+    static uint32_t oldCombinedHold = 0; 
     uint32_t newXRBtnHold = 0;
 
     // fetching stick inputs
@@ -756,105 +957,26 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     constexpr std::chrono::milliseconds delay{ 400 };
     const auto now = std::chrono::steady_clock::now();
 
+    processInputPrevention(gameState, now, delay);
 
-    // check if we need to prevent inputs from happening
-    if (gameState.in_game != gameState.was_in_game) {
-        gameState.prevent_inputs = true;
-        gameState.prevent_inputs_time = now;
-    }
-
-    if (gameState.prevent_inputs && now >= gameState.prevent_inputs_time + delay)
-        gameState.prevent_inputs = false;
-
-    if (gameState.prevent_grab_inputs && now >= gameState.prevent_grab_time + delay)
-        gameState.prevent_grab_inputs = false;
-
-    // toggleable help menu
     auto& isMenuOpen = VRManager::instance().XR->m_isMenuOpen;
-
-    if (inputs.shared.modMenuState.lastEvent == ButtonState::Event::LongPress && inputs.shared.modMenuState.longFired_actedUpon) {
-        isMenuOpen = !isMenuOpen;
-        inputs.shared.modMenuState.longFired_actedUpon = false;
-    }
-
-    // allow the gamepad inputs to control the imgui overlay
-    imguiOverlay->ProcessInputs(inputs);
-
-    // ignore stick input when the help menu is open
-    if (isMenuOpen) {
-        leftStickSource.currentState = { 0.0f, 0.0f };
-        rightStickSource.currentState = { 0.0f, 0.0f };
-        leftJoystickDir = Direction::None;
-        rightJoystickDir = Direction::None;
-    }
+    processModMenuInput(isMenuOpen, inputs, imguiOverlay, leftStickSource, rightStickSource, leftJoystickDir, rightJoystickDir);
 
     // Calculate hand gestures
     HandGestureState leftGesture = {};
     HandGestureState rightGesture = {};
+    processHandGesture(renderer, inputs, leftGesture, rightGesture, gameState);
 
-    auto headsetPose = renderer->GetMiddlePose();
-    if (headsetPose.has_value()) {
-        const auto headsetMtx = headsetPose.value();
-        const glm::fvec3 headsetPos(headsetMtx[3]);
-
-        const auto leftHandPos = ToGLM(inputs.shared.poseLocation[0].pose.position);
-        const auto rightHandPos = ToGLM(inputs.shared.poseLocation[1].pose.position);
-
-        leftGesture = calculateHandGesture(gameState, leftHandPos, headsetMtx, headsetPos, gameState.left_hand_position_stored, gameState.stored_left_hand_position);
-        rightGesture = calculateHandGesture(gameState, rightHandPos, headsetMtx, headsetPos, gameState.right_hand_position_stored, gameState.stored_right_hand_position);
-    }
-
-    // dpad menu toggle
-    if (gameState.quick_menu_open) {
-        newXRBtnHold |= gameState.current_quick_menu.button;
-    }
-
+    keepDpadMenuOpen(newXRBtnHold, gameState);
 
     // Process inputs
     if (isMenuOpen) {
         // ignore inputs when the mod menu is open
     }
     else if (gameState.in_game) {
-        // Spread the weapon detection from link's attachement bones over several frames.
-        // Each bone isn't necessarily checked each frames which can give wrong results sometimes
-        // Also, some animations seem to make the weapon not detected correctly (shooting arrow)
-        constexpr uint8_t REQUIRED_FRAMES = 5;
-        if (gameState.right_equip_type != gameState.previous_right_equip_type) {
-            gameState.right_hand_equip_type_change_requested_over_frames++;
-            if (gameState.right_hand_equip_type_change_requested_over_frames > REQUIRED_FRAMES) {
-                gameState.right_hand_equip_type_change_requested_over_frames = 0;
-            }
-            else
-                gameState.right_equip_type = gameState.previous_right_equip_type;
-        }
-        else {
-            gameState.right_hand_equip_type_change_requested_over_frames = 0;
-        }
+        spreadWeaponDetectionOverFrames(gameState);
 
-        if (gameState.left_equip_type != gameState.previous_left_equip_type) {
-            gameState.left_hand_equip_type_change_requested_over_frames++;
-            if (gameState.left_hand_equip_type_change_requested_over_frames > REQUIRED_FRAMES) {
-                gameState.left_hand_equip_type_change_requested_over_frames = 0;
-            }
-            else
-                gameState.left_equip_type = gameState.previous_left_equip_type;
-        }
-        else {
-            gameState.left_hand_equip_type_change_requested_over_frames = 0;
-        }
-
-        // if dpad menu was just closed, equip the weapon/item from the last dpad menu opened
-        if (gameState.quick_menu_closed) {
-            EquipType equipType = gameState.current_quick_menu.equipType;
-            if ((gameState.current_quick_menu.isLeftHand ? gameState.left_equip_type : gameState.right_equip_type) != equipType) {
-                newXRBtnHold |= gameState.current_quick_menu.equip;
-                gameState.last_item_held = equipType;
-            }
-            gameState.quick_menu_closed = false;
-            gameState.current_quick_menu = OpenXR::QuickMenu::None();
-            gameState.current_quick_menu_button = OpenXR::QuickMenuButton::None;
-        }
-
+        equipWeaponOnDpadMenuExit(newXRBtnHold, gameState, dt);
 
         if (!gameState.prevent_inputs) {
             // prevent jump when exiting menus with B button
@@ -879,23 +1001,27 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         if (inputs.inGame.crouch_scopeState.lastEvent == ButtonState::Event::ShortPress) {
             newXRBtnHold |= VPAD_BUTTON_STICK_L;
         }
-
+        
         // Optional rune inputs (for seated players)
-        if (inputs.shared.useRune_runeMenuState.lastEvent == ButtonState::Event::LongPress) {
-            openDpadMenu(newXRBtnHold, gameState, OpenXR::QuickMenu::Rune(), OpenXR::QuickMenuButton::Rune); // Rune quick menu
-        }
+        openDpadMenuRuneButton(inputs.shared.useRune_runeMenuState.lastEvent, newXRBtnHold, gameState);
         if (inputs.shared.useRune_runeMenuState.lastEvent == ButtonState::Event::ShortPress) {
-            newXRBtnHold |= VPAD_BUTTON_L; // Use rune
-            gameState.last_item_held = EquipType::SheikahSlate;
+            newXRBtnHold |= VPAD_BUTTON_L;  // Equip rune
+            gameState.last_equip_type_held = EquipType::SheikahSlate;
         }
-
+        
         // If climbing or paragliding, make the B button cancel instantly the action instead of long press to run
         if (gameState.is_climbing || gameState.is_paragliding) {
             newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run_interact, VPAD_BUTTON_B);
         }
-        else if (gameState.is_riding_mount) {
+        else if (gameState.is_riding_mount)
+        {
+            // A button to interact when riding a mount
             newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run_interact, VPAD_BUTTON_A);
-            newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.useLeftItem, VPAD_BUTTON_B);
+            // grabs to accelerate and brake when riding master cycle
+            if (inputs.inGame.interact[1].currentState)
+                newXRBtnHold |= VPAD_BUTTON_A;
+            if (inputs.inGame.interact[0].currentState)
+                newXRBtnHold |= VPAD_BUTTON_B;
         }
         else {
             if (inputs.inGame.runState.lastEvent == ButtonState::Event::LongPress) {
@@ -912,17 +1038,19 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
                 newXRBtnHold |= VPAD_BUTTON_DOWN;
             }
         }
-
+        
         // Hand-specific input
-        handleLeftHandInGameInput(newXRBtnHold, inputs, gameState, leftGesture, leftJoystickDir, leftStickSource, rightStickSource, now);
-        handleRightHandInGameInput(newXRBtnHold, inputs, gameState, rightGesture, rightStickSource, rightJoystickDir, now);
-
+        processLeftHandInGameInput(newXRBtnHold, inputs, gameState, leftGesture, 
+                                   leftJoystickDir, leftStickSource, rightStickSource, now, dt);
+        processRightHandInGameInput(newXRBtnHold, inputs, gameState, rightGesture, rightStickSource,
+                                    rightJoystickDir, now);
+        
         // Trigger handling
-        handleLeftTriggerBindings(newXRBtnHold, inputs, gameState, leftGesture);
-        handleRightTriggerBindings(newXRBtnHold, inputs, gameState, rightGesture);
+        processLeftTriggerBindings(newXRBtnHold, inputs, gameState, leftGesture);
+        processRightTriggerBindings(newXRBtnHold, inputs, gameState, rightGesture);
     }
     else {
-        handleMenuInput(newXRBtnHold, inputs, gameState, leftJoystickDir);
+        processMenuInput(newXRBtnHold, inputs, gameState, leftJoystickDir);
     }
 
     // Update rumble/haptics
@@ -931,33 +1059,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     // sticks
     static VPADButtons oldXRStickHold = VPAD_BUTTON_NONE;
     VPADButtons newXRStickHold = VPAD_BUTTON_NONE;
-
-    // movement/navigation stick
-    vpadStatus.leftStick = { leftStickSource.currentState.x + vpadStatus.leftStick.x.getLE(), leftStickSource.currentState.y + vpadStatus.leftStick.y.getLE() };
-
-    if (leftStickSource.currentState.x <= -AXIS_THRESHOLD || (HAS_FLAG(oldXRStickHold, VPAD_STICK_L_EMULATION_LEFT) && leftStickSource.currentState.x <= -HOLD_THRESHOLD))
-        newXRStickHold |= VPAD_STICK_L_EMULATION_LEFT;
-    else if (leftStickSource.currentState.x >= AXIS_THRESHOLD || (HAS_FLAG(oldXRStickHold, VPAD_STICK_L_EMULATION_RIGHT) && leftStickSource.currentState.x >= HOLD_THRESHOLD))
-        newXRStickHold |= VPAD_STICK_L_EMULATION_RIGHT;
-
-    if (leftStickSource.currentState.y <= -AXIS_THRESHOLD || (HAS_FLAG(oldXRStickHold, VPAD_STICK_L_EMULATION_DOWN) && leftStickSource.currentState.y <= -HOLD_THRESHOLD))
-        newXRStickHold |= VPAD_STICK_L_EMULATION_DOWN;
-    else if (leftStickSource.currentState.y >= AXIS_THRESHOLD || (HAS_FLAG(oldXRStickHold, VPAD_STICK_L_EMULATION_UP) && leftStickSource.currentState.y >= HOLD_THRESHOLD))
-        newXRStickHold |= VPAD_STICK_L_EMULATION_UP;
-
-    vpadStatus.rightStick = { rightStickSource.currentState.x + vpadStatus.rightStick.x.getLE(), rightStickSource.currentState.y + vpadStatus.rightStick.y.getLE() };
-
-    if (rightStickSource.currentState.x <= -AXIS_THRESHOLD || (HAS_FLAG(oldXRStickHold, VPAD_STICK_R_EMULATION_LEFT) && rightStickSource.currentState.x <= -HOLD_THRESHOLD))
-        newXRStickHold |= VPAD_STICK_R_EMULATION_LEFT;
-    else if (rightStickSource.currentState.x >= AXIS_THRESHOLD || (HAS_FLAG(oldXRStickHold, VPAD_STICK_R_EMULATION_RIGHT) && rightStickSource.currentState.x >= HOLD_THRESHOLD))
-        newXRStickHold |= VPAD_STICK_R_EMULATION_RIGHT;
-
-    if (rightStickSource.currentState.y <= -AXIS_THRESHOLD || (HAS_FLAG(oldXRStickHold, VPAD_STICK_R_EMULATION_DOWN) && rightStickSource.currentState.y <= -HOLD_THRESHOLD))
-        newXRStickHold |= VPAD_STICK_R_EMULATION_DOWN;
-    else if (rightStickSource.currentState.y >= AXIS_THRESHOLD || (HAS_FLAG(oldXRStickHold, VPAD_STICK_R_EMULATION_UP) && rightStickSource.currentState.y >= HOLD_THRESHOLD))
-        newXRStickHold |= VPAD_STICK_R_EMULATION_UP;
-
-    oldXRStickHold = newXRStickHold;
+    processJoystickInput(oldXRStickHold, newXRStickHold, vpadStatus, leftStickSource, rightStickSource);
 
     // calculate new hold, trigger and release
     uint32_t combinedHold = (vpadStatus.hold.getLE() | (newXRBtnHold | newXRStickHold));
@@ -983,28 +1085,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     // set r3 to 1 for hooked VPADRead function to return success
     hCPU->gpr[3] = 1;
 
-    // (re)set values for next frame
-    gameState.previous_button_hold = newXRBtnHold;
-    gameState.was_in_game = gameState.in_game;
-    if (gameState.in_game) {
-        gameState.has_something_in_right_hand = false;                    // updated in hook_ChangeWeaponMtx
-        gameState.has_something_in_left_hand = false;                     // updated in hook_ChangeWeaponMtx
-        gameState.is_throwable_object_held = false;                       // updated in hook_ChangeWeaponMtx
-        gameState.previous_left_equip_type = gameState.left_equip_type;   // use the previous values if no new values are written from hook_ChangeWeaponMtx this frame
-        gameState.previous_right_equip_type = gameState.right_equip_type; // use the previous values if no new values are written from hook_ChangeWeaponMtx this frame
-        gameState.left_equip_type = EquipType::None;                      // updated in hook_ChangeWeaponMtx
-        gameState.right_equip_type = EquipType::None;                     // updated in hook_ChangeWeaponMtx
-        gameState.left_equip_type_set_this_frame = false;                 // updated in hook_ChangeWeaponMtx
-        gameState.right_equip_type_set_this_frame = false;                // updated in hook_ChangeWeaponMtx
-    }
-
-    // Pull gesture
-    gameState.right_hand_was_over_left_shoulder_slot = isHandOverLeftShoulderSlot(rightGesture);
-    gameState.right_hand_was_over_right_shoulder_slot = isHandOverRightShoulderSlot(rightGesture);
-    gameState.right_hand_was_over_left_waist_slot = isHandOverLeftWaistSlot(rightGesture);
-    gameState.left_hand_was_over_left_shoulder_slot = isHandOverLeftShoulderSlot(leftGesture);
-    gameState.left_hand_was_over_right_shoulder_slot = isHandOverRightShoulderSlot(leftGesture);
-    gameState.left_hand_was_over_left_waist_slot = isHandOverLeftWaistSlot(leftGesture);
+    updatePreviousValues(gameState, newXRBtnHold, leftGesture, rightGesture, inputs.shared.inputTime);
 
     VRManager::instance().XR->m_gameState.store(gameState);
     VRManager::instance().XR->m_input.store(inputs);
