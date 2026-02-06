@@ -277,10 +277,10 @@ void equipWeaponOnQuickMenuExit(uint32_t& buttonHold, OpenXR::GameState& gameSta
         if (gameState.quick_menu_selection_already_equipped) {
             gameState.quick_menu_selection_already_equipped = false;
         }
+        //otherwise, equip
         else {
-            //otherwise, equip sheikah slate only
-            if (gameState.current_quick_menu.equipType == EquipType::SheikahSlate && gameState.left_hand_current_equip_type != EquipType::SheikahSlate) {
-                buttonHold |= VPAD_BUTTON_L;
+            if ((gameState.current_quick_menu.isLeftHand ? gameState.left_hand_current_equip_type : gameState.right_hand_current_equip_type) != gameState.current_quick_menu.equipType) {
+                buttonHold |= gameState.current_quick_menu.equipButton;
             }
             gameState.last_equip_type_held = gameState.current_quick_menu.equipType;
         }
