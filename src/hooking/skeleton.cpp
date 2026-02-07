@@ -317,7 +317,12 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
         return;
     }
 
+    // get bone position data
+    glm::mat4x3 gameMtx = getMemory<BEMatrix34>(matrixPtr).getLEMatrix();
+    glm::vec3 bonePos = gameMtx[3];
+    //glm::quat boneRot = glm::normalize(glm::quat_cast(glm::mat3(gameMtx)));
     glm::fvec3 boneScale = getMemory<BEVec3>(scalePtr).getLE();
+
     const glm::fmat4 playerMtx4 = glm::fmat4(getMemory<BEMatrix34>(s_playerMtxAddress).getLEMatrix());
     const glm::mat4 cameraMtx = s_lastCameraMtx;
 
@@ -434,7 +439,7 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
 
         if (GetSettings().UseDynamicEyeOffset()) {
             // restore original game Y position
-            targetPos.y = s_skeleton.GetBone(boneIndex)->localPos.y;
+            targetPos.y = bonePos.y;
         }
 
         // update skeleton for children (hands)
