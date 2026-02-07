@@ -177,7 +177,7 @@ public:
     std::atomic<InputState> m_input = InputState{};
     std::atomic<glm::fquat> m_inputCameraRotation = glm::identity<glm::fquat>();
 
-    class QuickMenuButton {
+    class DpadMenuButton {
     public:
         static bool LGrab(InputState inputState) {
             return inputState.shared.grabState[0].wasDownLastFrame;
@@ -195,10 +195,10 @@ public:
         bool in_game = false;
         bool was_in_game = false;
         bool map_open = false; // map = true, inventory = false
-        bool quick_menu_open = false;
-        bool quick_menu_closing = false;
-        EquipType current_quick_menu = EquipType::None;
-        std::function<bool(InputState)>* current_quick_menu_button = nullptr;
+        bool dpad_menu_open_requested = false;
+        bool was_dpad_menu_open = false;
+        EquipType last_dpad_menu_open = EquipType::None;
+        std::function<bool(InputState)>* current_dpad_menu_button = nullptr;
 
         bool prevent_inputs = false;
         std::chrono::steady_clock::time_point prevent_inputs_time;
@@ -218,7 +218,7 @@ public:
         EquipType right_hand_previous_frame_equip_type = EquipType::None;
         EquipType left_hand_previous_frame_equip_type = EquipType::None;
         EquipType last_equip_type_held = EquipType::None;
-        bool quick_menu_selection_already_equipped = false;
+        bool dpad_menu_selection_already_equipped = false;
         bool rune_need_reequip = false;
         float rune_reequip_timer = 0.0f;
         int right_hand_equip_type_change_requested_over_frames = 0;
