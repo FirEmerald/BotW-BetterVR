@@ -577,22 +577,32 @@ void processRightHandInGameInput(
             gameState.prevent_grab_time = now;
         }
 
-        // Handle weapon throw when over shoulder slot
-        if (isTriggerPressed) {
-            rumbleMgr->enqueueInputsRumbleCommand(rightRumbleInfiniteRaise);
-            buttonHold |= VPAD_BUTTON_R;
-            gameState.weapon_throwed = true;
+        
+        if (isTriggerPressed)
+        {
+            // Keep going or start shoot arrow action even if hand gets over right shoulder slot
+            if (gameState.left_hand_current_equip_type == EquipType::Bow)
+            {
+                rumbleMgr->enqueueInputsRumbleCommand(rightRumbleInfiniteRaise);
+                buttonHold |= VPAD_BUTTON_ZR;
+                gameState.trigger_pressed_over_body_slot = true;
+            }
+            // Handle weapon throw
+            else if (gameState.right_hand_current_equip_type == EquipType::Melee) {
+                rumbleMgr->enqueueInputsRumbleCommand(rightRumbleInfiniteRaise);
+                buttonHold |= VPAD_BUTTON_R;
+                gameState.trigger_pressed_over_body_slot = true;
+            }
         }
-        else if (gameState.weapon_throwed) {
+        else if (gameState.trigger_pressed_over_body_slot) {
             rumbleMgr->stopInputsRumble(1, RumbleType::Raising);
-            gameState.weapon_throwed = false;
+            gameState.trigger_pressed_over_body_slot = false;
         }
         return;  // Don't process normal input when over slots
     }
     // if hand not on shoulder slot but trigger still pressed, stop throw rumbles
-    else if (gameState.weapon_throwed) {
+    else if (gameState.trigger_pressed_over_body_slot && gameState.right_hand_current_equip_type == EquipType::Melee) {
         rumbleMgr->stopInputsRumble(1, RumbleType::Raising);
-        gameState.weapon_throwed = false;
     }
 
     // Handle waist slot interaction (Rune)
@@ -741,6 +751,7 @@ void processRightTriggerBindings(
 
     if (!inputs.inGame.useRightItem.currentState) {
         rumbleMgr->stopInputsRumble(1, RumbleType::Raising);
+        gameState.trigger_pressed_over_body_slot = false;
         return;
     }
     
@@ -764,7 +775,9 @@ void processRightTriggerBindings(
             buttonHold |= VPAD_BUTTON_A; // Use rune
             rumbleMgr->enqueueInputsRumbleCommand(leftRumbleFixed);
         }
-        else {
+        // gameState.trigger_was_pressed_over_body_slot check prevents the melee attack rumbles to wrongly start when the throw weapon inputs 
+        // hasn't been released yet. Necessary because the melee attack action won't start if the throw input is still held.
+        else if (!gameState.trigger_pressed_over_body_slot){
             rumbleMgr->enqueueInputsRumbleCommand(rightRumbleInfiniteRaiseWeaponThrow);
             buttonHold |= VPAD_BUTTON_Y;  // Melee attack
         }
