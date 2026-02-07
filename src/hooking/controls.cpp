@@ -1,5 +1,5 @@
-#include "cemu_hooks.h"
 #include "../instance.h"
+#include "cemu_hooks.h"
 #include "openxr_motion_bridge.h"
 
 
@@ -189,20 +189,63 @@ bool isHandFarEnoughFromStoredPosition(const HandGestureState& gesture) {
     return gesture.isFarEnoughFromStoredPosition;
 }
 
-void openQuickMenu(uint32_t& buttonHold, OpenXR::GameState& gameState, OpenXR::QuickMenu menu, std::function<bool(OpenXR::InputState)> button) {
-    buttonHold |= menu.menuButton;
-    gameState.current_quick_menu = menu;
-    gameState.current_quick_menu_button = &button;
-    gameState.quick_menu_open = true;
-    if ((menu.isLeftHand ? gameState.left_hand_current_equip_type : gameState.right_hand_current_equip_type) != menu.equipType) {
-        buttonHold |= menu.equipButton;
+VPADButtons getMenuButton(EquipType menu) {
+    switch (menu) {
+        case EquipType::Melee:
+        case EquipType::Bow:
+            return VPADButtons::VPAD_BUTTON_RIGHT;
+        case EquipType::Shield:
+        case EquipType::Arrow:
+            return VPADButtons::VPAD_BUTTON_LEFT;
+        case EquipType::SheikahSlate:
+            return VPADButtons::VPAD_BUTTON_UP;
+        default:
+            return VPADButtons::VPAD_BUTTON_NONE;
     }
-    else {
+}
+
+VPADButtons getEquipButton(EquipType menu) {
+    switch (menu) {
+        case EquipType::Melee:
+            return VPADButtons::VPAD_BUTTON_Y;
+        case EquipType::Bow:
+            return VPADButtons::VPAD_BUTTON_ZR;
+        case EquipType::SheikahSlate:
+            return VPADButtons::VPAD_BUTTON_L;
+        default:
+            return VPADButtons::VPAD_BUTTON_NONE;
+    }
+}
+
+EquipType getHandEquippedForMenu(OpenXR::GameState& gameState, EquipType menu) {
+    switch (menu) {
+        case EquipType::Melee:
+        case EquipType::Arrow:
+            return gameState.right_hand_current_equip_type;
+        case EquipType::Bow:
+        case EquipType::Shield:
+        case EquipType::SheikahSlate:
+            return gameState.left_hand_current_equip_type;
+        default:
+            return EquipType::None;
+    }
+}
+
+void openQuickMenu(uint32_t& buttonHold, OpenXR::GameState& gameState, EquipType menu, std::function<bool(OpenXR::InputState)> button) {
+    buttonHold |= getMenuButton(menu);
+    if (getHandEquippedForMenu(gameState, menu) == menu) {
         gameState.quick_menu_selection_already_equipped = true;
-        if (menu.equipType == EquipType::SheikahSlate) {
+        if (menu == EquipType::SheikahSlate) {
             gameState.rune_need_reequip = true;
         }
     }
+    else if (menu == EquipType::Bow) {
+        // Force a bow equip so the correct menu opens.
+        buttonHold |= VPAD_BUTTON_ZR;
+    }
+    gameState.current_quick_menu = menu;
+    gameState.current_quick_menu_button = &button;
+    gameState.quick_menu_open = true;
 }
 
 bool isHandNotOverAnySlot(const HandGestureState& gesture) {
@@ -211,7 +254,7 @@ bool isHandNotOverAnySlot(const HandGestureState& gesture) {
 
 bool openQuickMenuRuneButton(ButtonState::Event lastEvent, uint32_t& buttonHold, OpenXR::GameState& gameState) {
     if (lastEvent == ButtonState::Event::LongPress) {
-        openQuickMenu(buttonHold, gameState, OpenXR::QuickMenu::Rune(), OpenXR::QuickMenuButton::Rune);
+        openQuickMenu(buttonHold, gameState, EquipType::SheikahSlate, OpenXR::QuickMenuButton::Rune);
         return true;
     }
     return false;
@@ -219,26 +262,26 @@ bool openQuickMenuRuneButton(ButtonState::Event lastEvent, uint32_t& buttonHold,
 
 bool openQuickMenuBodySlots(ButtonState::Event lastEvent, HandGestureState handGesture, uint32_t& buttonHold, OpenXR::GameState& gameState, std::function<bool(OpenXR::InputState)> quickMenuButton) {
     if (lastEvent == ButtonState::Event::LongPress && !gameState.quick_menu_open) {
-        OpenXR::QuickMenu menu;
+        EquipType menu;
         if (isHandOverRightShoulderSlot(handGesture)) {
             //open arrow menu if bow is equipped in left hand
             if (gameState.left_hand_current_equip_type == EquipType::Bow)
-                menu = OpenXR::QuickMenu::Arrow();
+                menu = EquipType::Arrow;
             //else open melee weapon menu
             else
-                menu = OpenXR::QuickMenu::Melee();
+                menu = EquipType::Melee;
         }
         else if (isHandOverLeftShoulderSlot(handGesture)) {
             //open shield menu if melee is equipped in right hand
             if (gameState.right_hand_current_equip_type == EquipType::Melee)
-                menu = OpenXR::QuickMenu::Shield();
+                menu = EquipType::Shield;
             //else open bow menu
             else
-                menu = OpenXR::QuickMenu::Bow();
+                menu = EquipType::Bow;
         }
         // if not over shoulders slots, then it's over waist
         else
-            menu = OpenXR::QuickMenu::Rune();
+            menu = EquipType::SheikahSlate;
         openQuickMenu(buttonHold, gameState, menu, quickMenuButton);
         return true;
     }
@@ -248,7 +291,7 @@ bool openQuickMenuBodySlots(ButtonState::Event lastEvent, HandGestureState handG
 void handleQuickMenu(OpenXR::InputState& inputs, uint32_t& buttonHold, OpenXR::GameState& gameState) {
     if (gameState.quick_menu_open) {
         if ((*gameState.current_quick_menu_button)(inputs)) {
-            buttonHold |= gameState.current_quick_menu.menuButton;
+            buttonHold |= getMenuButton(gameState.current_quick_menu);
         }
         else {
             gameState.quick_menu_open = false;
@@ -280,14 +323,15 @@ void equipWeaponOnQuickMenuExit(uint32_t& buttonHold, OpenXR::GameState& gameSta
         }
         //otherwise, equip
         else {
-            if ((gameState.current_quick_menu.isLeftHand ? gameState.left_hand_current_equip_type : gameState.right_hand_current_equip_type) != gameState.current_quick_menu.equipType) {
-                buttonHold |= gameState.current_quick_menu.equipButton;
+            VPADButtons equipButton = getEquipButton(gameState.current_quick_menu);
+            if (equipButton != VPADButtons::VPAD_BUTTON_NONE) {
+                buttonHold |= equipButton;
+                gameState.last_equip_type_held = gameState.current_quick_menu;
             }
-            gameState.last_equip_type_held = gameState.current_quick_menu.equipType;
         }
         //reset quick menu state
         gameState.quick_menu_closing = false;
-        gameState.current_quick_menu = OpenXR::QuickMenu::None();
+        gameState.current_quick_menu = EquipType::None;
         gameState.current_quick_menu_button = nullptr;
     }
 }

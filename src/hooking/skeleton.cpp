@@ -434,7 +434,7 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
 
         if (GetSettings().UseDynamicEyeOffset()) {
             // restore original game Y position
-            targetPos.y = bonePos.y;
+            targetPos.y = s_skeleton.GetBone(boneIndex)->localPos.y;
         }
 
         // update skeleton for children (hands)

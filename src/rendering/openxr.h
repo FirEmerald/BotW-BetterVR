@@ -177,38 +177,6 @@ public:
     std::atomic<InputState> m_input = InputState{};
     std::atomic<glm::fquat> m_inputCameraRotation = glm::identity<glm::fquat>();
 
-    struct QuickMenu {
-    public:
-        VPADButtons menuButton = VPAD_BUTTON_NONE;
-        VPADButtons equipButton = VPAD_BUTTON_NONE;
-        EquipType equipType = EquipType::None;
-        bool isLeftHand = false;
-
-        static QuickMenu None() {
-            return { VPAD_BUTTON_NONE, VPAD_BUTTON_NONE, EquipType::None, false };
-        }
-
-        static QuickMenu Melee() {
-            return { VPAD_BUTTON_RIGHT, VPAD_BUTTON_Y, EquipType::Melee, false };
-        }
-
-        static QuickMenu Shield() {
-            return { VPAD_BUTTON_LEFT, VPAD_BUTTON_NONE, EquipType::Shield, true };
-        }
-
-        static QuickMenu Bow() {
-            return { VPAD_BUTTON_RIGHT, VPAD_BUTTON_ZR, EquipType::Bow, true };
-        }
-
-        static QuickMenu Arrow() {
-            return { VPAD_BUTTON_LEFT, VPAD_BUTTON_NONE, EquipType::Arrow, false };
-        }
-
-        static QuickMenu Rune() {
-            return { VPAD_BUTTON_UP, VPAD_BUTTON_L, EquipType::SheikahSlate, true };
-        }
-    };
-
     class QuickMenuButton {
     public:
         static bool LGrab(InputState inputState) {
@@ -229,7 +197,7 @@ public:
         bool map_open = false; // map = true, inventory = false
         bool quick_menu_open = false;
         bool quick_menu_closing = false;
-        QuickMenu current_quick_menu;
+        EquipType current_quick_menu = EquipType::None;
         std::function<bool(InputState)>* current_quick_menu_button = nullptr;
 
         bool prevent_inputs = false;
