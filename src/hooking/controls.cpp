@@ -231,7 +231,7 @@ EquipType getHandEquippedForMenu(OpenXR::GameState& gameState, EquipType menu) {
     }
 }
 
-void openDpadMenu(uint32_t& buttonHold, OpenXR::GameState& gameState, EquipType menu, std::function<bool(OpenXR::InputState)> button) {
+void openDpadMenu(uint32_t& buttonHold, OpenXR::GameState& gameState, EquipType menu, bool (*button)(OpenXR::InputState)) {
     buttonHold |= getMenuButton(menu);
     if (getHandEquippedForMenu(gameState, menu) == menu) {
         gameState.dpad_menu_selection_already_equipped = true;
@@ -244,7 +244,7 @@ void openDpadMenu(uint32_t& buttonHold, OpenXR::GameState& gameState, EquipType 
         buttonHold |= VPAD_BUTTON_ZR;
     }
     gameState.last_dpad_menu_open = menu;
-    gameState.current_dpad_menu_button = &button;
+    gameState.current_dpad_menu_button = button;
     gameState.dpad_menu_open_requested = true;
 }
 
@@ -260,7 +260,7 @@ bool openDpadMenuRuneButton(ButtonState::Event lastEvent, uint32_t& buttonHold, 
     return false;
 }
 
-bool openDpadMenuBodySlots(ButtonState::Event lastEvent, HandGestureState handGesture, uint32_t& buttonHold, OpenXR::GameState& gameState, std::function<bool(OpenXR::InputState)> dpadMenuButton) {
+bool openDpadMenuBodySlots(ButtonState::Event lastEvent, HandGestureState handGesture, uint32_t& buttonHold, OpenXR::GameState& gameState, bool (*dpadMenuButton)(OpenXR::InputState)) {
     if (lastEvent == ButtonState::Event::LongPress && !gameState.dpad_menu_open_requested) {
         EquipType menu;
         if (isHandOverRightShoulderSlot(handGesture)) {
@@ -290,7 +290,7 @@ bool openDpadMenuBodySlots(ButtonState::Event lastEvent, HandGestureState handGe
 
 void handleDpadMenu(OpenXR::InputState& inputs, uint32_t& buttonHold, OpenXR::GameState& gameState) {
     if (gameState.dpad_menu_open_requested) {
-        if ((*gameState.current_dpad_menu_button)(inputs)) {
+        if (gameState.current_dpad_menu_button(inputs)) {
             buttonHold |= getMenuButton(gameState.last_dpad_menu_open);
         }
         else {

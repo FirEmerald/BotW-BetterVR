@@ -198,7 +198,7 @@ public:
         bool dpad_menu_open_requested = false;
         bool was_dpad_menu_open = false;
         EquipType last_dpad_menu_open = EquipType::None;
-        std::function<bool(InputState)>* current_dpad_menu_button = nullptr;
+        bool(*current_dpad_menu_button)(InputState) = nullptr;
 
         bool prevent_inputs = false;
         std::chrono::steady_clock::time_point prevent_inputs_time;
