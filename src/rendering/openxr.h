@@ -156,7 +156,7 @@ public:
         glm::fvec3 stored_right_hand_position = glm::fvec3(0.0f, 0.0f, 0.0f);
         bool right_hand_position_stored = false;
         int magnesis_forward_frames_interval = 0;
-        bool weapon_throwed = false;
+        bool trigger_pressed_over_body_slot = false;
     };
     std::atomic<GameState> m_gameState{};
     std::atomic_bool m_isMenuOpen;
