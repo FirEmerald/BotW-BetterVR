@@ -211,9 +211,6 @@ public:
 
     class QuickMenuButton {
     public:
-        static bool None(InputState inputState) {
-            return false;
-        };
         static bool LGrab(InputState inputState) {
             return inputState.shared.grabState[0].wasDownLastFrame;
         };
@@ -233,7 +230,7 @@ public:
         bool quick_menu_open = false;
         bool quick_menu_closing = false;
         QuickMenu current_quick_menu;
-        bool (*current_quick_menu_button)(InputState) = QuickMenuButton::None;
+        std::function<bool(InputState)>* current_quick_menu_button = nullptr;
 
         bool prevent_inputs = false;
         std::chrono::steady_clock::time_point prevent_inputs_time;

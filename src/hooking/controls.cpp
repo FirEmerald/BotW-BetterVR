@@ -188,10 +188,10 @@ bool isHandFarEnoughFromStoredPosition(const HandGestureState& gesture) {
     return gesture.isFarEnoughFromStoredPosition;
 }
 
-void openQuickMenu(uint32_t& buttonHold, OpenXR::GameState& gameState, OpenXR::QuickMenu menu, bool (*button)(OpenXR::InputState)) {
+void openQuickMenu(uint32_t& buttonHold, OpenXR::GameState& gameState, OpenXR::QuickMenu menu, std::function<bool(OpenXR::InputState)> button) {
     buttonHold |= menu.menuButton;
     gameState.current_quick_menu = menu;
-    gameState.current_quick_menu_button = button;
+    gameState.current_quick_menu_button = &button;
     gameState.quick_menu_open = true;
     if ((menu.isLeftHand ? gameState.left_hand_current_equip_type : gameState.right_hand_current_equip_type) != menu.equipType) {
         buttonHold |= menu.equipButton;
@@ -216,7 +216,7 @@ bool openQuickMenuRuneButton(ButtonState::Event lastEvent, uint32_t& buttonHold,
     return false;
 }
 
-bool openQuickMenuBodySlots(ButtonState::Event lastEvent, HandGestureState handGesture, uint32_t& buttonHold, OpenXR::GameState& gameState, bool (*quickMenuButton)(OpenXR::InputState)) {
+bool openQuickMenuBodySlots(ButtonState::Event lastEvent, HandGestureState handGesture, uint32_t& buttonHold, OpenXR::GameState& gameState, std::function<bool(OpenXR::InputState)> quickMenuButton) {
     if (lastEvent == ButtonState::Event::LongPress && !gameState.quick_menu_open) {
         OpenXR::QuickMenu menu;
         if (isHandOverRightShoulderSlot(handGesture)) {
@@ -246,7 +246,7 @@ bool openQuickMenuBodySlots(ButtonState::Event lastEvent, HandGestureState handG
 
 void handleQuickMenu(OpenXR::InputState& inputs, uint32_t& buttonHold, OpenXR::GameState& gameState) {
     if (gameState.quick_menu_open) {
-        if (gameState.current_quick_menu_button(inputs)) {
+        if ((*gameState.current_quick_menu_button)(inputs)) {
             buttonHold |= gameState.current_quick_menu.menuButton;
         }
         else {
@@ -287,7 +287,7 @@ void equipWeaponOnQuickMenuExit(uint32_t& buttonHold, OpenXR::GameState& gameSta
         //reset quick menu state
         gameState.quick_menu_closing = false;
         gameState.current_quick_menu = OpenXR::QuickMenu::None();
-        gameState.current_quick_menu_button = OpenXR::QuickMenuButton::None;
+        gameState.current_quick_menu_button = nullptr;
     }
 }
 
