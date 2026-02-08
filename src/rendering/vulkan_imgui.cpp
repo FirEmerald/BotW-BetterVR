@@ -856,13 +856,10 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
 
 
                             DrawSettingRow("Player Eye Height", [&]() {
-                                ImGui::PushItemWidth(windowWidth.x * 0.35f);
                                 if (ImGui::SliderFloat("##EyeHeight", &height, 0.0f, 3.0f, heightValueStr.c_str())) {
                                     settings.eyeHeight = height;
                                     changed = true;
                                 }
-                                ImGui::PopItemWidth();
-                                ImGui::SameLine();
                                 if (ImGui::Button("Set Eye Height To Automatic")) {
                                     settings.eyeHeight = 0.0f;
                                     changed = true;
@@ -881,13 +878,10 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                                 float smoothingFactor = settings.dynamicEyeOffsetSmoothing;
                                 std::string smoothingFactorStr = std::format("{0}", smoothingFactor);
                                 DrawSettingRow("Dynamic Camera Offset Smoothing Factor (lower values are smoother)", [&]() {
-                                    ImGui::PushItemWidth(windowWidth.x * 0.35f);
                                     if (ImGui::SliderFloat("##SmoothingFactor", &smoothingFactor, 0.01f, 1.0f, smoothingFactorStr.c_str())) {
                                         settings.dynamicEyeOffsetSmoothing = smoothingFactor;
                                         changed = true;
                                     }
-                                    ImGui::PopItemWidth();
-                                    ImGui::SameLine();
                                     if (ImGui::Button("Reset Smoothing Factor")) {
                                         settings.dynamicEyeOffsetSmoothing = 0.1f;
                                         changed = true;
@@ -911,32 +905,36 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                         //    settings.leftHanded = leftHanded ? 1 : 0;
                         //    changed = true;
                         //}
-
-                        float worldScale = settings.worldScale;
-                        std::string worldScaleValueStr;
-                        if (worldScale == 0.0f)
-                            worldScaleValueStr = "Automatic (Calibrates on recenter)";
-                        else {
-                            float vanillaAdjustMeters = worldScale * 1.73442;
-                            float vanillaAdjustInches = vanillaAdjustMeters * 39.3700787f;
-                            int32_t vanillaAdjustFeet = std::floor(vanillaAdjustInches / 12);
-                            vanillaAdjustInches -= vanillaAdjustFeet * 12;
-                            worldScaleValueStr = std::format("{0:.03f} ({1:.02f}m/{2}ft {3:.02f}in tall unmodded)", worldScale, vanillaAdjustMeters, vanillaAdjustFeet, vanillaAdjustInches);
-                        }
-                        DrawSettingRow("World Scale", [&]() {
-                            ImGui::PushItemWidth(windowWidth.x * 0.35f);
-                            if (ImGui::SliderFloat("##WorldScale", &worldScale, 0.25f, 2.0f, worldScaleValueStr.c_str())) {
-                                settings.worldScale = worldScale;
-                                changed = true;
-                            }
-                            ImGui::PopItemWidth();
-                            ImGui::SameLine();
-                            if (ImGui::Button("Set World Scale To Automatic")) {
-                                settings.worldScale = 0.0f;
-                                changed = true;
-                            }
-                        });
                     }
+
+                    float worldScale = settings.worldScale;
+                    std::string worldScaleValueStr;
+                    if (worldScale == 0.0f)
+                        worldScaleValueStr = "Automatic (Calibrates on recenter)";
+                    else {
+                        float vanillaAdjustMeters = worldScale * 1.73442;
+                        float vanillaAdjustInches = vanillaAdjustMeters * 39.3700787f;
+                        int32_t vanillaAdjustFeet = std::floor(vanillaAdjustInches / 12);
+                        vanillaAdjustInches -= vanillaAdjustFeet * 12;
+                        worldScaleValueStr = std::format("{0:.03f} ({1:.02f}m/{2}ft {3:.02f}in tall unmodded)", worldScale, vanillaAdjustMeters, vanillaAdjustFeet, vanillaAdjustInches);
+                    }
+                    DrawSettingRow("World Scale", [&]() {
+                        if (ImGui::SliderFloat("##WorldScale", &worldScale, 0.25f, 2.0f, worldScaleValueStr.c_str())) {
+                            settings.worldScale = worldScale;
+                            changed = true;
+                        }
+                        ImGui::PushItemWidth(ImGui::CalcItemWidth() * 0.5f);
+                        if (ImGui::Button("Set World Scale To Automatic")) {
+                            settings.worldScale = 0.0f;
+                            changed = true;
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Button("Set World Scale To 1")) {
+                            settings.worldScale = 1.0f;
+                            changed = true;
+                        }
+                        ImGui::PopItemWidth();
+                    });
 
                     ImGui::Spacing();
                     ImGui::Separator();
