@@ -794,7 +794,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                             }
                             ImGui::PopItemWidth();
                             ImGui::SameLine();
-                            if (ImGui::Button("Reset")) {
+                            if (ImGui::Button("Reset##HeightOffset")) {
                                 settings.playerHeightOffset = 0.0f;
                                 changed = true;
                             }
@@ -821,7 +821,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                         }
                         ImGui::PopItemWidth();
                         ImGui::SameLine();
-                        if (ImGui::Button("Reset")) {
+                        if (ImGui::Button("Reset##WorldScale")) {
                             settings.worldScale = 1.0f;
                             changed = true;
                         }
