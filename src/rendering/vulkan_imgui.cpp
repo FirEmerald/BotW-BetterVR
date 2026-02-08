@@ -807,6 +807,26 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                         //}
                     }
 
+                    float worldScale = settings.worldScale;
+                    float vanillaAdjustMeters = worldScale * 1.73442;
+                    float vanillaAdjustInches = vanillaAdjustMeters * 39.3700787f;
+                    int32_t vanillaAdjustFeet = std::floor(vanillaAdjustInches / 12);
+                    vanillaAdjustInches -= vanillaAdjustFeet * 12;
+                    std::string worldScaleValueStr = std::format("{0:.03f} ({1:.02f}m/{2}ft {3:.02f}in tall unmodded)", worldScale, vanillaAdjustMeters, vanillaAdjustFeet, vanillaAdjustInches);
+                    DrawSettingRow("World Scale", [&]() {
+                        ImGui::PushItemWidth(windowWidth.x * 0.35f);
+                        if (ImGui::SliderFloat("##WorldScale", &worldScale, 0.25f, 2.0f, worldScaleValueStr.c_str())) {
+                            settings.worldScale = worldScale;
+                            changed = true;
+                        }
+                        ImGui::PopItemWidth();
+                        ImGui::SameLine();
+                        if (ImGui::Button("Reset")) {
+                            settings.worldScale = 1.0f;
+                            changed = true;
+                        }
+                    });
+
                     ImGui::Spacing();
                     ImGui::Separator();
                     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_HeaderActive));

@@ -522,6 +522,7 @@ struct ModSettings {
 
     // first-person settings
     std::atomic<float> playerHeightOffset = 0.0f;
+    std::atomic<float> worldScale = 1.0f;
     std::atomic_bool leftHanded = false;
     std::atomic_bool uiFollowsGaze = true;
     std::atomic_bool cropFlatTo16x9 = true;
@@ -550,6 +551,7 @@ struct ModSettings {
 
         return playerHeightOffset;
     }
+    float GetWorldScale() const { return worldScale; }
     EventMode GetCutsceneCameraMode() const {
         // if in third-person mode, always use third-person cutscene camera
         if (GetCameraMode() == CameraMode::THIRD_PERSON) {
@@ -573,6 +575,7 @@ struct ModSettings {
         std::format_to(std::back_inserter(buffer), " - Left Handed: {}\n", IsLeftHanded() ? "Yes" : "No");
         std::format_to(std::back_inserter(buffer), " - GUI Follow Setting: {}\n", DoesUIFollowGaze() ? "Follow Looking Direction" : "Fixed");
         std::format_to(std::back_inserter(buffer), " - Player Height: {} meters\n", GetPlayerHeightOffset());
+        std::format_to(std::back_inserter(buffer), " - World Scale: {}\n", GetWorldScale());
         std::format_to(std::back_inserter(buffer), " - Crop Flat to 16:9: {}\n", ShouldFlatPreviewBeCroppedTo16x9() ? "Yes" : "No");
         std::format_to(std::back_inserter(buffer), " - Debug Overlay: {}\n", ShowDebugOverlay() ? "Enabled" : "Disabled");
         std::format_to(std::back_inserter(buffer), " - Cutscene Camera Mode: {}\n", GetCutsceneCameraMode() == EventMode::ALWAYS_FIRST_PERSON ? "Always First Person" : (GetCutsceneCameraMode() == EventMode::ALWAYS_THIRD_PERSON ? "Always Third Person" : "Follow Default Event Settings"));

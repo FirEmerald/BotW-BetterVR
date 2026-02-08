@@ -200,6 +200,12 @@ public:
 
     static void DrawDebugOverlays();
 
+    static float WorldScaleInverse() {
+        return 1.0f / GetSettings().GetWorldScale();
+    }
+
+    static void ApplyCameraOffsets(glm::fvec3* playerPos, bool isRenderCamera);
+
 private:
     HMODULE m_cemuHandle;
 

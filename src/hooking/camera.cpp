@@ -41,6 +41,25 @@ std::chrono::steady_clock::time_point crouch_state_change_time;
 uint32_t s_isLadderClimbing = 0;
 uint32_t s_isRiding = 0;
 
+void CemuHooks::ApplyCameraOffsets(glm::fvec3* playerPos, bool isRenderCamera) {
+    if (s_isRiding || !s_isSwimming || isRenderCamera) {
+        playerPos->y += GetSettings().GetPlayerHeightOffset() * WorldScaleInverse();
+        if (s_isRiding) {
+            playerPos->y -= hardcodedRidingOffset;
+        }
+        else if (s_isSwimming) {
+            playerPos->y += hardcodedSwimOffset;
+        }
+        else {
+            playerPos->y -= actualCrouchOffset;
+        }
+    }
+    else {
+        float playerHeight = VRManager::instance().XR->GetRenderer()->GetMiddlePose().value()[3].y;
+        playerPos->y += 1.73f - playerHeight * WorldScaleInverse();
+    }
+}
+
 void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
 
@@ -126,17 +145,7 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
         BEMatrix34& mtx = actor.mtx;
         glm::fvec3 playerPos = actor.mtx.getPos().getLE();
 
-        if (s_isRiding) {
-            playerPos.y -= hardcodedRidingOffset;
-        }
-        else if (s_isSwimming) {
-            float playerHeight = VRManager::instance().XR->GetRenderer()->GetMiddlePose().value()[3].y;
-            playerPos.y += 1.73f - playerHeight;
-        }
-        else {
-            playerPos.y += GetSettings().GetPlayerHeightOffset() - actualCrouchOffset;
-        }
-
+        ApplyCameraOffsets(&playerPos, false);
 
         if (auto eventSettings = GetFirstPersonSettingsForActiveEvent()) {
             if (eventSettings->ignoreCameraRotation) {
@@ -155,7 +164,7 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
 
         s_wasCrouching = s_isCrouching;
 
-        glm::mat4 playerMtx4 = glm::inverse(glm::translate(glm::identity<glm::mat4>(), playerPos) * glm::mat4(s_wsCameraRotation));
+        glm::mat4 playerMtx4 = glm::inverse(glm::scale(glm::translate(glm::identity<glm::mat4>(), playerPos), glm::vec3(WorldScaleInverse())) * glm::mat4(s_wsCameraRotation));
         existingGameMtx = playerMtx4;
     }
 
@@ -225,16 +234,8 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
         BEMatrix34 playerMtx = {};
         readMemory(s_playerMtxAddress, &playerMtx);
         glm::fvec3 playerPos = playerMtx.getPos().getLE();
-        
-        if (s_isRiding) {
-            playerPos.y -= hardcodedRidingOffset;
-        }
-        else if (s_isSwimming) {
-            playerPos.y += hardcodedSwimOffset + GetSettings().GetPlayerHeightOffset();
-        }
-        else {
-            playerPos.y += GetSettings().GetPlayerHeightOffset() - actualCrouchOffset;
-        }
+
+        ApplyCameraOffsets(&playerPos, true);
 
         basePos = playerPos;
         if (auto eventSettings = GetFirstPersonSettingsForActiveEvent()) {
@@ -248,13 +249,13 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
         }
     }
 
-    s_lastCameraMtx = glm::fmat4x3(glm::translate(glm::identity<glm::fmat4>(), basePos) * glm::mat4(baseYawWithoutClimbingFix));
+    s_lastCameraMtx = glm::fmat4x3(glm::scale(glm::translate(glm::identity<glm::fmat4>(), basePos), glm::vec3(WorldScaleInverse())) * glm::mat4(baseYawWithoutClimbingFix));
 
     // vr camera
     std::optional<XrPosef> currPoseOpt = VRManager::instance().XR->GetRenderer()->GetPose(side);
     if (!currPoseOpt.has_value())
         return;
-    glm::fvec3 eyePos = ToGLM(currPoseOpt.value().position);
+    glm::fvec3 eyePos = ToGLM(currPoseOpt.value().position) * WorldScaleInverse();
     glm::fquat eyeRot = ToGLM(currPoseOpt.value().orientation);
 
     glm::vec3 newPos = basePos + (baseYaw * eyePos);
@@ -521,7 +522,7 @@ void CemuHooks::hook_ModifyProjectionUsingCamera(PPCInterpreter_t* hCPU) {
         std::optional<XrPosef> currPoseOpt = VRManager::instance().XR->GetRenderer()->GetPose(side);
         if (!currPoseOpt.has_value())
             return;
-        glm::fvec3 eyePos = ToGLM(currPoseOpt.value().position);
+        glm::fvec3 eyePos = ToGLM(currPoseOpt.value().position) * WorldScaleInverse();
         glm::fquat eyeRot = ToGLM(currPoseOpt.value().orientation);
 
         glm::vec3 newPos = basePos + (baseYaw * eyePos);
@@ -606,15 +607,7 @@ std::pair<glm::vec3, glm::fquat> CemuHooks::CalculateVRWorldPose(const BESeadLoo
         readMemory(s_playerMtxAddress, &playerMtx);
         glm::fvec3 playerPos = playerMtx.getPos().getLE();
 
-        if (s_isRiding) {
-            playerPos.y -= hardcodedRidingOffset;
-        }
-        else if (s_isSwimming) {
-            playerPos.y += hardcodedSwimOffset;
-        }
-        else {
-            playerPos.y += GetSettings().GetPlayerHeightOffset() - actualCrouchOffset;
-        }
+        ApplyCameraOffsets(&playerPos, true);
 
         basePos = playerPos;
         if (auto eventSettings = GetFirstPersonSettingsForActiveEvent()) {

@@ -25,6 +25,7 @@ static void Settings_ReadLine(ImGuiContext*, ImGuiSettingsHandler*, void* entry,
     if (sscanf(line, "CutsceneCameraMode=%d", &i_val) == 1) { s->cutsceneCameraMode.store((EventMode)i_val); return; }
     if (sscanf(line, "UseBlackBarsForCutscenes=%d", &i_val) == 1) { s->useBlackBarsForCutscenes.store(i_val); return; }
     if (sscanf(line, "PlayerHeightOffset=%f", &f_val) == 1) { s->playerHeightOffset.store(f_val); return; }
+    if (sscanf(line, "WorldScale=%f", &f_val) == 1) { s->worldScale.store(f_val); return; }
     if (sscanf(line, "LeftHanded=%d", &i_val) == 1)      { s->leftHanded.store(i_val); return; }
     if (sscanf(line, "UiFollowsGaze=%d", &i_val) == 1)   { s->uiFollowsGaze.store(i_val); return; }
     if (sscanf(line, "CropFlatTo16x9=%d", &i_val) == 1)  { s->cropFlatTo16x9.store(i_val); return; }
@@ -47,6 +48,7 @@ static void Settings_WriteAll(ImGuiContext* ctx, ImGuiSettingsHandler* handler, 
     buf->appendf("CutsceneCameraMode=%d\n", (int)s.cutsceneCameraMode.load());
     buf->appendf("UseBlackBarsForCutscenes=%d\n", (int)s.useBlackBarsForCutscenes.load());
     buf->appendf("PlayerHeightOffset=%.3f\n", s.playerHeightOffset.load());
+    buf->appendf("WorldScale=%.3f\n", s.worldScale.load());
     buf->appendf("LeftHanded=%d\n", (int)s.leftHanded.load());
     buf->appendf("UiFollowsGaze=%d\n", (int)s.uiFollowsGaze.load());
     buf->appendf("CropFlatTo16x9=%d\n", (int)s.cropFlatTo16x9.load());
