@@ -1,5 +1,5 @@
-#include "../instance.h"
 #include "cemu_hooks.h"
+#include "../instance.h"
 #include "openxr_motion_bridge.h"
 
 
@@ -52,17 +52,18 @@ struct HandGestureState {
     bool isCloseToMouth;
     bool isCloseToWaist;
     bool isNearChestHeight;
-    bool isOnLeftSide; // true = left side of body, false = right side
+    bool isOnLeftSide;  // true = left side of body, false = right side
     bool isFarEnoughFromStoredPosition;
     float magnesisForwardAmount;
     float magnesisVerticalAmount;
 };
 
-int getMagnesisForwardFrameInterval(float v) {
-    if (v <= 0.0f) return 0;
+int getMagnesisForwardFrameInterval(float v)
+{
+    if (v <= 0.0f)    return 0;
     if (v <= 0.25f) return 10;
-    if (v < 0.5f) return 5;
-    if (v < 0.75f) return 2;
+    if (v < 0.5f)   return 5;
+    if (v < 0.75f)  return 2;
     return 1;
 }
 
@@ -76,31 +77,31 @@ HandGestureState calculateHandGesture(
     const glm::fvec3& storedHandPos
 ) {
     HandGestureState gesture = {};
-
+    
     // Calculate directional vectors
     glm::fvec3 headsetForward = -glm::normalize(glm::fvec3(headsetMatrix[2]));
     headsetForward.y = 0.0f;
     headsetForward = glm::normalize(headsetForward);
-
+    
     glm::fvec3 headsetRight = glm::normalize(glm::fvec3(headsetMatrix[0]));
     glm::fvec3 headToHand = handPos - headsetPos;
-
+    
     // Check if hand is behind head (for shoulder slots)
     float forwardDot = glm::dot(headsetForward, headToHand);
     gesture.isBehindHead = (forwardDot < 0.0f);
-
+    
     // Check if hand is behind head (for waist slot) - uses flattened vectors
     glm::vec3 flatForward = glm::normalize(glm::vec3(headsetForward.x, 0.0f, headsetForward.z));
     glm::vec3 flatHandOffset = glm::vec3(headToHand.x, 0.0f, headToHand.z);
-
+    
     constexpr float WAIST_BEHIND_OFFSET = -0.05f; //0.15f
     float flatForwardDot = glm::dot(flatForward, flatHandOffset) + WAIST_BEHIND_OFFSET;
     gesture.isBehindHeadWithWaistOffset = (flatForwardDot < 0.0f);
-
+    
     // Check which side of body the hand is on
     float rightDot = glm::dot(headsetRight, headToHand);
     gesture.isOnLeftSide = (rightDot < 0.0f);
-
+    
     // Check distance from head (for shoulder slots)
     constexpr float SHOULDER_RADIUS = 0.35f;
     constexpr float SHOULDER_RADIUS_SQ = SHOULDER_RADIUS * SHOULDER_RADIUS;
@@ -110,7 +111,7 @@ HandGestureState calculateHandGesture(
     constexpr float MOUTH_RADIUS = 0.2f;
     constexpr float MOUTH_RADIUS_SQ = MOUTH_RADIUS * MOUTH_RADIUS;
     gesture.isCloseToMouth = (glm::length2(headToHand) < MOUTH_RADIUS_SQ);
-
+    
     // Check distance from waist (rough estimate)
     glm::fvec3 waistPos = headsetPos - glm::fvec3(0.0f, 0.45f, 0.0f);
     gesture.isCloseToWaist = (handPos.y < waistPos.y);
@@ -153,10 +154,11 @@ HandGestureState calculateHandGesture(
             if (gameState.magnesis_forward_frames_interval > 0) {
                 gesture.magnesisForwardAmount = 0.0f;
             }
-            else if (gameState.magnesis_forward_frames_interval <= -1) {
+            else if (gameState.magnesis_forward_frames_interval <= -1)
+            {
                 gameState.magnesis_forward_frames_interval = getMagnesisForwardFrameInterval(glm::abs(gesture.magnesisForwardAmount));
             }
-
+            
             gameState.magnesis_forward_frames_interval--;
             //Log::print<INFO>("gesture.magnesisForwardAmount  : {}", gesture.magnesisForwardAmount);
         }
@@ -1080,9 +1082,10 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
             // A button to interact when riding a mount
             newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run_interact, VPAD_BUTTON_A);
             // grabs to accelerate and brake when riding master cycle
-            if (inputs.inGame.interact[1].currentState)
+            // Skip when the respective hand is inside a body slot so grips can still equip/unequip
+            if (inputs.inGame.interact[1].currentState && isHandNotOverAnySlot(rightGesture))
                 newXRBtnHold |= VPAD_BUTTON_A;
-            if (inputs.inGame.interact[0].currentState)
+            if (inputs.inGame.interact[0].currentState && isHandNotOverAnySlot(leftGesture))
                 newXRBtnHold |= VPAD_BUTTON_B;
         }
         else {
