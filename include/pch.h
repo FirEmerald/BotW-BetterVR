@@ -361,6 +361,14 @@ struct BEMatrix34 : BETypeCompatible {
 
     BEMatrix34() = default;
 
+    BEMatrix34(const glm::fvec3& pos, const glm::fquat& quat) {
+        setPos(pos);
+        setRotLE(quat);
+    }
+    BEMatrix34(const glm::mat4x3& mat) {
+        setLEMatrix(mat);
+    }
+
     float DistanceSq(const BEMatrix34& other) const {
         return (pos_x.getLE() - other.pos_x.getLE()) * (pos_x.getLE() - other.pos_x.getLE()) + (pos_y.getLE() - other.pos_y.getLE()) * (pos_y.getLE() - other.pos_y.getLE()) + (pos_z.getLE() - other.pos_z.getLE()) * (pos_z.getLE() - other.pos_z.getLE());
     }
@@ -505,6 +513,9 @@ enum class AngularVelocityFixerMode : int32_t {
 };
 
 struct ModSettings {
+    static constexpr float kDefaultAxisThreshold = 0.5f;
+    static constexpr float kDefaultStickDeadzone = 0.15f;
+
     // playing mode settings
     std::atomic<CameraMode> cameraMode = CameraMode::FIRST_PERSON;
     std::atomic<PlayMode> playMode = PlayMode::STANDING;
@@ -524,6 +535,10 @@ struct ModSettings {
     std::atomic_uint32_t performanceOverlay = 0;
     std::atomic_uint32_t performanceOverlayFrequency = 90;
     std::atomic_bool tutorialPromptShown = false;
+
+    // Input settings
+    std::atomic<float> axisThreshold = kDefaultAxisThreshold;
+    std::atomic<float> stickDeadzone = kDefaultStickDeadzone;
 
     CameraMode GetCameraMode() const { return cameraMode; }
 
@@ -567,6 +582,8 @@ struct ModSettings {
         std::format_to(std::back_inserter(buffer), " - Show Black Bars for Third-Person Cutscenes: {}\n", UseBlackBarsForCutscenes() ? "Yes" : "No");
         std::format_to(std::back_inserter(buffer), " - Performance Overlay: {}\n", performanceOverlay == 0 ? "Disabled" : (performanceOverlay == 1 ? "2D Only" : "Enabled"));
         std::format_to(std::back_inserter(buffer), " - Performance Overlay Frequency: {} Hz\n", performanceOverlayFrequency.load());
+        std::format_to(std::back_inserter(buffer), " - Stick Direction Threshold: {}\n", axisThreshold.load());
+        std::format_to(std::back_inserter(buffer), " - Thumbstick Deadzone: {}\n", stickDeadzone.load());
         return buffer;
     }
 
