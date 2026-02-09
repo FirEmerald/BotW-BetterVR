@@ -59,7 +59,3 @@ src/rendering/vc140.pdb
 enc_temp_folder/
 
 BetterVR.zip
-
-# Rules Generator build files
-RulesGenerator/bin/
-RulesGenerator/obj/
