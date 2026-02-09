@@ -196,7 +196,7 @@ bool isHandNotOverAnySlot(const HandGestureState& gesture) {
 }
 
 bool openDpadMenuRuneButton(ButtonState::Event lastEvent, uint32_t& buttonHold, OpenXR::GameState& gameState) {
-    if (lastEvent == ButtonState::Event::LongPress) {
+    if (lastEvent == ButtonState::Event::LongPress && gameState.right_hand_current_equip_type != EquipType::MagnetGlove) {
         if (gameState.left_hand_current_equip_type == EquipType::SheikahSlate) {
             gameState.dpad_menu_selection_already_equipped = true;
             gameState.rune_need_reequip = true;
@@ -211,7 +211,7 @@ bool openDpadMenuRuneButton(ButtonState::Event lastEvent, uint32_t& buttonHold, 
 }
 
 bool openDpadMenuBodySlots(ButtonState::Event lastEvent, HandGestureState handGesture, uint32_t& buttonHold, OpenXR::GameState& gameState, bool (*gripButton)(OpenXR::InputState)) {
-    if (lastEvent == ButtonState::Event::LongPress && !gameState.dpad_menu_open_requested) {
+    if (lastEvent == ButtonState::Event::LongPress && !gameState.dpad_menu_open_requested && gameState.right_hand_current_equip_type != EquipType::MagnetGlove) {
         if (isHandOverRightShoulderSlot(handGesture)) {
             //open arrow menu if bow is equipped in left hand
             if (gameState.left_hand_current_equip_type == EquipType::Bow) {
