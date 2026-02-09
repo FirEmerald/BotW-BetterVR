@@ -89,6 +89,7 @@ public:
             XrActionStateBoolean useRightItem;
 
             std::array<bool, 2> drop_weapon; // LEFT/RIGHT
+
             std::array<ButtonState, 2> interactState; // LEFT/RIGHT
         } inGame;
         struct InMenu {
@@ -109,70 +110,6 @@ public:
 
             XrActionStateBoolean rotate;
         } inMenu;
-
-        const std::string debug() {
-            return "Shared:\n" +
-                   debug("inventory_map", shared.inventory_map) + debug(shared.inventory_mapState) +
-                   debug("modMenu", shared.modMenu) + debug(shared.modMenuState) +
-                   debug("grab left", shared.grab[0]) + debug(shared.grabState[0]) +
-                   debug("grab right", shared.grab[1]) + debug(shared.grabState[1]) +
-                   debug("useRune_dpadMenu", shared.useRune_dpadMenu) + debug(shared.useRune_runeMenuState) +
-                   "In Game:\n" +
-                   debug("crouch_scope", inGame.crouch_scope) + debug(inGame.crouch_scopeState) +
-                   debug("move", inGame.move) +
-                   debug("camera", inGame.camera) +
-                   debug("interact left", inGame.interact[0]) + debug(inGame.interactState[0]) +
-                   debug("interact right", inGame.interact[1]) + debug(inGame.interactState[1]) +
-                   debug("jump_cancel", inGame.jump_cancel) +
-                   debug("run_interact", inGame.run_interact) + debug(inGame.runState) +
-                   debug("useLeftItem", inGame.useLeftItem) +
-                   debug("useRightItem", inGame.useRightItem) +
-                   "In Menu:\n" +
-                   debug("scroll", inMenu.scroll) +
-                   debug("navigate", inMenu.navigate) +
-                   debug("select", inMenu.select) +
-                   debug("back", inMenu.back) +
-                   debug("sort", inMenu.sort) +
-                   debug("hold", inMenu.hold) +
-                   debug("leftGrip", inMenu.leftGrip) +
-                   debug("rightGrip", inMenu.rightGrip) +
-                   debug("leftTrigger", inMenu.leftTrigger) +
-                   debug("rightTrigger", inMenu.rightTrigger) +
-                   debug("rotate", inMenu.rotate);
-        }
-
-        const std::string debug(std::string name, XrActionStateBoolean action) {
-            return "\t" + name + ": active=" + toString(action.isActive) + ", type=" + std::to_string(action.type) + ", state=" + toString(action.currentState) + "\n";
-        }
-
-        const std::string debug(std::string name, XrActionStateFloat action) {
-            return "\t" + name + ": active=" + toString(action.isActive) + ", type=" + std::to_string(action.type) + ", state=" + std::to_string(action.currentState) + "\n";
-        }
-
-        const std::string debug(std::string name, XrActionStateVector2f action) {
-            return "\t" + name + ": active=" + toString(action.isActive) + ", type=" + std::to_string(action.type) + ", x=" + std::to_string(action.currentState.x) + ", y=" + std::to_string(action.currentState.y) + "\n";
-        }
-
-        const std::string debug(ButtonState state) {
-            return "\t\tisDown=" + toString(state.wasDownLastFrame) + ", lastEvent=" + toString(state.lastEvent) + "\n";
-        }
-
-        const std::string toString(bool value) {
-            return value ? "true" : "false";
-        }
-
-        const std::string toString(ButtonState::Event event) {
-            switch (event) {
-                case ButtonState::Event::None:
-                    return "None";
-                case ButtonState::Event::ShortPress:
-                    return "ShortPress";
-                case ButtonState::Event::LongPress:
-                    return "LongPress";
-                default:
-                    return std::to_string(static_cast<int32_t>(event));
-            }
-        }
     };
     std::atomic<InputState> m_input = InputState{};
     std::atomic<glm::fquat> m_inputCameraRotation = glm::identity<glm::fquat>();
@@ -198,7 +135,7 @@ public:
         bool dpad_menu_open_requested = false;
         bool was_dpad_menu_open = false;
         EquipType last_dpad_menu_open = EquipType::None;
-        bool(*current_dpad_menu_button)(InputState) = nullptr;
+        bool (*current_dpad_menu_button)(InputState) = nullptr;
 
         bool prevent_inputs = false;
         std::chrono::steady_clock::time_point prevent_inputs_time;
@@ -279,11 +216,11 @@ private:
     XrSession m_session = XR_NULL_HANDLE;
     XrSpace m_stageSpace = XR_NULL_HANDLE;
     XrSpace m_headSpace = XR_NULL_HANDLE;
+    std::array<XrSpace, 2> m_handSpaces = { XR_NULL_HANDLE, XR_NULL_HANDLE };
     std::array<XrPath, 2> m_handPaths = { XR_NULL_PATH, XR_NULL_PATH };
 
     //shared actions
     XrActionSet m_sharedActionSet = XR_NULL_HANDLE;
-    std::array<XrSpace, 2> m_handSpaces = { XR_NULL_HANDLE, XR_NULL_HANDLE };
 
     XrAction m_gripPoseAction = XR_NULL_HANDLE;
     XrAction m_aimPoseAction = XR_NULL_HANDLE;
@@ -292,7 +229,7 @@ private:
     XrAction m_inventory_mapAction = XR_NULL_HANDLE;
 
     XrAction m_grabAction = XR_NULL_HANDLE;
-    XrAction m_runeAction = XR_NULL_HANDLE;
+    XrAction m_useRune_dpadMenu_Action = XR_NULL_HANDLE;
 
     XrAction m_rumbleAction = XR_NULL_HANDLE;
 
@@ -304,7 +241,6 @@ private:
     XrAction m_interactAction = XR_NULL_HANDLE;
     XrAction m_jumpAction = XR_NULL_HANDLE;
     XrAction m_run_interactAction = XR_NULL_HANDLE;
-    XrAction m_useRune_dpadMenu_Action = XR_NULL_HANDLE;
 
     XrAction m_useLeftItemAction = XR_NULL_HANDLE;
     XrAction m_useRightItemAction = XR_NULL_HANDLE;

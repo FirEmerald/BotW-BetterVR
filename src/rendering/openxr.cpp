@@ -278,7 +278,7 @@ void OpenXR::CreateActions() {
     {
         XrActionSetCreateInfo actionSetInfo = { XR_TYPE_ACTION_SET_CREATE_INFO };
         strcpy_s(actionSetInfo.actionSetName, "shared");
-        strcpy_s(actionSetInfo.localizedActionSetName, "Always Active");
+        strcpy_s(actionSetInfo.localizedActionSetName, "Shared");
         actionSetInfo.priority = 0;
         checkXRResult(xrCreateActionSet(m_instance, &actionSetInfo, &m_sharedActionSet), "Failed to create controller actions for shared!");
 
@@ -332,11 +332,19 @@ void OpenXR::CreateActions() {
         createAction(m_menuActionSet, "lefttrigger", "Left Trigger", XR_ACTION_TYPE_BOOLEAN_INPUT, m_leftTriggerAction);
         createAction(m_menuActionSet, "righttrigger", "Right Trigger", XR_ACTION_TYPE_BOOLEAN_INPUT, m_rightTriggerAction);
         createAction(m_menuActionSet, "rotate", "Rotate (In inventory) (Right Thumbstick Click)", XR_ACTION_TYPE_BOOLEAN_INPUT, m_rotateAction);
-
     }
 
     {
         std::array suggestedBindings = {
+            // === shared suggestions ===
+            XrActionSuggestedBinding{ .action = m_gripPoseAction, .binding = GetXRPath("/user/hand/left/input/grip/pose") },
+            XrActionSuggestedBinding{ .action = m_gripPoseAction, .binding = GetXRPath("/user/hand/right/input/grip/pose") },
+            XrActionSuggestedBinding{ .action = m_aimPoseAction, .binding = GetXRPath("/user/hand/left/input/aim/pose") },
+            XrActionSuggestedBinding{ .action = m_aimPoseAction, .binding = GetXRPath("/user/hand/right/input/aim/pose") },
+
+            XrActionSuggestedBinding{ .action = m_grabAction, .binding = GetXRPath("/user/hand/left/input/select/click") },
+            XrActionSuggestedBinding{ .action = m_grabAction, .binding = GetXRPath("/user/hand/right/input/select/click") },
+
             // === gameplay suggestions ===
             XrActionSuggestedBinding{ .action = m_crouch_scopeAction, .binding = GetXRPath("/user/hand/left/input/menu/click") },
 
@@ -365,12 +373,12 @@ void OpenXR::CreateActions() {
             XrActionSuggestedBinding{ .action = m_aimPoseAction, .binding = GetXRPath("/user/hand/left/input/aim/pose") },
             XrActionSuggestedBinding{ .action = m_aimPoseAction, .binding = GetXRPath("/user/hand/right/input/aim/pose") },
 
-            XrActionSuggestedBinding{ .action = m_modMenuAction, .binding = GetXRPath("/user/hand/left/input/x/click") },
-            XrActionSuggestedBinding{ .action = m_inventory_mapAction, .binding = GetXRPath("/user/hand/right/input/thumbstick/click") },
-
             XrActionSuggestedBinding{ .action = m_grabAction, .binding = GetXRPath("/user/hand/left/input/squeeze/value") },
             XrActionSuggestedBinding{ .action = m_grabAction, .binding = GetXRPath("/user/hand/right/input/squeeze/value") },
+
             XrActionSuggestedBinding{ .action = m_useRune_dpadMenu_Action, .binding = GetXRPath("/user/hand/left/input/y/click") },
+            XrActionSuggestedBinding{ .action = m_modMenuAction, .binding = GetXRPath("/user/hand/left/input/x/click") },
+            XrActionSuggestedBinding{ .action = m_inventory_mapAction, .binding = GetXRPath("/user/hand/right/input/thumbstick/click") },
 
             XrActionSuggestedBinding{ .action = m_rumbleAction, .binding = GetXRPath("/user/hand/left/output/haptic") },
             XrActionSuggestedBinding{ .action = m_rumbleAction, .binding = GetXRPath("/user/hand/right/output/haptic") },
@@ -417,12 +425,12 @@ void OpenXR::CreateActions() {
             XrActionSuggestedBinding{ .action = m_aimPoseAction, .binding = GetXRPath("/user/hand/left/input/aim/pose") },
             XrActionSuggestedBinding{ .action = m_aimPoseAction, .binding = GetXRPath("/user/hand/right/input/aim/pose") },
 
-            XrActionSuggestedBinding{ .action = m_modMenuAction, .binding = GetXRPath("/user/hand/left/input/a/click") },
-            XrActionSuggestedBinding{ .action = m_inventory_mapAction, .binding = GetXRPath("/user/hand/right/input/thumbstick/click") },
-
             XrActionSuggestedBinding{ .action = m_grabAction, .binding = GetXRPath("/user/hand/left/input/squeeze/force") },
             XrActionSuggestedBinding{ .action = m_grabAction, .binding = GetXRPath("/user/hand/right/input/squeeze/force") },
+
             XrActionSuggestedBinding{ .action = m_useRune_dpadMenu_Action, .binding = GetXRPath("/user/hand/left/input/b/click") },
+            XrActionSuggestedBinding{ .action = m_modMenuAction, .binding = GetXRPath("/user/hand/left/input/a/click") },
+            XrActionSuggestedBinding{ .action = m_inventory_mapAction, .binding = GetXRPath("/user/hand/right/input/thumbstick/click") },
 
             XrActionSuggestedBinding{ .action = m_rumbleAction, .binding = GetXRPath("/user/hand/left/output/haptic") },
             XrActionSuggestedBinding{ .action = m_rumbleAction, .binding = GetXRPath("/user/hand/right/output/haptic") },
@@ -571,13 +579,12 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
         }
     }
     // update shared actions
-    {
-        XrActionStateGetInfo getInventoryMapInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
-        getInventoryMapInfo.action = m_inventory_mapAction;
-        getInventoryMapInfo.subactionPath = XR_NULL_PATH;
-        auto& inventory_mapAction = newState.shared.inventory_map;
-        inventory_mapAction = { XR_TYPE_ACTION_STATE_BOOLEAN };
-        checkXRResult(xrGetActionStateBoolean(m_session, &getInventoryMapInfo, &inventory_mapAction), "Failed to get inventory_help action value!");
+    XrActionStateGetInfo getInventoryMapInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
+    getInventoryMapInfo.action = m_inventory_mapAction;
+    getInventoryMapInfo.subactionPath = XR_NULL_PATH;
+    auto& inventory_mapAction = newState.shared.inventory_map;
+    inventory_mapAction = { XR_TYPE_ACTION_STATE_BOOLEAN };
+    checkXRResult(xrGetActionStateBoolean(m_session, &getInventoryMapInfo, &inventory_mapAction), "Failed to get inventory_help action value!");
 
         auto& inventory_mapButtonState = newState.shared.inventory_mapState;
         if (inventory_mapAction.isActive == XR_TRUE) {
@@ -585,11 +592,12 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
             CheckButtonState(buttonPressed, inventory_mapButtonState);
         }
 
-        XrActionStateGetInfo getModMenuInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
-        getModMenuInfo.action = m_modMenuAction;
-        getModMenuInfo.subactionPath = XR_NULL_PATH;
-        newState.shared.modMenu = { XR_TYPE_ACTION_STATE_BOOLEAN };
-        checkXRResult(xrGetActionStateBoolean(m_session, &getModMenuInfo, &newState.shared.modMenu), "Failed to get crouch and map action value!");
+    XrActionStateGetInfo getModMenuInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
+    getModMenuInfo.action = m_modMenuAction;
+    getModMenuInfo.subactionPath = XR_NULL_PATH;
+    auto& modMenuAction = newState.shared.modMenu;
+    modMenuAction = { XR_TYPE_ACTION_STATE_BOOLEAN };
+    checkXRResult(xrGetActionStateBoolean(m_session, &getModMenuInfo, &modMenuAction), "Failed to get mod menu action value!");
 
         auto& modMenuButtonState = newState.shared.modMenuState;
         if (newState.shared.modMenu.isActive == XR_TRUE) {
@@ -597,31 +605,30 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
             CheckButtonState(buttonPressed, modMenuButtonState);
         }
 
-        for (EyeSide side : { EyeSide::LEFT, EyeSide::RIGHT }) {
-            XrActionStateGetInfo getGrabInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
-            getGrabInfo.action = m_grabAction;
-            getGrabInfo.subactionPath = m_handPaths[side];
-            newState.shared.grab[side] = { XR_TYPE_ACTION_STATE_FLOAT };
-            checkXRResult(xrGetActionStateFloat(m_session, &getGrabInfo, &newState.shared.grab[side]), "Failed to get grab action value!");
+    for (EyeSide side : { EyeSide::LEFT, EyeSide::RIGHT }) {
+        XrActionStateGetInfo getGrabInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
+        getGrabInfo.action = m_grabAction;
+        getGrabInfo.subactionPath = m_handPaths[side];
+        newState.shared.grab[side] = { XR_TYPE_ACTION_STATE_FLOAT };
+        checkXRResult(xrGetActionStateFloat(m_session, &getGrabInfo, &newState.shared.grab[side]), "Failed to get grab action value!");
 
-            auto& buttonState = newState.shared.grabState[side];
-            if (newState.shared.grab[side].isActive == XR_TRUE) {
-                auto buttonPressed = newState.shared.grab[side].currentState > 0.75f;
-                CheckButtonState(buttonPressed, buttonState);
-            }
+        auto& buttonState = newState.shared.grabState[side];
+        if (newState.shared.grab[side].isActive == XR_TRUE) {
+            auto buttonPressed = newState.shared.grab[side].currentState > 0.75f;
+            CheckButtonState(buttonPressed, buttonState);
         }
+    }
 
-        XrActionStateGetInfo getUseRuneInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
-        getUseRuneInfo.action = m_useRune_dpadMenu_Action;
-        getUseRuneInfo.subactionPath = XR_NULL_PATH;
-        newState.shared.useRune_dpadMenu = { XR_TYPE_ACTION_STATE_BOOLEAN };
-        checkXRResult(xrGetActionStateBoolean(m_session, &getUseRuneInfo, &newState.shared.useRune_dpadMenu), "Failed to get use rune action value!");
+    XrActionStateGetInfo getUseRuneInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
+    getUseRuneInfo.action = m_useRune_dpadMenu_Action;
+    getUseRuneInfo.subactionPath = XR_NULL_PATH;
+    newState.shared.useRune_dpadMenu = { XR_TYPE_ACTION_STATE_BOOLEAN };
+    checkXRResult(xrGetActionStateBoolean(m_session, &getUseRuneInfo, &newState.shared.useRune_dpadMenu), "Failed to get use rune action value!");
 
-        auto& useRuneButtonState = newState.shared.useRune_runeMenuState;
-        if (newState.shared.useRune_dpadMenu.isActive == XR_TRUE) {
-            auto buttonPressed = newState.shared.useRune_dpadMenu.currentState == XR_TRUE;
-            CheckButtonState(buttonPressed, useRuneButtonState);
-        }
+    auto& useRuneButtonState = newState.shared.useRune_runeMenuState;
+    if (newState.shared.useRune_dpadMenu.isActive == XR_TRUE) {
+        auto buttonPressed = newState.shared.useRune_dpadMenu.currentState == XR_TRUE;
+        CheckButtonState(buttonPressed, useRuneButtonState);
     }
 
     // update in-menu or in-game actions
