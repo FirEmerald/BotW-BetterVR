@@ -855,6 +855,18 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                         }
                     }
 
+                    ImGui::NewLine();
+                    DrawSettingRow("Reset All Options", [&]() {
+                        if (ImGui::Button("Reset")) {
+                            auto options = settings.GetOptions();
+                            for (int i = 0; i < options.size(); ++i) {
+                                options[i]->Reset();
+                            }
+                            changed = true;
+                        }
+                    });
+
+
                     ImGui::EndTabItem();
                 }
 
