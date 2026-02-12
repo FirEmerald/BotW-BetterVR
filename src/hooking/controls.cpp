@@ -1062,9 +1062,9 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
             newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run_interact, VPAD_BUTTON_A);
             // grabs to accelerate and brake when riding master cycle
             // Skip when the respective hand is inside a body slot so grips can still equip/unequip
-            if (inputs.inGame.interact[1].currentState && isHandNotOverAnySlot(rightGesture))
+            if (inputs.inGame.interact[1].wasDownLastFrame && isHandNotOverAnySlot(rightGesture))
                 newXRBtnHold |= VPAD_BUTTON_A;
-            if (inputs.inGame.interact[0].currentState && isHandNotOverAnySlot(leftGesture))
+            if (inputs.inGame.interact[0].wasDownLastFrame && isHandNotOverAnySlot(leftGesture))
                 newXRBtnHold |= VPAD_BUTTON_B;
         }
         else {
