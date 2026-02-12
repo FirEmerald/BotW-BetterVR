@@ -93,16 +93,15 @@ public:
 
     void AddSliderToGUI(bool* changed, int min = int(this->min), int max = int(this->max), std::function<std::string(float)> format = [&](float value) { return std::format("%.2f", value); }) {
         int value = int(this->Get());
-        std::string idStr = "##";
-        idStr += this->name;
+        std::string idStr = std::format("##{}", this->name);
         if (ImGui::SliderInt(idStr.c_str(), &value, min, max, format(value).c_str())) {
             this->Set(T(value));
             *changed = true;
         }
     }
 
-    void AddSetToGUI(bool* changed, std::string id, T value) {
-        std::string idStr = id + "##" + this->name;
+    void AddSetToGUI(bool* changed, const char* label, T value) {
+        std::string idStr = std::format("{}##{}", label, this->name);
         if (ImGui::Button(idStr.c_str())) {
             this->Set(value);
             *changed = true;
@@ -110,8 +109,7 @@ public:
     }
 
     void AddResetToGUI(bool* changed) {
-        std::string idStr = "Reset##";
-        idStr += this->name;
+        std::string idStr = std::format("Reset##{}", this->name);
         if (ImGui::Button(idStr.c_str())) {
             this->Reset();
             *changed = true;
@@ -187,16 +185,15 @@ public:
 
     void AddSliderToGUI(bool* changed, int min = int(this->min), int max = int(this->max), std::function<std::string(float)> format = [&](float value) { return std::format("%.2f", value); }) {
         int value = int(this->Get());
-        std::string idStr = "##";
-        idStr += this->name;
+        std::string idStr = std::format("##{}", this->name);
         if (ImGui::SliderInt(idStr.c_str(), &value, min, max, format(value).c_str())) {
             this->Set(T(value));
             *changed = true;
         }
     }
 
-    void AddSetToGUI(bool* changed, std::string id, T value) {
-        std::string idStr = id + "##" + this->name;
+    void AddSetToGUI(bool* changed, const char* label, T value) {
+        std::string idStr = std::format("{}##{}", label, this->name);
         if (ImGui::Button(idStr.c_str())) {
             this->Set(value);
             *changed = true;
@@ -204,8 +201,7 @@ public:
     }
 
     void AddResetToGUI(bool* changed) {
-        std::string idStr = "Reset##";
-        idStr += this->name;
+        std::string idStr = std::format("Reset##{}", this->name);
         if (ImGui::Button(idStr.c_str())) {
             this->Reset();
             *changed = true;
@@ -288,16 +284,15 @@ public:
 
     void AddSliderToGUI(bool* changed, float min = float(this->min), float max = float(this->max), std::function<std::string(float)> format = [&](float value) { return std::format("%.2f", value); }) {
         float value = float(this->Get());
-        std::string idStr = "##";
-        idStr += this->name;
+        std::string idStr = std::format("##{}", this->name);
         if (ImGui::SliderFloat(idStr.c_str(), &value, min, max, format(value).c_str())) {
             this->Set(T(value));
             *changed = true;
         }
     }
 
-    void AddSetToGUI(bool* changed, std::string id, T value) {
-        std::string idStr = id + "##" + this->name;
+    void AddSetToGUI(bool* changed, const char* label, T value) {
+        std::string idStr = std::format("{}##{}", label, this->name);
         if (ImGui::Button(idStr.c_str())) {
             this->Set(value);
             *changed = true;
@@ -305,8 +300,7 @@ public:
     }
 
     void AddResetToGUI(bool* changed) {
-        std::string idStr = "Reset##";
-        idStr += this->name;
+        std::string idStr = std::format("Reset##{}", this->name);
         if (ImGui::Button(idStr.c_str())) {
             this->Reset();
             *changed = true;
@@ -361,8 +355,7 @@ public:
 
     void AddToGUI(bool* changed) {
         bool value = this->Get();
-        std::string idStr = "##";
-        idStr += this->name;
+        std::string idStr = std::format("##{}", this->name);
         if (ImGui::Checkbox(idStr.c_str(), &value)) {
             this->Set(value);
             *changed = true;
@@ -450,9 +443,7 @@ public:
             else {
                 ImGui::SameLine();
             }
-            std::string idStr = std::string(getDisplayName(value));
-            idStr += "##";
-            idStr += this->name;
+            std::string idStr = std::format("{}##{}", getDisplayName(value), this->name);
             if (ImGui::RadioButton(idStr.c_str(), &val, int(std::to_underlying(value)))) {
                 this->Set(value);
                 *changed = true;
@@ -463,16 +454,14 @@ public:
     void AddComboToGUI(bool* changed, const char* (*getDisplayName)(T)) {
         T cur = this->Get();
         int index;
-        std::string idStr = "##";
-        idStr += this->name;
+        std::string idStr = std::format("##{}", this->name);
         std::string idComboStr = "";
         for (int i = 0; i < values.size(); ++i) {
             T value = values[i];
             if (value == cur) {
                 index = i;
             }
-            idComboStr += getDisplayName(value);
-            idComboStr += '\0';
+            idComboStr = std::format("{}{}{}", idComboStr, getDisplayName(value), '\0');
         }
         if (ImGui::Combo(idStr.c_str(), &index, idComboStr.c_str())) {
             this->Set(values[index]);
