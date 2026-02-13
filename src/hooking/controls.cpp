@@ -3,17 +3,6 @@
 #include "openxr_motion_bridge.h"
 
 
-Direction getJoystickDirection(const XrVector2f& stick)
-{
-    const float threshold = GetSettings().axisThreshold;
-    if (stick.y >= threshold)       return Direction::Up;
-    if (stick.y <= -threshold)      return Direction::Down;
-    if (stick.x <= -threshold)      return Direction::Left;
-    if (stick.x >= threshold)       return Direction::Right;
-
-    return Direction::None;
-}
-
 void spreadWeaponDetectionOverFrames(OpenXR::GameState& gameState) {
     // Spread the weapon detection from link's attachement bones over several frames.
     // Each bone isn't necessarily checked each frames which can give wrong results sometimes
@@ -336,7 +325,6 @@ void processLeftHandInGameInput(
     OpenXR::InputState& inputs,
     OpenXR::GameState& gameState,
     const HandGestureState& leftGesture,
-    Direction leftStickDir,
     XrActionStateVector2f& leftStickSource,
     XrActionStateVector2f& rightStickSource,
     const std::chrono::steady_clock::time_point& now,
@@ -520,7 +508,6 @@ void processRightHandInGameInput(
     OpenXR::GameState& gameState,
     const HandGestureState& rightGesture,
     XrActionStateVector2f& rightStickSource,
-    Direction rightStickDir,
     const std::chrono::steady_clock::time_point& now
 ) {
     constexpr std::chrono::milliseconds INPUT_DELAY(400);
@@ -795,8 +782,7 @@ void processRightTriggerBindings(
 void processMenuInput(
     uint32_t& buttonHold,
     OpenXR::InputState& inputs,
-    OpenXR::GameState& gameState,
-    Direction leftStickDir
+    OpenXR::GameState& gameState
 ) {
     auto mapButton = [](XrActionStateBoolean& state, VPADButtons btn) -> uint32_t { 
         return state.currentState ? btn : 0;
@@ -836,7 +822,7 @@ void processInputPrevention(OpenXR::GameState& gameState, std::chrono::steady_cl
         gameState.prevent_grab_inputs = false;
 }
 
-void processModMenuInput(std::atomic_bool& isMenuOpen, OpenXR::InputState& inputs, VPADStatus& vpadInputs, RND_Renderer::ImGuiOverlay* imguiOverlay, XrActionStateVector2f& leftStickSource, XrActionStateVector2f& rightStickSource, Direction& leftJoystickDir, Direction& rightJoystickDir)
+void processModMenuInput(std::atomic_bool& isMenuOpen, OpenXR::InputState& inputs, VPADStatus& vpadInputs, RND_Renderer::ImGuiOverlay* imguiOverlay, XrActionStateVector2f& leftStickSource, XrActionStateVector2f& rightStickSource)
 {
     if (inputs.shared.modMenuState.lastEvent == ButtonState::Event::LongPress && inputs.shared.modMenuState.longFired_actedUpon) {
         isMenuOpen = !isMenuOpen;
@@ -851,8 +837,6 @@ void processModMenuInput(std::atomic_bool& isMenuOpen, OpenXR::InputState& input
         vpadInputs = {};
         leftStickSource.currentState = { 0.0f, 0.0f };
         rightStickSource.currentState = { 0.0f, 0.0f };
-        leftJoystickDir = Direction::None;
-        rightJoystickDir = Direction::None;
     }
 }
 
@@ -1003,9 +987,6 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     applyDeadzone(leftStickSource.currentState);
     applyDeadzone(rightStickSource.currentState);
 
-    Direction leftJoystickDir = getJoystickDirection(leftStickSource.currentState);
-    Direction rightJoystickDir = getJoystickDirection(rightStickSource.currentState);
-
     //Delay to wait before allowing specific inputs again
     constexpr std::chrono::milliseconds delay{ 400 };
     const auto now = std::chrono::steady_clock::now();
@@ -1013,7 +994,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     processInputPrevention(gameState, now, delay);
 
     auto& isMenuOpen = VRManager::instance().XR->m_isMenuOpen;
-    processModMenuInput(isMenuOpen, inputs, vpadStatus, imguiOverlay, leftStickSource, rightStickSource, leftJoystickDir, rightJoystickDir);
+    processModMenuInput(isMenuOpen, inputs, vpadStatus, imguiOverlay, leftStickSource, rightStickSource);
 
     // Calculate hand gestures
     HandGestureState leftGesture = {};
@@ -1094,17 +1075,15 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         }
         
         // Hand-specific input
-        processLeftHandInGameInput(newXRBtnHold, inputs, gameState, leftGesture, 
-                                   leftJoystickDir, leftStickSource, rightStickSource, now, dt);
-        processRightHandInGameInput(newXRBtnHold, inputs, gameState, rightGesture, rightStickSource,
-                                    rightJoystickDir, now);
+        processLeftHandInGameInput(newXRBtnHold, inputs, gameState, leftGesture, leftStickSource, rightStickSource, now, dt);
+        processRightHandInGameInput(newXRBtnHold, inputs, gameState, rightGesture, rightStickSource, now);
         
         // Trigger handling
         processLeftTriggerBindings(newXRBtnHold, inputs, gameState, leftGesture);
         processRightTriggerBindings(newXRBtnHold, inputs, gameState, rightGesture);
     }
     else {
-        processMenuInput(newXRBtnHold, inputs, gameState, leftJoystickDir);
+        processMenuInput(newXRBtnHold, inputs, gameState);
     }
 
     // Update rumble/haptics
