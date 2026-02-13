@@ -267,7 +267,7 @@ void keepDpadMenuOpen(uint32_t& buttonHold, OpenXR::GameState& gameState) {
     }
 }
 
-bool closeDpadMenu(OpenXR::InputState& inputs, uint32_t& buttonHold, OpenXR::GameState& gameState) {
+bool closeDpadMenu(OpenXR::InputState& inputs, OpenXR::GameState& gameState) {
     if (!gameState.dpad_menu_open_requested)
         return false;
 
@@ -325,7 +325,6 @@ void processLeftHandInGameInput(
     OpenXR::InputState& inputs,
     OpenXR::GameState& gameState,
     const HandGestureState& leftGesture,
-    XrActionStateVector2f& leftStickSource,
     XrActionStateVector2f& rightStickSource,
     const std::chrono::steady_clock::time_point& now,
     float dt
@@ -686,8 +685,7 @@ void processRightHandInGameInput(
 void processLeftTriggerBindings(
     uint32_t& buttonHold,
     OpenXR::InputState& inputs,
-    OpenXR::GameState& gameState,
-    HandGestureState leftGesture
+    OpenXR::GameState& gameState
 ) {
     if (!inputs.inGame.useLeftItem.currentState) {
         // reset lock on state when trigger is released
@@ -793,7 +791,7 @@ void processMenuInput(
         return state.currentState ? btn : 0;
     };
 
-    if (!closeDpadMenu(inputs, buttonHold, gameState))
+    if (!closeDpadMenu(inputs, gameState))
         buttonHold |= mapButton(inputs.inMenu.sort, VPAD_BUTTON_Y);
 
     if (!gameState.prevent_inputs) {
@@ -1080,11 +1078,11 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         }
         
         // Hand-specific input
-        processLeftHandInGameInput(newXRBtnHold, inputs, gameState, leftGesture, leftStickSource, rightStickSource, now, dt);
+        processLeftHandInGameInput(newXRBtnHold, inputs, gameState, leftGesture, rightStickSource, now, dt);
         processRightHandInGameInput(newXRBtnHold, inputs, gameState, rightGesture, rightStickSource, now);
         
         // Trigger handling
-        processLeftTriggerBindings(newXRBtnHold, inputs, gameState, leftGesture);
+        processLeftTriggerBindings(newXRBtnHold, inputs, gameState);
         processRightTriggerBindings(newXRBtnHold, inputs, gameState, rightGesture);
     }
     else {
