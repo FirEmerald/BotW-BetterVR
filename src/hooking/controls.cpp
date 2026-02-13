@@ -514,6 +514,7 @@ void processRightHandInGameInput(
     
     constexpr RumbleParameters rightRumbleFall = { true, 1, RumbleType::Falling, 0.5f, false, 0.3, 0.1f, 0.75f };
     constexpr RumbleParameters rightRumbleInfiniteRaise = { true, 1, RumbleType::Raising, 0.5f, true, 1.0, 0.25f, 0.25f };
+    constexpr RumbleParameters OverSlotsRumble = { false, 1, RumbleType::OscillationRaisingSawtoothWave, 1.0f, false, 1.0, 0.25f, 0.25f };
 
     auto* rumbleMgr = VRManager::instance().XR->GetRumbleManager();
     bool isGrabPressedShort = inputs.inGame.grabState[1].lastEvent == ButtonState::Event::ShortPress;
@@ -527,6 +528,10 @@ void processRightHandInGameInput(
         if (openDpadMenuBodySlots(inputs.inGame.grabState[1].lastEvent, rightGesture, buttonHold, gameState))
             // Don't process normal input when opening dpad menu
             return;
+
+        // Haptics to help finding the body slot for weapons throw
+        if (isHandOverRightShoulderSlot(rightGesture) && gameState.right_hand_current_equip_type == EquipType::Melee && !inputs.inGame.useRightItem.currentState)
+            rumbleMgr->enqueueInputsRumbleCommand(OverSlotsRumble);
 
         // Handle equip/unequip
         if (!gameState.prevent_grab_inputs && isGrabPressedShort) { 
