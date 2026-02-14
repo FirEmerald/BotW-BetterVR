@@ -694,15 +694,15 @@ public:
 
     std::string ToString() const {
         std::string buffer = "";
-        std::format_to(std::back_inserter(buffer), " - Camera Mode: {}\n", GetCameraMode() == CameraMode::FIRST_PERSON ? "First Person" : "Third Person");
+        std::format_to(std::back_inserter(buffer), " - Camera Mode: {}\n", toDisplayString(GetCameraMode()));
         std::format_to(std::back_inserter(buffer), " - Left Handed: {}\n", IsLeftHanded() ? "Yes" : "No");
         std::format_to(std::back_inserter(buffer), " - GUI Follow Setting: {}\n", DoesUIFollowGaze() ? "Follow Looking Direction" : "Fixed");
         std::format_to(std::back_inserter(buffer), " - Player Height: {} meters\n", GetPlayerHeightOffset());
         std::format_to(std::back_inserter(buffer), " - Crop Flat to 16:9: {}\n", ShouldFlatPreviewBeCroppedTo16x9() ? "Yes" : "No");
         std::format_to(std::back_inserter(buffer), " - Debug Overlay: {}\n", ShowDebugOverlay() ? "Enabled" : "Disabled");
-        std::format_to(std::back_inserter(buffer), " - Cutscene Camera Mode: {}\n", GetCutsceneCameraMode() == EventMode::ALWAYS_FIRST_PERSON ? "Always First Person" : (GetCutsceneCameraMode() == EventMode::ALWAYS_THIRD_PERSON ? "Always Third Person" : "Follow Default Event Settings"));
+        std::format_to(std::back_inserter(buffer), " - Cutscene Camera Mode: {}\n", toDisplayString(GetCutsceneCameraMode()));
         std::format_to(std::back_inserter(buffer), " - Show Black Bars for Third-Person Cutscenes: {}\n", UseBlackBarsForCutscenes() ? "Yes" : "No");
-        std::format_to(std::back_inserter(buffer), " - Performance Overlay: {}\n", performanceOverlay == PerformanceOverlayMode::DISABLE ? "Disabled" : (performanceOverlay == PerformanceOverlayMode::WINDOW_ONLY ? "2D Only" : "Enabled"));
+        std::format_to(std::back_inserter(buffer), " - Performance Overlay: {}\n", toDisplayString(performanceOverlay));
         std::format_to(std::back_inserter(buffer), " - Performance Overlay Frequency: {} Hz\n", performanceOverlayFrequency.Get());
         std::format_to(std::back_inserter(buffer), " - Stick Direction Threshold: {}\n", axisThreshold.Get());
         std::format_to(std::back_inserter(buffer), " - Thumbstick Deadzone: {}\n", stickDeadzone.Get());
