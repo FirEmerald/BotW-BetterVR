@@ -282,7 +282,7 @@ public:
         }
     }
 
-    void AddSliderToGUI(bool* changed, float min = float(this->min), float max = float(this->max), std::function<std::string(float)> format = [&](float value) { return std::format("%.2f", value); }) {
+    void AddSliderToGUI(bool* changed, float min, float max, std::function<std::string(float)> format = [&](float value) { return std::format("%.2f", value); }) {
         float value = float(this->Get());
         std::string idStr = std::format("##{}", this->name);
         if (ImGui::SliderFloat(idStr.c_str(), &value, min, max, format(value).c_str())) {
@@ -307,7 +307,7 @@ public:
         }
     }
 
-    void AddToGUI(bool* changed, float windowWidth, float min = float(this->min), float max = float(this->max), std::function<std::string(float)> format = [&](float value) { return std::format("%.2f", value); }) {
+    void AddToGUI(bool* changed, float windowWidth, float min, float max, std::function<std::string(float)> format = [&](float value) { return std::format("%.2f", value); }) {
         ImGui::PushItemWidth(windowWidth * 0.35f);
         AddSliderToGUI(changed, min, max, format);
         ImGui::PopItemWidth();
