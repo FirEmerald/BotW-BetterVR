@@ -809,7 +809,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                         });
                         if (settings.dynamicEyeOffset.Get()) {
                             DrawSettingRow("Eye Offset Smoothing (Lower is Smoother)", [&]() {
-                                settings.dynamicEyeOffsetSmoothing.AddToGUI(&changed, windowWidth.x, 0.0f, 1.0f);
+                                settings.dynamicEyeOffsetSmoothing.AddToGUI(&changed, windowWidth.x, 0.001f, 1.0f);
                             });
                         }
                         DrawSettingRow("User Eye Height", [&]() {

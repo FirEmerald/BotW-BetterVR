@@ -650,7 +650,7 @@ public:
 
     // first-person settings
     BoolSetting dynamicEyeOffset = BoolSetting("DynamicEyeOffset", false);
-    FloatSetting<float> dynamicEyeOffsetSmoothing = FloatSetting<float>("DynamicEyeOffsetSmoothing", 0.1f, 0.0f, 0.99f);
+    FloatSetting<float> dynamicEyeOffsetSmoothing = FloatSetting<float>("DynamicEyeOffsetSmoothing", 0.1f, 0.001f, 1.0f);
     BoolSetting hideHead = BoolSetting("HideHead", true);
     FloatSetting<float> playerHeightOffset = FloatSetting<float>("PlayerHeightOffset", 0.0f);
     FloatSetting<float> eyeHeight = FloatSetting<float>("EyeHeight", 0.0f, 0.0f);
