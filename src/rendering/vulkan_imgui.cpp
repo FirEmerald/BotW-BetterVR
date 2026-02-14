@@ -814,7 +814,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                         }
                         DrawSettingRow("User Eye Height", [&]() {
                             auto format = [&](float height) {
-                                if (height == 0.0f) return std::string("Automatic");
+                                if (height == 0.0f) return std::string("Automatic (Calibrates on recenter)");
                                 float heightInches = height * 39.3700787f;
                                 int32_t heightFeet = std::floor(heightInches / 12);
                                 heightInches -= heightFeet * 12;
@@ -825,15 +825,28 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                             ImGui::PopItemWidth();
                             ImGui::SameLine();
                             settings.playerHeightOffset.AddSetToGUI(&changed, "Auto", 0.0f);
+                            ImGui::SameLine();
                             settings.playerHeightOffset.AddSetToGUI(&changed, "1.6m", 1.6f);
                         });
                     }
                     DrawSettingRow("World Scale", [&]() {
+                        auto format = [&](float worldScale) {
+                            if (worldScale == 0.0f)
+                                return std::string("Automatic (Calibrates on recenter)");
+                            else {
+                                float vanillaAdjustMeters = worldScale * 1.73442;
+                                float vanillaAdjustInches = vanillaAdjustMeters * 39.3700787f;
+                                int32_t vanillaAdjustFeet = std::floor(vanillaAdjustInches / 12);
+                                vanillaAdjustInches -= vanillaAdjustFeet * 12;
+                                return std::format("{0:.03f} ({1:.02f}m/{2}ft {3:.02f}in tall unmodded)", worldScale, vanillaAdjustMeters, vanillaAdjustFeet, vanillaAdjustInches);
+                            }
+                        };
                         ImGui::PushItemWidth(windowWidth.x * 0.35f);
-                        settings.worldScale.AddSliderToGUI(&changed, 0.01f, 2.0f);
+                        settings.worldScale.AddSliderToGUI(&changed, 0.01f, 2.0f, format);
                         ImGui::PopItemWidth();
                         ImGui::SameLine();
                         settings.worldScale.AddSetToGUI(&changed, "Auto", 0.0f);
+                        ImGui::SameLine();
                         settings.worldScale.AddSetToGUI(&changed, "1", 1.0f);
                     });
 
