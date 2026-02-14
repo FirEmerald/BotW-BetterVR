@@ -68,14 +68,21 @@ static void Settings_WriteAll(ImGuiContext* ctx, ImGuiSettingsHandler* handler, 
         buf->appendf("%s=%s\n", option->name, serialized.c_str());
     }
     buf->appendf("\n");
+    Log::print<INFO>("VR Settings Saved:\n{}", s.ToString());
 }
 
-void InitSettings() {
+static void Settings_ReadFinish() {
+    auto& s = GetSettings();
+    Log::print<INFO>("VR Settings Loaded:\n{}", s.ToString());
+}
+
+void InitSettings(ImGuiContext* ctx, ImGuiSettingsHandler* handler) {
     ImGuiSettingsHandler ini_handler;
     ini_handler.TypeName = "BetterVR";
     ini_handler.TypeHash = ImHashStr("BetterVR");
     ini_handler.ReadOpenFn = Settings_ReadOpen;
     ini_handler.ReadLineFn = Settings_ReadLine;
+    ini_handler.ApplyAllFn = Settings_ReadFinish;
     ini_handler.WriteAllFn = Settings_WriteAll;
     ImGui::AddSettingsHandler(&ini_handler);
 }
@@ -170,12 +177,6 @@ void CemuHooks::hook_UpdateSettings(PPCInterpreter_t* hCPU) {
     }
     prevEnabledScreens = currentEnabledScreens;
 #endif
-
-    static bool logSettings = true;
-    if (logSettings) {
-        Log::print<INFO>("VR Settings:\n{}", g_settings.ToString());
-        logSettings = false;
-    }
 
     initCutsceneDefaultSettings(ppc_tableOfCutsceneEventSettings);
 }
