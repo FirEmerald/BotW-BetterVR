@@ -3,6 +3,7 @@
 #include "instance.h"
 #include "utils/vulkan_utils.h"
 #include "vulkan.h"
+#include "utils/mod_settings.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -507,7 +508,7 @@ void RND_Renderer::ImGuiOverlay::Render(long frameIdx, bool renderBackground) {
         VRManager::instance().Hooks->DrawDebugOverlays();
     }
 
-    if (((renderBackground && GetSettings().performanceOverlay == 1) || GetSettings().performanceOverlay == 2) && !VRManager::instance().XR->m_isMenuOpen) {
+    if (((renderBackground && GetSettings().performanceOverlay == PerformanceOverlayMode::WINDOW_ONLY) || GetSettings().performanceOverlay == PerformanceOverlayMode::WINDOW_AND_VR) && !VRManager::instance().XR->m_isMenuOpen) {
         EntityDebugger::DrawFPSOverlay(renderer);
     }
 
@@ -751,17 +752,9 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                 ImGui::PopStyleVar();
                 if (DrawStyledTab(ICON_KI_COG "Settings", 0)) {
                     ImGui::Separator();
-                    int cameraMode = (int)settings.cameraMode.load();
+                    CameraMode cameraMode = settings.cameraMode.Get();
                     DrawSettingRow("Camera Mode", [&]() {
-                        if (ImGui::RadioButton("First Person (Recommended)##CameraMode", &cameraMode, static_cast<int32_t>(CameraMode::FIRST_PERSON))) {
-                            settings.cameraMode = CameraMode::FIRST_PERSON;
-                            changed = true;
-                        }
-                        ImGui::SameLine();
-                        if (ImGui::RadioButton("Third Person##CameraMode", &cameraMode, static_cast<int32_t>(CameraMode::THIRD_PERSON))) {
-                            settings.cameraMode = CameraMode::THIRD_PERSON;
-                            changed = true;
-                        }
+                        settings.cameraMode.AddRadioToGUI(&changed, ModSettings::toDisplayString);
                     });
                     ImGui::Separator();
                     int playMode = (int)settings.playMode.load();
@@ -782,135 +775,22 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_HeaderActive));
                     ImGui::Text("Camera / Player Options");
                     ImGui::PopStyleColor();
-                    if (cameraMode == static_cast<int32_t>(CameraMode::THIRD_PERSON)) {
-                        float distance = settings.thirdPlayerDistance;
+                    if (cameraMode == CameraMode::THIRD_PERSON) {
                         DrawSettingRow("Camera Distance", [&]() {
-                            ImGui::PushItemWidth(windowWidth.x * 0.35f);
-                            if (ImGui::SliderFloat("##CameraDistance", &distance, 0.5f, 0.65f, "%.2f")) {
-                                settings.thirdPlayerDistance = distance;
-                                changed = true;
-                            }
-                            ImGui::PopItemWidth();
-                            ImGui::SameLine();
-                            if (ImGui::Button("Reset##CameraDistance")) {
-                                settings.thirdPlayerDistance = 0.5f;
-                                changed = true;
-                            }
+                            settings.thirdPlayerDistance.AddSliderToGUI(&changed, 0.5f, 0.65f);
                         });
                     }
                     else {
-                        int cameraAnchor = (int)settings.cameraAnchor.load();
-                        DrawSettingRow("View Relative To", [&]() {
-                            if (ImGui::RadioButton("Eyes##CameraAnchor", &cameraAnchor, static_cast<int32_t>(CameraAnchor::EYES))) {
-                                settings.cameraAnchor = CameraAnchor::EYES;
-                                changed = true;
-                            }
-                            ImGui::SameLine();
-                            if (ImGui::RadioButton("Ground##CameraAnchor", &cameraAnchor, static_cast<int32_t>(CameraAnchor::GROUND))) {
-                                settings.cameraAnchor = CameraAnchor::GROUND;
-                                changed = true;
-                            }
+                        DrawSettingRow("Height Offset", [&]() {
+                            auto format = [&](float height) {
+                                return std::format("{0}{1:.02f} meters / {0}{2:.02f} feet", (height > 0.0f ? "+" : ""), height, height * 3.28084f);
+                            };
+                            settings.playerHeightOffset.AddToGUI(&changed, windowWidth.x, -0.5f, 1.0f, format);
                         });
 
-                        if (cameraAnchor == static_cast<int32_t>(CameraAnchor::GROUND)) {
-                            float height = settings.playerHeightOffset;
-                            std::string heightOffsetValueStr;
-                            if (height < -0.01) {
-                                float heightInches = height * -39.3700787f;
-                                int32_t heightFeet = std::floor(heightInches / 12);
-                                heightInches -= heightFeet * 12;
-                                heightOffsetValueStr = std::format("-{0:.02f} meters / {1}ft {2:.02f}in", -height, heightFeet, heightInches);
-                            }
-                            else if (height > 0.01) {
-                                float heightInches = height * 39.3700787f;
-                                int32_t heightFeet = std::floor(heightInches / 12);
-                                heightInches -= heightFeet * 12;
-                                heightOffsetValueStr = std::format("+{0:.02f} meters / {1}ft {2:.02f}in", height, heightFeet, heightInches);
-                            }
-                            else {
-                                heightOffsetValueStr = "None";
-                            }
-                            DrawSettingRow("Player Height Offset", [&]() {
-                                ImGui::PushItemWidth(windowWidth.x * 0.35f);
-                                if (ImGui::SliderFloat("##HeightOffset", &height, -0.5f, 1.0f, heightOffsetValueStr.c_str())) {
-                                    settings.playerHeightOffset = height;
-                                    changed = true;
-                                }
-                                ImGui::PopItemWidth();
-                                ImGui::SameLine();
-                                if (ImGui::Button("Reset##HeightOffset")) {
-                                    settings.playerHeightOffset = 0.0f;
-                                    changed = true;
-                                }
-                            });
-                        }
-                        else {
-                            float height = settings.eyeHeight;
-                            std::string heightValueStr;
-                            if (height == 0.0f)
-                                heightValueStr = "Automatic (Calibrates on recenter)";
-                            else {
-                                float heightInches = height * 39.3700787f;
-                                int32_t heightFeet = std::floor(heightInches / 12);
-                                heightInches -= heightFeet * 12;
-                                heightValueStr = std::format("{0:.02f} meters / {1}ft {2:.02f}in", height, heightFeet, heightInches);
-                            }
-                            DrawSettingRow("Player Eye Height", [&]() {
-                                ImGui::PushItemWidth(windowWidth.x * 0.35f);
-                                if (ImGui::SliderFloat("##EyeHeight", &height, 0.0f, 3.0f, heightValueStr.c_str())) {
-                                    settings.eyeHeight = height;
-                                    changed = true;
-                                }
-                                ImGui::PopItemWidth();
-                                ImGui::SameLine();
-                                if (ImGui::Button("Automatic##EyeHeight")) {
-                                    settings.eyeHeight = 0.0f;
-                                    changed = true;
-                                }
-                            });
-
-                            bool dynamicCameraOffset = settings.dynamicEyeOffset;
-                            DrawSettingRow("Use dynamic camera offset", [&]() {
-                                if (ImGui::Checkbox("##DynamicCameraOffset", &dynamicCameraOffset)) {
-                                    settings.dynamicEyeOffset = dynamicCameraOffset;
-                                    changed = true;
-                                }
-                            });
-
-                            if (dynamicCameraOffset) {
-                                float smoothingFactor = settings.dynamicEyeOffsetSmoothing;
-                                std::string smoothingFactorStr = std::format("{0}", smoothingFactor);
-                                DrawSettingRow("Dynamic Camera Offset Smoothing Factor (lower values are smoother)", [&]() {
-                                    ImGui::PushItemWidth(windowWidth.x * 0.35f);
-                                    if (ImGui::SliderFloat("##SmoothingFactor", &smoothingFactor, 0.01f, 1.0f, smoothingFactorStr.c_str())) {
-                                        settings.dynamicEyeOffsetSmoothing = smoothingFactor;
-                                        changed = true;
-                                    }
-                                    ImGui::PopItemWidth();
-                                    ImGui::SameLine();
-                                    if (ImGui::Button("Reset##SmoothingFactor")) {
-                                        settings.dynamicEyeOffsetSmoothing = 0.1f;
-                                        changed = true;
-                                    }
-                                });
-
-                                bool hideHead = settings.hideHead;
-                                DrawSettingRow("Hide Player Head", [&]() {
-                                    if (ImGui::Checkbox("##HidePlayerHead", &hideHead)) {
-                                        settings.hideHead = hideHead;
-                                        changed = true;
-                                    }
-                                });
-                            }
-
-                        }
-
-
-                        //bool leftHanded = settings.leftHanded;
-                        //if (ImGui::Checkbox("Left Handed Mode", &leftHanded)) {
-                        //    settings.leftHanded = leftHanded ? 1 : 0;
-                        //    changed = true;
-                        //}
+                        //DrawSettingRow("Left Handed Mode", [&]() {
+                        //    settings.leftHanded.AddToGUI(&changed);
+                        //});
                     }
 
                     float worldScale = settings.worldScale;
@@ -949,25 +829,14 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     ImGui::Text("Cutscenes");
                     ImGui::PopStyleColor();
 
-                    int cutsceneMode = (int)settings.cutsceneCameraMode.load();
-                    int currentCutsceneModeIdx = cutsceneMode - 1;
-                    if (currentCutsceneModeIdx < 0) currentCutsceneModeIdx = 1;
-
-                    if (settings.GetCameraMode() != CameraMode::THIRD_PERSON) {
+                    if (cameraMode != CameraMode::THIRD_PERSON) {
                         DrawSettingRow("Camera In Cutscenes", [&]() {
-                            if (ImGui::Combo("##CutsceneCamera", &currentCutsceneModeIdx, "First Person (Always)\0Optimal Settings (Mix Of Third/First)\0Third Person (Always)\0\0")) {
-                                settings.cutsceneCameraMode = (EventMode)(currentCutsceneModeIdx + 1);
-                                changed = true;
-                            }
+                            settings.cutsceneCameraMode.AddComboToGUI(&changed, ModSettings::toDisplayString);
                         });
                     }
 
-                    bool blackBars = settings.useBlackBarsForCutscenes;
                     DrawSettingRow("Black Bars In Third-Person Cutscenes", [&]() {
-                        if (ImGui::Checkbox("##BlackBars", &blackBars)) {
-                            settings.useBlackBarsForCutscenes = blackBars ? 1 : 0;
-                            changed = true;
-                        }
+                        settings.useBlackBarsForCutscenes.AddToGUI(&changed);
                     });
 
                     ImGui::Spacing();
@@ -975,13 +844,9 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_HeaderActive));
                     ImGui::Text("UI");
                     ImGui::PopStyleColor();
-                    if (cameraMode == 1) {
-                        bool guiFollow = settings.uiFollowsGaze;
+                    if (cameraMode == CameraMode::FIRST_PERSON) {
                         DrawSettingRow("UI Follows Where You Look", [&]() {
-                            if (ImGui::Checkbox("##UIFollow", &guiFollow)) {
-                                settings.uiFollowsGaze = guiFollow ? 1 : 0;
-                                changed = true;
-                            }
+                            settings.uiFollowsGaze.AddToGUI(&changed);
                         });
                     }
                     else {
@@ -993,35 +858,13 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_HeaderActive));
                     ImGui::Text("Input");
                     ImGui::PopStyleColor();
-                    if (cameraMode == 1) {
-                        float deadzone = settings.stickDeadzone;
+                    if (cameraMode == CameraMode::FIRST_PERSON) {
                         DrawSettingRow("Thumbstick Deadzone", [&]() {
-                            ImGui::PushItemWidth(windowWidth.x * 0.35f);
-                            if (ImGui::SliderFloat("##StickDeadzone", &deadzone, 0.0f, 0.5f, "%.2f")) {
-                                settings.stickDeadzone = deadzone;
-                                changed = true;
-                            }
-                            ImGui::PopItemWidth();
-                            ImGui::SameLine();
-                            if (ImGui::Button("Reset##Deadzone")) {
-                                settings.stickDeadzone = ModSettings::kDefaultStickDeadzone;
-                                changed = true;
-                            }
+                            settings.stickDeadzone.AddToGUI(&changed, windowWidth.x, 0.0f, 0.5f);
                         });
 
-                        float threshold = settings.axisThreshold;
                         DrawSettingRow("Stick Direction Threshold", [&]() {
-                            ImGui::PushItemWidth(windowWidth.x * 0.35f);
-                            if (ImGui::SliderFloat("##AxisThreshold", &threshold, 0.1f, 0.9f, "%.2f")) {
-                                settings.axisThreshold = threshold;
-                                changed = true;
-                            }
-                            ImGui::PopItemWidth();
-                            ImGui::SameLine();
-                            if (ImGui::Button("Reset##Threshold")) {
-                                settings.axisThreshold = ModSettings::kDefaultAxisThreshold;
-                                changed = true;
-                            }
+                            settings.axisThreshold.AddToGUI(&changed, windowWidth.x, 0.1f, 0.9f);
                         });
 
                         DrawSettingRow("Reset Input Thresholds", [&]() {
@@ -1037,38 +880,35 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     }
 
                     if (ImGui::CollapsingHeader("Advanced Settings")) {
-                        bool crop16x9 = settings.cropFlatTo16x9;
                         DrawSettingRow("Crop VR Image To 16:9 For Cemu Window", [&]() {
-                            if (ImGui::Checkbox("##Crop16x9", &crop16x9)) {
-                                settings.cropFlatTo16x9 = crop16x9 ? 1 : 0;
-                                changed = true;
-                            }
+                            settings.cropFlatTo16x9.AddToGUI(&changed);
                         });
 
-                        bool debugOverlay = settings.ShowDebugOverlay();
                         DrawSettingRow("Show Debugging Overlays (for developers)", [&]() {
-                            if (ImGui::Checkbox("##DebugOverlay", &debugOverlay)) {
-                                settings.enableDebugOverlay = debugOverlay ? 1 : 0;
-                                changed = true;
-                            }
+                            settings.enableDebugOverlay.AddToGUI(&changed);
                         });
 
                         if (VRManager::instance().XR->m_capabilities.isOculusLinkRuntime) {
-                            int angularFix = (int)settings.buggyAngularVelocity.load();
-                            const char* angularOptions[] = { "Auto (Oculus Link)", "Forced On", "Forced Off" };
-                            if (angularFix < 0 || angularFix > 2) angularFix = 0;
-
                             DrawSettingRow("Angular Velocity Fixer", [&]() {
-                                if (ImGui::Combo("##AngularVelocity", &angularFix, angularOptions, 3)) {
-                                    settings.buggyAngularVelocity = (AngularVelocityFixerMode)angularFix;
-                                    changed = true;
-                                }
+                                settings.buggyAngularVelocity.AddComboToGUI(&changed, ModSettings::toDisplayString);
                             });
                         }
                         else {
                             settings.buggyAngularVelocity = AngularVelocityFixerMode::AUTO;
                         }
                     }
+
+                    ImGui::NewLine();
+                    DrawSettingRow("Reset All Options", [&]() {
+                        if (ImGui::Button("Reset")) {
+                            auto options = settings.GetOptions();
+                            for (int i = 0; i < options.size(); ++i) {
+                                options[i]->Reset();
+                            }
+                            changed = true;
+                        }
+                    });
+
 
                     ImGui::EndTabItem();
                 }
@@ -1099,20 +939,13 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
 
                     auto& settings = GetSettings();
 
-                    int performanceOverlay = settings.performanceOverlay;
-                    const char* fpsOverlayOptions[] = { "Disable", "Only show in Cemu window", "Show in both Cemu and VR" };
-                    if (performanceOverlay < 0 || performanceOverlay > 2) performanceOverlay = 0;
-
                     DrawSettingRow("Show FPS Overlay", [&]() {
-                        if (ImGui::Combo("##FPSOverlay", &performanceOverlay, fpsOverlayOptions, 3)) {
-                            settings.performanceOverlay = performanceOverlay;
-                            changed = true;
-                        }
+                        settings.performanceOverlay.AddComboToGUI(&changed, ModSettings::toDisplayString);
                     });
 
-                    if (performanceOverlay >= 0) {
+                    if (settings.performanceOverlay != PerformanceOverlayMode::DISABLE) {
                         static const int freqOptions[] = { 30, 60, 72, 80, 90, 120, 144 };
-                        int currentFreq = (int)settings.performanceOverlayFrequency.load();
+                        int currentFreq = (int)settings.performanceOverlayFrequency.Get();
                         int freqIdx = 5; // Default to 90
                         for (int i = 0; i < std::size(freqOptions); i++) {
                             if (freqOptions[i] == currentFreq) {
