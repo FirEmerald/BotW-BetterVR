@@ -1,9 +1,9 @@
 #include "hooking/cemu_hooks.h"
 #include "hooking/entity_debugger.h"
 #include "instance.h"
+#include "utils/mod_settings.h"
 #include "utils/vulkan_utils.h"
 #include "vulkan.h"
-#include "utils/mod_settings.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -214,20 +214,21 @@ RND_Renderer::ImGuiOverlay::ImGuiOverlay(VkCommandBuffer cb, VkExtent2D fbRes, V
 
     // load vulkan functions
     checkAssert(ImGui_ImplVulkan_LoadFunctions(VRManager::instance().vkVersion, [](const char* funcName, void* data_queue) {
-        VkInstance instance = VRManager::instance().VK->GetInstance();
-        VkDevice device = VRManager::instance().VK->GetDevice();
-        PFN_vkVoidFunction addr = VRManager::instance().VK->GetDeviceDispatch()->GetDeviceProcAddr(device, funcName);
+                    VkInstance instance = VRManager::instance().VK->GetInstance();
+                    VkDevice device = VRManager::instance().VK->GetDevice();
+                    PFN_vkVoidFunction addr = VRManager::instance().VK->GetDeviceDispatch()->GetDeviceProcAddr(device, funcName);
 
-        if (addr == nullptr) {
-            addr = VRManager::instance().VK->GetInstanceDispatch()->GetInstanceProcAddr(instance, funcName);
-            Log::print<VERBOSE>("Loaded function {} at {} using instance", funcName, (void*)addr);
-        }
-        else {
-            Log::print<VERBOSE>("Loaded function {} at {}", funcName, (void*)addr);
-        }
+                    if (addr == nullptr) {
+                        addr = VRManager::instance().VK->GetInstanceDispatch()->GetInstanceProcAddr(instance, funcName);
+                        Log::print<VERBOSE>("Loaded function {} at {} using instance", funcName, (void*)addr);
+                    }
+                    else {
+                        Log::print<VERBOSE>("Loaded function {} at {}", funcName, (void*)addr);
+                    }
 
-        return addr;
-    }), "Failed to load vulkan functions for ImGui");
+                    return addr;
+                }),
+                "Failed to load vulkan functions for ImGui");
 
     ImGui_ImplVulkan_InitInfo init_info = {
         .Instance = VRManager::instance().VK->GetInstance(),
@@ -535,7 +536,6 @@ void RND_Renderer::ImGuiOverlay::ProcessInputs(OpenXR::InputState& inputs, const
         confirmDown = inputs.inGame.run_interact.currentState;
         pageLeft = inputs.inGame.useLeftItem.currentState && inputs.inGame.useLeftItem.changedSinceLastSync;
         pageRight = inputs.inGame.useRightItem.currentState && inputs.inGame.useRightItem.changedSinceLastSync;
-
     }
     else {
         stick = inputs.inMenu.navigate;
@@ -553,7 +553,7 @@ void RND_Renderer::ImGuiOverlay::ProcessInputs(OpenXR::InputState& inputs, const
     bool isBDown = (hold & VPAD_BUTTON_B) != 0;
     bool bPressed = isBDown && !wasBDown;
     wasBDown = isBDown;
-    
+
     // imgui wants us to only have state changes, and we also want to refiring DPAD inputs (used for moving the menu cursor) when held down
     constexpr float THRESHOLD_PRESS = 0.5f;
     constexpr float THRESHOLD_RELEASE = 0.3f;
@@ -756,18 +756,11 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     DrawSettingRow("Camera Mode", [&]() {
                         settings.cameraMode.AddRadioToGUI(&changed, ModSettings::toDisplayString);
                     });
-                    ImGui::Separator();
-                    int playMode = (int)settings.playMode.load();
-                    DrawSettingRow("Play Mode", [&]() {
-                        if (ImGui::RadioButton("Standing##PlayMode", &playMode, static_cast<int32_t>(PlayMode::STANDING))) {
-                            settings.playMode = PlayMode::STANDING;
-                            changed = true;
-                        }
-                        ImGui::SameLine();
-                        if (ImGui::RadioButton("Seated##PlayMode", &playMode, static_cast<int32_t>(PlayMode::SEATED))) {
-                            settings.playMode = PlayMode::SEATED;
-                            changed = true;
-                        }
+                    DrawSettingRow("Play Style", [&]() {
+                        settings.playMode.AddRadioToGUI(&changed, ModSettings::toDisplayString);
+                    });
+                    DrawSettingRow("Camera Relative To", [&]() {
+                        settings.cameraAnchor.AddRadioToGUI(&changed, ModSettings::toDisplayString);
                     });
 
                     ImGui::Spacing();
@@ -781,47 +774,69 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                         });
                     }
                     else {
-                        DrawSettingRow("Height Offset", [&]() {
-                            auto format = [&](float height) {
-                                return std::format("{0}{1:.02f} meters / {0}{2:.02f} feet", (height > 0.0f ? "+" : ""), height, height * 3.28084f);
-                            };
-                            settings.playerHeightOffset.AddToGUI(&changed, windowWidth.x, -0.5f, 1.0f, format);
+                        DrawSettingRow("Hide Player Head", [&]() {
+                            settings.hideHead.AddToGUI(&changed);
                         });
-
                         //DrawSettingRow("Left Handed Mode", [&]() {
                         //    settings.leftHanded.AddToGUI(&changed);
                         //});
                     }
-
-                    float worldScale = settings.worldScale;
-                    std::string worldScaleValueStr;
-                    if (worldScale == 0.0f)
-                        worldScaleValueStr = "Automatic (Calibrates on recenter)";
+                    if (settings.GetCameraAnchor() == CameraAnchor::GROUND) {
+                        DrawSettingRow("Height Offset", [&]() {
+                            auto format = [&](float height) {
+                                if (height < -.01) {
+                                    float heightInches = height * -39.3700787f;
+                                    int32_t heightFeet = std::floor(heightInches / 12);
+                                    heightInches -= heightFeet * 12;
+                                    return std::format("-{0:.02f} meters / {1}ft {2:.02f}in", -height, heightFeet, heightInches);
+                                }
+                                else if (height > .01) {
+                                    float heightInches = height * 39.3700787f;
+                                    int32_t heightFeet = std::floor(heightInches / 12);
+                                    heightInches -= heightFeet * 12;
+                                    return std::format("+{0:.02f} meters / {1}ft {2:.02f}in", height, heightFeet, heightInches);
+                                }
+                                else {
+                                    return std::string("None");
+                                }
+                            };
+                            settings.playerHeightOffset.AddToGUI(&changed, windowWidth.x, -0.5f, 1.0f, format);
+                        });
+                    }
                     else {
-                        float vanillaAdjustMeters = worldScale * 1.73442;
-                        float vanillaAdjustInches = vanillaAdjustMeters * 39.3700787f;
-                        int32_t vanillaAdjustFeet = std::floor(vanillaAdjustInches / 12);
-                        vanillaAdjustInches -= vanillaAdjustFeet * 12;
-                        worldScaleValueStr = std::format("{0:.03f} ({1:.02f}m/{2}ft {3:.02f}in tall unmodded)", worldScale, vanillaAdjustMeters, vanillaAdjustFeet, vanillaAdjustInches);
+                        DrawSettingRow("Use Dynamic Eye Offsets", [&]() {
+                            settings.dynamicEyeOffset.AddToGUI(&changed);
+                        });
+                        if (settings.dynamicEyeOffset.Get()) {
+                            DrawSettingRow("Eye Offset Smoothing (Lower is Smoother)", [&]() {
+                                settings.dynamicEyeOffsetSmoothing.AddToGUI(&changed, windowWidth.x, 0.0f, 1.0f);
+                            });
+                        }
+                        DrawSettingRow("User Eye Height", [&]() {
+                            auto format = [&](float height) {
+                                if (height == 0.0f) return std::string("Automatic");
+                                float heightInches = height * 39.3700787f;
+                                int32_t heightFeet = std::floor(heightInches / 12);
+                                heightInches -= heightFeet * 12;
+                                return std::format("+{0:.02f} meters / {1}ft {2:.02f}in", height, heightFeet, heightInches);
+                            };
+                            ImGui::PushItemWidth(windowWidth.x * 0.35f);
+                            settings.playerHeightOffset.AddSliderToGUI(&changed, 0.0f, 5.0f, format);
+                            ImGui::PopItemWidth();
+                            ImGui::SameLine();
+                            settings.playerHeightOffset.AddSetToGUI(&changed, "Auto", 0.0f);
+                            settings.playerHeightOffset.AddSetToGUI(&changed, "1.6m", 1.6f);
+                        });
                     }
                     DrawSettingRow("World Scale", [&]() {
                         ImGui::PushItemWidth(windowWidth.x * 0.35f);
-                        if (ImGui::SliderFloat("##WorldScale", &worldScale, 0.25f, 2.0f, worldScaleValueStr.c_str())) {
-                            settings.worldScale = worldScale;
-                            changed = true;
-                        }
+                        settings.worldScale.AddSliderToGUI(&changed, 0.01f, 2.0f);
                         ImGui::PopItemWidth();
                         ImGui::SameLine();
-                        if (ImGui::Button("Automatic##WorldScale")) {
-                            settings.worldScale = 0.0f;
-                            changed = true;
-                        }
-                        ImGui::SameLine();
-                        if (ImGui::Button("1##WorldScale")) {
-                            settings.worldScale = 1.0f;
-                            changed = true;
-                        }
+                        settings.worldScale.AddSetToGUI(&changed, "Auto", 0.0f);
+                        settings.worldScale.AddSetToGUI(&changed, "1", 1.0f);
                     });
+
 
                     ImGui::Spacing();
                     ImGui::Separator();
@@ -995,7 +1010,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     ImGui::Text("- Crementif");
 
                     ImGui::Dummy(ImVec2(0.0f, 10.0f));
-                    
+
                     ImGui::EndTabItem();
                 }
 

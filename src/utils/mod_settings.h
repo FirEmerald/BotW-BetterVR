@@ -282,7 +282,7 @@ public:
         }
     }
 
-    void AddSliderToGUI(bool* changed, float min = float(this->min), float max = float(this->max), std::function<std::string(float)> format = [&](float value) { return std::format("%.2f", value); }) {
+    void AddSliderToGUI(bool* changed, float min, float max, std::function<std::string(float)> format = [&](float value) { return std::format("%.2f", value); }) {
         float value = float(this->Get());
         std::string idStr = std::format("##{}", this->name);
         if (ImGui::SliderFloat(idStr.c_str(), &value, min, max, format(value).c_str())) {
@@ -307,7 +307,7 @@ public:
         }
     }
 
-    void AddToGUI(bool* changed, float windowWidth, float min = float(this->min), float max = float(this->max), std::function<std::string(float)> format = [&](float value) { return std::format("%.2f", value); }) {
+    void AddToGUI(bool* changed, float windowWidth, float min, float max, std::function<std::string(float)> format = [&](float value) { return std::format("%.2f", value); }) {
         ImGui::PushItemWidth(windowWidth * 0.35f);
         AddSliderToGUI(changed, min, max, format);
         ImGui::PopItemWidth();
@@ -491,6 +491,11 @@ enum class CameraMode : int32_t {
     FIRST_PERSON = 1,
 };
 
+enum class CameraAnchor : int32_t {
+    GROUND = 0,
+    EYES = 1
+};
+
 enum class PlayMode : int32_t {
     SEATED = 0,
     STANDING = 1,
@@ -549,6 +554,24 @@ public:
                 return "Third Person";
             case CameraMode::FIRST_PERSON:
                 return "First Person (Recommended)";
+        }
+    }
+
+    static const char* toString(CameraAnchor cameraAnchor) {
+        switch (cameraAnchor) {
+            case CameraAnchor::GROUND:
+                return "GROUND";
+            case CameraAnchor::EYES:
+                return "EYES";
+        }
+    }
+
+    static const char* toDisplayString(CameraAnchor cameraAnchor) {
+        switch (cameraAnchor) {
+            case CameraAnchor::GROUND:
+                return "Match Ground";
+            case CameraAnchor::EYES:
+                return "Match Eye Height";
         }
     }
 
@@ -620,12 +643,18 @@ public:
     // playing mode settings
     EnumSetting<CameraMode> cameraMode = EnumSetting<CameraMode>("CameraMode", CameraMode::FIRST_PERSON, ModSettings::toString, { CameraMode::THIRD_PERSON, CameraMode::FIRST_PERSON });
     EnumSetting<PlayMode> playMode = EnumSetting<PlayMode>("PlayMode", PlayMode::STANDING, ModSettings::toString, { PlayMode::STANDING, PlayMode::SEATED });
+    EnumSetting<CameraAnchor> cameraAnchor = EnumSetting<CameraAnchor>("CameraAnchor", CameraAnchor::GROUND, ModSettings::toString, { CameraAnchor::GROUND, CameraAnchor::EYES });
     FloatSetting<float> thirdPlayerDistance = FloatSetting<float>("ThirdPlayerDistance", 0.5f, 0.0f);
     EnumSetting<EventMode> cutsceneCameraMode = EnumSetting<EventMode>("CutsceneCameraMode", EventMode::FOLLOW_DEFAULT_EVENT_SETTINGS, ModSettings::toString, { EventMode::ALWAYS_FIRST_PERSON, EventMode::FOLLOW_DEFAULT_EVENT_SETTINGS, EventMode::ALWAYS_THIRD_PERSON });
     BoolSetting useBlackBarsForCutscenes = BoolSetting("UseBlackBarsForCutscenes", false);
 
     // first-person settings
+    BoolSetting dynamicEyeOffset = BoolSetting("DynamicEyeOffset", false);
+    FloatSetting<float> dynamicEyeOffsetSmoothing = FloatSetting<float>("DynamicEyeOffsetSmoothing", 0.1f, 0.0f, 0.99f);
+    BoolSetting hideHead = BoolSetting("HideHead", true);
     FloatSetting<float> playerHeightOffset = FloatSetting<float>("PlayerHeightOffset", 0.0f);
+    FloatSetting<float> eyeHeight = FloatSetting<float>("EyeHeight", 0.0f, 0.0f);
+    FloatSetting<float> worldScale = FloatSetting<float>("worldScale", 0.0f, 0.0f);
     BoolSetting leftHanded = BoolSetting("LeftHanded", false);
     BoolSetting uiFollowsGaze = BoolSetting("UiFollowsGaze", true);
     BoolSetting cropFlatTo16x9 = BoolSetting("CropFlatTo16x9", true);
@@ -645,10 +674,16 @@ public:
         return std::to_array<ModSettingBase*>({ 
             &cameraMode,
             &playMode,
+            &cameraAnchor,
             &thirdPlayerDistance,
             &cutsceneCameraMode,
             &useBlackBarsForCutscenes,
+            &dynamicEyeOffset,
+            &dynamicEyeOffsetSmoothing,
+            &hideHead,
             &playerHeightOffset,
+            &eyeHeight,
+            &worldScale,
             &leftHanded,
             &uiFollowsGaze,
             &cropFlatTo16x9,
@@ -665,8 +700,23 @@ public:
     CameraMode GetCameraMode() const { return cameraMode; }
 
     PlayMode GetPlayMode() const { return playMode; }
+
+    CameraAnchor GetCameraAnchor() const { return cameraAnchor; }
+
     bool DoesUIFollowGaze() const { return uiFollowsGaze; }
     bool IsLeftHanded() const { return leftHanded; }
+    bool UseDynamicEyeOffset() const {
+        return cameraMode == CameraMode::FIRST_PERSON && cameraAnchor == CameraAnchor::EYES && dynamicEyeOffset;
+    }
+    float GetDynamicEyeOffsetSmoothing() const { return dynamicEyeOffsetSmoothing; }
+    float ShouldHideHead() const {
+        if (cameraMode == CameraMode::THIRD_PERSON)
+            return false;
+        else if (cameraAnchor == CameraAnchor::GROUND || !dynamicEyeOffset)
+            return true;
+        else
+            return hideHead;
+    }
     float GetPlayerHeightOffset() const {
         // disable height offset in third-person mode
         if (GetCameraMode() == CameraMode::THIRD_PERSON) {
@@ -675,6 +725,8 @@ public:
 
         return playerHeightOffset;
     }
+    float GetPlayerEyeHeight() const { return eyeHeight; }
+    float GetWorldScale() const { return worldScale; }
     EventMode GetCutsceneCameraMode() const {
         // if in third-person mode, always use third-person cutscene camera
         if (GetCameraMode() == CameraMode::THIRD_PERSON) {
@@ -695,9 +747,22 @@ public:
     std::string ToString() const {
         std::string buffer = "";
         std::format_to(std::back_inserter(buffer), " - Camera Mode: {}\n", toDisplayString(GetCameraMode()));
+        std::format_to(std::back_inserter(buffer), " - Play Style: {}\n", toDisplayString(GetPlayMode()));
+        std::format_to(std::back_inserter(buffer), " - Camera Anchor: {}\n", toDisplayString(GetCameraAnchor()));
+        std::format_to(std::back_inserter(buffer), " - Dynamic Camera Offsets: {}\n", UseDynamicEyeOffset() ? "Yes" : "No");
+        std::format_to(std::back_inserter(buffer), " - Camera Offset Smoothing Factor: {}\n", GetDynamicEyeOffsetSmoothing());
+        std::format_to(std::back_inserter(buffer), " - Hide Model Head: {}\n", ShouldHideHead() ? "Yes" : "No");
         std::format_to(std::back_inserter(buffer), " - Left Handed: {}\n", IsLeftHanded() ? "Yes" : "No");
         std::format_to(std::back_inserter(buffer), " - GUI Follow Setting: {}\n", DoesUIFollowGaze() ? "Follow Looking Direction" : "Fixed");
         std::format_to(std::back_inserter(buffer), " - Player Height: {} meters\n", GetPlayerHeightOffset());
+        if (eyeHeight <= 0.0)
+        std::format_to(std::back_inserter(buffer), " - Eye Height: Automatic\n");
+        else
+        std::format_to(std::back_inserter(buffer), " - Eye Height: {} meters\n", GetPlayerEyeHeight());
+        if (worldScale <= 0.0)
+        std::format_to(std::back_inserter(buffer), " - World Scale: Automatic\n");
+        else
+        std::format_to(std::back_inserter(buffer), " - World Scale: {}\n", GetWorldScale());
         std::format_to(std::back_inserter(buffer), " - Crop Flat to 16:9: {}\n", ShouldFlatPreviewBeCroppedTo16x9() ? "Yes" : "No");
         std::format_to(std::back_inserter(buffer), " - Debug Overlay: {}\n", ShowDebugOverlay() ? "Enabled" : "Disabled");
         std::format_to(std::back_inserter(buffer), " - Cutscene Camera Mode: {}\n", toDisplayString(GetCutsceneCameraMode()));

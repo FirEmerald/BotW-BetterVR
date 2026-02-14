@@ -71,12 +71,12 @@ static void Settings_WriteAll(ImGuiContext* ctx, ImGuiSettingsHandler* handler, 
     Log::print<INFO>("VR Settings Saved:\n{}", s.ToString());
 }
 
-static void Settings_ReadFinish() {
+static void Settings_ReadFinish(ImGuiContext* ctx, ImGuiSettingsHandler* handler) {
     auto& s = GetSettings();
     Log::print<INFO>("VR Settings Loaded:\n{}", s.ToString());
 }
 
-void InitSettings(ImGuiContext* ctx, ImGuiSettingsHandler* handler) {
+void InitSettings() {
     ImGuiSettingsHandler ini_handler;
     ini_handler.TypeName = "BetterVR";
     ini_handler.TypeHash = ImHashStr("BetterVR");
