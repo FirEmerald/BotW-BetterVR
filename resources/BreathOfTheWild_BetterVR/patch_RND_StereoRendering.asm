@@ -1107,3 +1107,59 @@ blr
 
 ;0x0318FE7C = ba custom_ModifyProjectionUsingCamera
 ;0x0318FEFC = ba import.coreinit.hook_ModifyProjectionUsingCamera
+
+
+; =================================================================================
+
+
+
+hook_updateUIPosition:
+lis r10, currentEyeSide@ha
+lwz r10, currentEyeSide@l(r10)
+lis r11, currentFrameCounter@ha
+lwz r11, currentFrameCounter@l(r11)
+; r12 holds uiManager instance
+ba import.coreinit.hook_UpdateUIPosition
+blr
+
+;0x03078ACC = ba hook_updateUIPosition
+
+;0x03060CD0 = blr
+;0x03A3BCC8 = blr
+
+
+; =================================================================================
+
+0x02FB2468 = orig_StaminaGaugeScreenPositionFn:
+
+hook_fixStaminaGaugeToScreenPosition:
+mflr r0
+stwu r1, -0x20(r1)
+stw r0, 0x24(r1)
+stw r3, 0x1C(r1)
+stw r4, 0x18(r1)
+stw r5, 0x14(r1)
+
+lis r3, orig_StaminaGaugeScreenPositionFn@ha
+addi r3, r3, orig_StaminaGaugeScreenPositionFn@l
+mtctr r3
+lwz r3, 0x1C(r1)
+bctrl ; call original function to get the original screen position
+
+lwz r4, 0x18(r1) ; r4 is a pointer to the 2D screen position that we need to overwrite
+lwz r5, 0x14(r1) ; r5 is a pointer to the world position
+bla import.coreinit.hook_FixStaminaGaugeScreenPosition
+
+lwz r5, 0x14(r1)
+lwz r4, 0x18(r1)
+lwz r3, 0x1C(r1)
+lwz r0, 0x24(r1)
+addi r1, r1, 0x20
+mtlr r0
+blr
+
+; replace the player pos to screen position with static screen coords
+0x02FB2608 = bla hook_fixStaminaGaugeToScreenPosition
+
+; force extra stamina gauge icons to just stay in place instead of dynamically hanging onto the regular stamina wheel once it appears
+0x02FB2760 = bla import.coreinit.hook_FixExtraStaminaGaugeIconPositions

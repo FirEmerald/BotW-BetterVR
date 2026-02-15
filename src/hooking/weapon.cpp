@@ -371,6 +371,15 @@ void CemuHooks::hook_EnableWeaponAttackSensor(PPCInterpreter_t* hCPU) {
         return;
     }
 
+
+    //AttackSensorInitArg arg = weapon.setupAttackSensor;
+    //std::string attackSensorInitStr;
+    //attackSensorInitStr += std::format("mode = {}, flags = {:08X}, mul = {}, scale = {}, shieldBreakPwr = {:08X}", arg.mode.getLE(), arg.flags.getLE(), arg.multiplier.getLE(), arg.scale.getLE(), arg.shieldBreakPower.getLE());
+    //attackSensorInitStr += std::format(", overrideImpact = {}, powerForPlayers = {}, impact = {}, field898 = {}, comboCount = {}, setContactLayer = {}", arg.overrideImpact.getLE(), arg.powerForPlayers.getLE(), arg.impact.getLE(), arg.unk_20.getLE(), arg.comboCount.getLE(), arg.isContactLayerInitialized.getLE());
+    //
+    //Log::print<INFO>(attackSensorInitStr.c_str());
+    //return;
+
     if (heldIndex >= m_motionAnalyzers.size()) {
         Log::print<CONTROLS>("Invalid heldIndex: {}. Skipping motion analysis.", heldIndex);
         return;
@@ -405,6 +414,24 @@ void CemuHooks::hook_EnableWeaponAttackSensor(PPCInterpreter_t* hCPU) {
         weapon.setupAttackSensor.resetAttack = 1;
         weapon.setupAttackSensor.mode = 2;
         weapon.setupAttackSensor.isContactLayerInitialized = 0;
+        weapon.setupAttackSensor.shieldBreakPower = 2; // this is more like a damageType. 2 is required for trees to be chopped.
+        //weapon.setupAttackSensor.multiplier = 1; // this is multiplied by the weapon's damage number. Aka, a weapon that lists 69 is multiplied by this.
+        //weapon.setupAttackSensor.powerForPlayers = 1;
+        //weapon.setupAttackSensor.scale = 1;
+
+
+        //weapon.setupAttackSensor.mode = 2;
+        //weapon.setupAttackSensor.flags = 0;
+        //weapon.setupAttackSensor.multiplier = 1;
+        //weapon.setupAttackSensor.scale = 1;
+        //weapon.setupAttackSensor.shieldBreakPower = 0x01;
+        //weapon.setupAttackSensor.overrideImpact = 16;
+        //weapon.setupAttackSensor.powerForPlayers = 1;
+        //weapon.setupAttackSensor.unk_20 = 0;
+        //weapon.setupAttackSensor.comboCount = 1;
+        //weapon.setupAttackSensor.isContactLayerInitialized = 0;
+
+
         //weapon.setupAttackSensor.overrideImpact = 1;
         //weapon.setupAttackSensor.impact = 2312;
         //weapon.setupAttackSensor.multiplier = 20.0f;

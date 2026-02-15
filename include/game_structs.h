@@ -446,14 +446,6 @@ enum class RumbleType {
      float amplitude = 0.0f;
  };
 
-enum class Direction {
-    Up,
-    Right,
-    Down,
-    Left,
-    None
-};
-
 struct Weapon : WeaponBase {
     PADDED_BYTES(0x72C, 0x870);
     AttackSensorInitArg setupAttackSensor;
@@ -541,6 +533,25 @@ struct BESeadLookAtCamera : BESeadCamera {
 };
 static_assert(sizeof(BESeadCamera) == 0x34, "BESeadCamera size mismatch");
 static_assert(sizeof(BESeadLookAtCamera) == 0x58, "BESeadLookAtCamera size mismatch");
+
+
+struct UIManagerInnerArray {
+    PADDED_BYTES(0x00, 0x34);
+    BEVec3 uiPos1;
+    BEVec3 uiPos2;
+    PADDED_BYTES(0x50, 0x40668-0x04);
+};
+struct UIManager {
+    PADDED_BYTES(0x00, 0x1C);
+    UIManagerInnerArray innerArray;
+    PADDED_BYTES(0x40688, 0x40DD0-0x04);
+};
+
+static_assert(offsetof(UIManager, innerArray) == 0x20, "UIManager.innerArray offset mismatch");
+static_assert(offsetof(UIManager, innerArray.uiPos1) == 0x58, "UIManagerInnerArray.uiPos1 offset mismatch");
+static_assert(offsetof(UIManager, innerArray.uiPos2) == 0x64, "UIManagerInnerArray.uiPos1 offset mismatch");
+static_assert(sizeof(UIManagerInnerArray) == 0x40668, "UIManagerInnerArray size mismatch");
+static_assert(sizeof(UIManager) == 0x40DD0, "UIManager size mismatch");
 
 // not identical memory layout wise
 struct Frustum {
