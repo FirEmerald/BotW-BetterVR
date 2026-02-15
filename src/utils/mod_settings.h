@@ -626,6 +626,7 @@ public:
 
     // first-person settings
     FloatSetting<float> playerHeightOffset = FloatSetting<float>("PlayerHeightOffset", 0.0f);
+    FloatSetting<float> worldScale = FloatSetting<float>("WorldScale", 1.0f, 0.25f, 2.0f);
     BoolSetting leftHanded = BoolSetting("LeftHanded", false);
     BoolSetting uiFollowsGaze = BoolSetting("UiFollowsGaze", true);
     BoolSetting cropFlatTo16x9 = BoolSetting("CropFlatTo16x9", true);
@@ -649,6 +650,7 @@ public:
             &cutsceneCameraMode,
             &useBlackBarsForCutscenes,
             &playerHeightOffset,
+            &worldScale,
             &leftHanded,
             &uiFollowsGaze,
             &cropFlatTo16x9,

@@ -788,9 +788,9 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                             int32_t vanillaAdjustFeet = std::floor(vanillaAdjustInches / 12);
                             vanillaAdjustInches -= vanillaAdjustFeet * 12;
                             return std::format("{0:.03f} ({1:.02f}m/{2}ft {3:.02f}in tall unmodded)", worldScale, vanillaAdjustMeters, vanillaAdjustFeet, vanillaAdjustInches);
-                            };
+                        };
                         settings.worldScale.AddToGUI(&changed, windowWidth.x, 0.01f, 2.0f, format);
-                        });
+                    });
 
                     ImGui::Spacing();
                     ImGui::Separator();
