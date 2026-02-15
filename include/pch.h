@@ -315,6 +315,10 @@ struct BEVec2 : BETypeCompatible {
     BEVec2() = default;
     BEVec2(float x, float y): x(x), y(y) {}
     BEVec2(BEType<float> x, BEType<float> y): x(x), y(y) {}
+
+    glm::fvec2 getLE() const {
+        return { x.getLE(), y.getLE() };
+    }
 };
 
 struct BEVec3 : BETypeCompatible {

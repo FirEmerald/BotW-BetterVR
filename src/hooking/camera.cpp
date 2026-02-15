@@ -193,6 +193,65 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
     s_framesSinceLastCameraUpdate = 0;
 }
 
+// turns out this only does the minimap ui, and not the stamina UI :/
+//void CemuHooks::hook_UpdateUIPosition(PPCInterpreter_t* hCPU) {
+//    hCPU->instructionPointer = hCPU->sprNew.LR;
+//
+//    EyeSide side = hCPU->gpr[10] == 0 ? EyeSide::LEFT : EyeSide::RIGHT;
+//    uint32_t currFrameCounter = hCPU->gpr[11];
+//    uint32_t doesUIManagerExist = hCPU->gpr[3] != 0;
+//    uint32_t uiManagerInstance = hCPU->gpr[12];
+//
+//    if (!doesUIManagerExist) {
+//        return;
+//    }
+//
+//    BEVec3 playerPosCopy = getMemory<BEVec3>(uiManagerInstance + offsetof(UIManager, innerArray.uiPos1));
+//    BEVec3 playerMtxPositionCopy = getMemory<BEVec3>(uiManagerInstance + offsetof(UIManager, innerArray.uiPos2));
+//
+//    Log::print<INFO>("[{}] Updating UI position (frame = {}, playerPos = {}, playerMtxPos = {})", side, currFrameCounter, playerPosCopy, playerMtxPositionCopy);
+//
+//    writeMemory(uiManagerInstance + offsetof(UIManager, innerArray.uiPos1), &playerPosCopy);
+//    writeMemory(uiManagerInstance + offsetof(UIManager, innerArray.uiPos2), &playerMtxPositionCopy);
+//}
+
+void CemuHooks::hook_FixStaminaGaugeScreenPosition(PPCInterpreter_t* hCPU) {
+    hCPU->instructionPointer = hCPU->sprNew.LR;
+
+    if (IsThirdPerson()) {
+        return;
+    }
+
+    BEVec2 staminaGauge2DPos;
+    readMemory(hCPU->gpr[4], &staminaGauge2DPos);
+    BEVec3 playerPosToCameraPos;
+    readMemory(hCPU->gpr[5], &playerPosToCameraPos);
+
+    Log::print<PPC>("Fixing stamina gauge position (oldPos = {}, playerPosToCameraPos = {})", staminaGauge2DPos.getLE(), playerPosToCameraPos);
+
+    staminaGauge2DPos = BEVec2{ -482.0f, +170.0f }; // nested under hearts
+    //staminaGauge2DPos = BEVec2{ 380.0f, 300.0f }; // above the status bars but at the top of the screen
+    //staminaGauge2DPos = BEVec2{ -220.0f, 300.0f }; // above the status bars but at the top of the screen
+    playerPosToCameraPos = BEVec3{ 0.0f, 0.0, 0.0f };
+
+    writeMemory(hCPU->gpr[4], &staminaGauge2DPos);
+    writeMemory(hCPU->gpr[5], &playerPosToCameraPos);
+}
+
+void CemuHooks::hook_FixExtraStaminaGaugeIconPositions(PPCInterpreter_t* hCPU) {
+    hCPU->instructionPointer = hCPU->sprNew.LR;
+
+    // original instruction that got replaced
+    hCPU->fpr[29].fp0 = 1.0f;
+
+    if (IsThirdPerson()) {
+        return;
+    }
+
+    // manually jump
+    hCPU->instructionPointer = 0x02FB29C4;
+}
+
 glm::mat4 CemuHooks::s_lastCameraMtx = glm::mat4(1.0f);
 
 void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
