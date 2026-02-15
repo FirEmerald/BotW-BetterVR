@@ -47,6 +47,8 @@ public:
         osLib_registerHLEFunction("coreinit", "hook_PlayerLadderFix", &hook_PlayerLadderFix);
         osLib_registerHLEFunction("coreinit", "hook_PlayerIsRiding", &hook_PlayerIsRiding);
         osLib_registerHLEFunction("coreinit", "hook_PlayerIsRidingSandSeal", &hook_PlayerIsRidingSandSeal);
+        osLib_registerHLEFunction("coreinit", "hook_FixStaminaGaugeScreenPosition", &hook_FixStaminaGaugeScreenPosition);
+        osLib_registerHLEFunction("coreinit", "hook_FixExtraStaminaGaugeIconPositions", &hook_FixExtraStaminaGaugeIconPositions);
 
         // First-Person Model Hooks
         osLib_registerHLEFunction("coreinit", "hook_SetActorOpacity", &hook_SetActorOpacity);
@@ -271,6 +273,8 @@ private:
     static void hook_CalculateModelOpacity(PPCInterpreter_t* hCPU);
     static void hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU);
     static void hook_ChangeWeaponMtx(PPCInterpreter_t* hCPU);
+    static void hook_FixStaminaGaugeScreenPosition(PPCInterpreter_t* hCPU);
+    static void hook_FixExtraStaminaGaugeIconPositions(PPCInterpreter_t* hCPU);
 
     // First-Person Weapon Hooks
     static void hook_EquipWeapon(PPCInterpreter_t* hCPU);
