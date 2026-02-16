@@ -386,7 +386,7 @@ public:
         for (T value : values) {
             if (value == defaultValue) return;
         }
-        throw std::invalid_argument("Recieved illegal default value");
+        throw std::invalid_argument("Received illegal default value");
     }
 
     void Set(const T value) override {
@@ -514,7 +514,6 @@ enum class PerformanceOverlayMode : int32_t {
 };
 
 struct ModSettings {
-public:
     static const char* toString(EventMode eventMode) {
         switch (eventMode) {
             case EventMode::NO_EVENT:
@@ -525,6 +524,8 @@ public:
                 return "FOLLOW_DEFAULT_EVENT_SETTINGS";
             case EventMode::ALWAYS_THIRD_PERSON:
                 return "ALWAYS_THIRD_PERSON";
+            default:
+                return "";
         }
     }
 
@@ -536,6 +537,8 @@ public:
                 return "Optimal Settings (Mix Of Third/First)";
             case EventMode::ALWAYS_THIRD_PERSON:
                 return "Third Person (Always)";
+            default:
+                return "";
         }
     }
 
@@ -545,6 +548,8 @@ public:
                 return "THIRD_PERSON";
             case CameraMode::FIRST_PERSON:
                 return "FIRST_PERSON";
+            default:
+                return "";
         }
     }
 
@@ -554,6 +559,8 @@ public:
                 return "Third Person";
             case CameraMode::FIRST_PERSON:
                 return "First Person (Recommended)";
+            default:
+                return "";
         }
     }
 
@@ -581,6 +588,8 @@ public:
                 return "STANDING";
             case PlayMode::SEATED:
                 return "SEATED";
+            default:
+                return "";
         }
     }
 
@@ -590,6 +599,8 @@ public:
                 return "Standing";
             case PlayMode::SEATED:
                 return "Seated";
+            default:
+                return "";
         }
     }
 
@@ -601,6 +612,8 @@ public:
                 return "FORCED_ON";
             case AngularVelocityFixerMode::FORCED_OFF:
                 return "FORCED_OFF";
+            default:
+                return "";
         }
     }
 
@@ -612,6 +625,8 @@ public:
                 return "Forced On";
             case AngularVelocityFixerMode::FORCED_OFF:
                 return "Forced Off";
+            default:
+                return "";
         }
     }
 
@@ -623,6 +638,8 @@ public:
                 return "WINDOW_ONLY";
             case PerformanceOverlayMode::WINDOW_AND_VR:
                 return "WINDOW_AND_VR";
+            default:
+                return "";
         }
     }
 
@@ -634,6 +651,8 @@ public:
                 return "Only show in Cemu window";
             case PerformanceOverlayMode::WINDOW_AND_VR:
                 return "Show in both Cemu and VR";
+            default:
+                return "";
         }
     }
 
@@ -641,7 +660,7 @@ public:
     static constexpr float kDefaultStickDeadzone = 0.15f;
 
     // playing mode settings
-    EnumSetting<CameraMode> cameraMode = EnumSetting<CameraMode>("CameraMode", CameraMode::FIRST_PERSON, ModSettings::toString, { CameraMode::THIRD_PERSON, CameraMode::FIRST_PERSON });
+    EnumSetting<CameraMode> cameraMode = EnumSetting<CameraMode>("CameraMode", CameraMode::FIRST_PERSON, ModSettings::toString, { CameraMode::FIRST_PERSON, CameraMode::THIRD_PERSON });
     EnumSetting<PlayMode> playMode = EnumSetting<PlayMode>("PlayMode", PlayMode::STANDING, ModSettings::toString, { PlayMode::STANDING, PlayMode::SEATED });
     EnumSetting<CameraAnchor> cameraAnchor = EnumSetting<CameraAnchor>("CameraAnchor", CameraAnchor::GROUND, ModSettings::toString, { CameraAnchor::GROUND, CameraAnchor::EYES });
     FloatSetting<float> thirdPlayerDistance = FloatSetting<float>("ThirdPlayerDistance", 0.5f, 0.0f);
@@ -694,7 +713,7 @@ public:
             &tutorialPromptShown,
             &axisThreshold,
             &stickDeadzone 
-            });
+        });
     }
 
     CameraMode GetCameraMode() const { return cameraMode; }
