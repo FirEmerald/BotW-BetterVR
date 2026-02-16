@@ -682,7 +682,21 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     else {
                         DrawSettingRow("Height Offset", [&]() {
                             auto format = [&](float height) {
-                                return std::format("{0}{1:.02f} meters / {0}{2:.02f} feet", (height > 0.0f ? "+" : ""), height, height * 3.28084f);
+                                if (height < -.01) {
+                                    float heightInches = height * -39.3700787f;
+                                    int32_t heightFeet = std::floor(heightInches / 12);
+                                    heightInches -= heightFeet * 12;
+                                    return std::format("-{0:.02f}m / {1}\'{2:.02f}\"", -height, heightFeet, heightInches);
+                                }
+                                else if (height > .01) {
+                                    float heightInches = height * 39.3700787f;
+                                    int32_t heightFeet = std::floor(heightInches / 12);
+                                    heightInches -= heightFeet * 12;
+                                    return std::format("+{0:.02f}m / {1}\'{2:.02f}\"", height, heightFeet, heightInches);
+                                }
+                                else {
+                                    return std::string("0.0");
+                                }
                             };
                             settings.playerHeightOffset.AddToGUI(&changed, windowWidth.x, -0.5f, 1.0f, format);
                         });
