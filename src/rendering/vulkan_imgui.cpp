@@ -782,54 +782,54 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                         //DrawSettingRow("Left Handed Mode", [&]() {
                         //    settings.leftHanded.AddToGUI(&changed);
                         //});
-                    }
-                    if (settings.GetCameraAnchor() == CameraAnchor::GROUND) {
-                        DrawSettingRow("Height Offset", [&]() {
-                            auto format = [&](float height) {
-                                if (height < -.01) {
-                                    float heightInches = height * -39.3700787f;
-                                    int32_t heightFeet = std::floor(heightInches / 12);
-                                    heightInches -= heightFeet * 12;
-                                    return std::format("-{0:.02f} meters / {1}ft {2:.02f}in", -height, heightFeet, heightInches);
-                                }
-                                else if (height > .01) {
+                        if (settings.GetCameraAnchor() == CameraAnchor::GROUND) {
+                            DrawSettingRow("Height Offset", [&]() {
+                                auto format = [&](float height) {
+                                    if (height < -.01) {
+                                        float heightInches = height * -39.3700787f;
+                                        int32_t heightFeet = std::floor(heightInches / 12);
+                                        heightInches -= heightFeet * 12;
+                                        return std::format("-{0:.02f} meters / {1}ft {2:.02f}in", -height, heightFeet, heightInches);
+                                    }
+                                    else if (height > .01) {
+                                        float heightInches = height * 39.3700787f;
+                                        int32_t heightFeet = std::floor(heightInches / 12);
+                                        heightInches -= heightFeet * 12;
+                                        return std::format("+{0:.02f} meters / {1}ft {2:.02f}in", height, heightFeet, heightInches);
+                                    }
+                                    else {
+                                        return std::string("None");
+                                    }
+                                };
+                                settings.playerHeightOffset.AddToGUI(&changed, windowWidth.x, -0.5f, 1.0f, format);
+                            });
+                        }
+                        else {
+                            DrawSettingRow("Use Dynamic Eye Offsets", [&]() {
+                                settings.dynamicEyeOffset.AddToGUI(&changed);
+                            });
+                            if (settings.dynamicEyeOffset.Get()) {
+                                DrawSettingRow("Eye Offset Smoothing (Lower is Smoother)", [&]() {
+                                    settings.dynamicEyeOffsetSmoothing.AddToGUI(&changed, windowWidth.x, 0.001f, 1.0f);
+                                });
+                            }
+                            DrawSettingRow("User Eye Height", [&]() {
+                                auto format = [&](float height) {
+                                    if (height == 0.0f) return std::string("Automatic (Calibrates on recenter)");
                                     float heightInches = height * 39.3700787f;
                                     int32_t heightFeet = std::floor(heightInches / 12);
                                     heightInches -= heightFeet * 12;
                                     return std::format("+{0:.02f} meters / {1}ft {2:.02f}in", height, heightFeet, heightInches);
-                                }
-                                else {
-                                    return std::string("None");
-                                }
-                            };
-                            settings.playerHeightOffset.AddToGUI(&changed, windowWidth.x, -0.5f, 1.0f, format);
-                        });
-                    }
-                    else {
-                        DrawSettingRow("Use Dynamic Eye Offsets", [&]() {
-                            settings.dynamicEyeOffset.AddToGUI(&changed);
-                        });
-                        if (settings.dynamicEyeOffset.Get()) {
-                            DrawSettingRow("Eye Offset Smoothing (Lower is Smoother)", [&]() {
-                                settings.dynamicEyeOffsetSmoothing.AddToGUI(&changed, windowWidth.x, 0.001f, 1.0f);
+                                };
+                                ImGui::PushItemWidth(windowWidth.x * 0.35f);
+                                settings.playerHeightOffset.AddSliderToGUI(&changed, 0.0f, 5.0f, format);
+                                ImGui::PopItemWidth();
+                                ImGui::SameLine();
+                                settings.playerHeightOffset.AddSetToGUI(&changed, "Auto", 0.0f);
+                                ImGui::SameLine();
+                                settings.playerHeightOffset.AddSetToGUI(&changed, "1.6m", 1.6f);
                             });
                         }
-                        DrawSettingRow("User Eye Height", [&]() {
-                            auto format = [&](float height) {
-                                if (height == 0.0f) return std::string("Automatic (Calibrates on recenter)");
-                                float heightInches = height * 39.3700787f;
-                                int32_t heightFeet = std::floor(heightInches / 12);
-                                heightInches -= heightFeet * 12;
-                                return std::format("+{0:.02f} meters / {1}ft {2:.02f}in", height, heightFeet, heightInches);
-                            };
-                            ImGui::PushItemWidth(windowWidth.x * 0.35f);
-                            settings.playerHeightOffset.AddSliderToGUI(&changed, 0.0f, 5.0f, format);
-                            ImGui::PopItemWidth();
-                            ImGui::SameLine();
-                            settings.playerHeightOffset.AddSetToGUI(&changed, "Auto", 0.0f);
-                            ImGui::SameLine();
-                            settings.playerHeightOffset.AddSetToGUI(&changed, "1.6m", 1.6f);
-                        });
                     }
                     DrawSettingRow("World Scale", [&]() {
                         auto format = [&](float worldScale) {
