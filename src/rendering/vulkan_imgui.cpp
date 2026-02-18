@@ -709,7 +709,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                                         return std::format("+{0:.02f} meters / {1}ft {2:.02f}in", height, heightFeet, heightInches);
                                     }
                                     else {
-                                        return std::string("None");
+                                        return std::string("0.0");
                                     }
                                 };
                                 settings.playerHeightOffset.AddToGUI(&changed, windowWidth.x, -0.5f, 1.0f, format);
@@ -806,14 +806,6 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
 
                         DrawSettingRow("Stick Direction Threshold", [&]() {
                             settings.axisThreshold.AddToGUI(&changed, windowWidth.x, 0.1f, 0.9f);
-                        });
-
-                        DrawSettingRow("Reset Input Thresholds", [&]() {
-                            if (ImGui::Button("Reset##InputThresholds")) {
-                                settings.stickDeadzone = ModSettings::kDefaultStickDeadzone;
-                                settings.axisThreshold = ModSettings::kDefaultAxisThreshold;
-                                changed = true;
-                            }
                         });
                     }
                     else {
