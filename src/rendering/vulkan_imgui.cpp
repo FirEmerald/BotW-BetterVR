@@ -700,13 +700,13 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                                         float heightInches = height * -39.3700787f;
                                         int32_t heightFeet = std::floor(heightInches / 12);
                                         heightInches -= heightFeet * 12;
-                                        return std::format("-{0:.02f} meters / {1}ft {2:.02f}in", -height, heightFeet, heightInches);
+                                        return std::format("-{0:.02f}m / {1}\'{2:.02f}\"", -height, heightFeet, heightInches);
                                     }
                                     else if (height > .01) {
                                         float heightInches = height * 39.3700787f;
                                         int32_t heightFeet = std::floor(heightInches / 12);
                                         heightInches -= heightFeet * 12;
-                                        return std::format("+{0:.02f} meters / {1}ft {2:.02f}in", height, heightFeet, heightInches);
+                                        return std::format("+{0:.02f}m / {1}\'{2:.02f}\"", -height, heightFeet, heightInches);
                                     }
                                     else {
                                         return std::string("0.0");
@@ -730,7 +730,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                                     float heightInches = height * 39.3700787f;
                                     int32_t heightFeet = std::floor(heightInches / 12);
                                     heightInches -= heightFeet * 12;
-                                    return std::format("+{0:.02f} meters / {1}ft {2:.02f}in", height, heightFeet, heightInches);
+                                    return std::format("{0:.02f}m / {1}\'{2:.02f}\"", -height, heightFeet, heightInches);
                                 };
                                 ImGui::PushItemWidth(windowWidth.x * 0.35f);
                                 settings.playerHeightOffset.AddSliderToGUI(&changed, 0.0f, 5.0f, format);
@@ -738,7 +738,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                                 ImGui::SameLine();
                                 settings.playerHeightOffset.AddSetToGUI(&changed, "Auto", 0.0f);
                                 ImGui::SameLine();
-                                settings.playerHeightOffset.AddSetToGUI(&changed, "1.6m", 1.6f);
+                                settings.playerHeightOffset.AddSetToGUI(&changed, "1.6m / 5\'3\"", 1.6f);
                             });
                         }
                     }
@@ -751,7 +751,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                                 float vanillaAdjustInches = vanillaAdjustMeters * 39.3700787f;
                                 int32_t vanillaAdjustFeet = std::floor(vanillaAdjustInches / 12);
                                 vanillaAdjustInches -= vanillaAdjustFeet * 12;
-                                return std::format("{0:.03f} ({1:.02f}m/{2}ft {3:.02f}in tall unmodded)", worldScale, vanillaAdjustMeters, vanillaAdjustFeet, vanillaAdjustInches);
+                                return std::format("{0:.03f} ({1:.02f}m / {2}\'{3:.02f}\" tall unmodded)", worldScale, vanillaAdjustMeters, vanillaAdjustFeet, vanillaAdjustInches);
                             }
                         };
                         ImGui::PushItemWidth(windowWidth.x * 0.35f);
