@@ -3,10 +3,6 @@ moduleMatches = 0x6267BFD0
 
 .origin = codecave
 
-
-
-
-
 0x037A6EC4 = real_actor_job1_1:
 0x101E5FFC = Player_vtable:
 
@@ -496,6 +492,29 @@ scopedDeltaSetter_float2:
 strActor_job0_1:
 .string "job0_1"
 
+stub_routeActorJob_job0_1:
+li r6, 0
+cmpwi r5, 0
+bne exit_stub_routeActorJob_job0_1
+lwz r11, 0xE8(r3)
+lis r10, Player_vtable@ha
+addi r10, r10, Player_vtable@l
+cmpw r11, r10
+li r6, 1
+bne exit_stub_routeActorJob_job0_1
+li r6, 2
+
+exit_stub_routeActorJob_job0_1:
+mr r3, r6
+blr
+
+stub_routeActorJob_skipRight:
+li r3, 0
+cmpwi r5, 1
+bnelr
+li r3, 1
+blr
+
 hook_actor_job0_1:
 mflr r0
 stwu r1, -0x20(r1)
@@ -510,7 +529,17 @@ lis r4, strActor_job0_1@ha
 addi r4, r4, strActor_job0_1@l
 lis r5, currentEyeSide@ha
 lwz r5, currentEyeSide@l(r5)
-bl import.coreinit.hook_RouteActorJob
+lis r12, useStubHooks@ha
+lwz r12, useStubHooks@l(r12)
+cmpwi r12, 1
+lis r12, stub_routeActorJob_job0_1@ha
+addi r12, r12, stub_routeActorJob_job0_1@l
+beq routeActorJob_job0_1
+lis r12, import.coreinit.hook_RouteActorJob@ha
+addi r12, r12, import.coreinit.hook_RouteActorJob@l
+routeActorJob_job0_1:
+mtctr r12
+bctrl
 
 cmpwi r3, 0
 beq job0_1_normal
@@ -605,7 +634,17 @@ lis r4, strActor_job0_2@ha
 addi r4, r4, strActor_job0_2@l
 lis r5, currentEyeSide@ha
 lwz r5, currentEyeSide@l(r5)
-bl import.coreinit.hook_RouteActorJob
+lis r12, useStubHooks@ha
+lwz r12, useStubHooks@l(r12)
+cmpwi r12, 1
+lis r12, stub_routeActorJob_skipRight@ha
+addi r12, r12, stub_routeActorJob_skipRight@l
+beq routeActorJob_job0_2
+lis r12, import.coreinit.hook_RouteActorJob@ha
+addi r12, r12, import.coreinit.hook_RouteActorJob@l
+routeActorJob_job0_2:
+mtctr r12
+bctrl
 
 cmpwi r3, 1
 beq finish_hook_actor_job0_2
@@ -648,7 +687,17 @@ lis r4, strActor_job1_1@ha
 addi r4, r4, strActor_job1_1@l
 lis r5, currentEyeSide@ha
 lwz r5, currentEyeSide@l(r5)
-bl import.coreinit.hook_RouteActorJob
+lis r12, useStubHooks@ha
+lwz r12, useStubHooks@l(r12)
+cmpwi r12, 1
+lis r12, stub_routeActorJob_skipRight@ha
+addi r12, r12, stub_routeActorJob_skipRight@l
+beq routeActorJob_job1_1
+lis r12, import.coreinit.hook_RouteActorJob@ha
+addi r12, r12, import.coreinit.hook_RouteActorJob@l
+routeActorJob_job1_1:
+mtctr r12
+bctrl
 
 cmpwi r3, 1
 beq finish_hook_actor_job1_1
@@ -694,7 +743,17 @@ lis r4, strActor_job1_2@ha
 addi r4, r4, strActor_job1_2@l
 lis r5, currentEyeSide@ha
 lwz r5, currentEyeSide@l(r5)
-bl import.coreinit.hook_RouteActorJob
+lis r12, useStubHooks@ha
+lwz r12, useStubHooks@l(r12)
+cmpwi r12, 1
+lis r12, stub_routeActorJob_skipRight@ha
+addi r12, r12, stub_routeActorJob_skipRight@l
+beq routeActorJob_job1_2
+lis r12, import.coreinit.hook_RouteActorJob@ha
+addi r12, r12, import.coreinit.hook_RouteActorJob@l
+routeActorJob_job1_2:
+mtctr r12
+bctrl
 
 cmpwi r3, 1
 beq finish_hook_actor_job1_2
@@ -739,7 +798,17 @@ lis r4, strActor_job2_1@ha
 addi r4, r4, strActor_job2_1@l
 lis r5, currentEyeSide@ha
 lwz r5, currentEyeSide@l(r5)
-bl import.coreinit.hook_RouteActorJob
+lis r12, useStubHooks@ha
+lwz r12, useStubHooks@l(r12)
+cmpwi r12, 1
+lis r12, stub_routeActorJob_skipRight@ha
+addi r12, r12, stub_routeActorJob_skipRight@l
+beq routeActorJob_job2_1
+lis r12, import.coreinit.hook_RouteActorJob@ha
+addi r12, r12, import.coreinit.hook_RouteActorJob@l
+routeActorJob_job2_1:
+mtctr r12
+bctrl
 
 cmpwi r3, 1
 beq finish_hook_actor_job2_1
@@ -784,7 +853,17 @@ lis r4, strActor_job2_2@ha
 addi r4, r4, strActor_job2_2@l
 lis r5, currentEyeSide@ha
 lwz r5, currentEyeSide@l(r5)
-bl import.coreinit.hook_RouteActorJob
+lis r12, useStubHooks@ha
+lwz r12, useStubHooks@l(r12)
+cmpwi r12, 1
+lis r12, stub_routeActorJob_skipRight@ha
+addi r12, r12, stub_routeActorJob_skipRight@l
+beq routeActorJob_job2_2
+lis r12, import.coreinit.hook_RouteActorJob@ha
+addi r12, r12, import.coreinit.hook_RouteActorJob@l
+routeActorJob_job2_2:
+mtctr r12
+bctrl
 
 cmpwi r3, 1
 beq finish_hook_actor_job2_2
@@ -829,7 +908,17 @@ lis r4, strActor_job4@ha
 addi r4, r4, strActor_job4@l
 lis r5, currentEyeSide@ha
 lwz r5, currentEyeSide@l(r5)
-bl import.coreinit.hook_RouteActorJob
+lis r12, useStubHooks@ha
+lwz r12, useStubHooks@l(r12)
+cmpwi r12, 1
+lis r12, stub_routeActorJob_skipRight@ha
+addi r12, r12, stub_routeActorJob_skipRight@l
+beq routeActorJob_job4
+lis r12, import.coreinit.hook_RouteActorJob@ha
+addi r12, r12, import.coreinit.hook_RouteActorJob@l
+routeActorJob_job4:
+mtctr r12
+bctrl
 
 cmpwi r3, 1
 beq finish_hook_actor_job4
