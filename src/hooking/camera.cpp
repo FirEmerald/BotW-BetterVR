@@ -116,7 +116,7 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
 
     // read the camera matrix from the game's memory
     uint32_t ppc_cameraMatrixOffsetIn = hCPU->gpr[31];
-    OpenXR::EyeSide side = hCPU->gpr[3] == 0 ? OpenXR::EyeSide::LEFT : OpenXR::EyeSide::RIGHT;
+    OpenXR::EyeSide side = hCPU->gpr[3] == 0 ? EyeSide::LEFT : EyeSide::RIGHT;
     ActCamera actCam = {};
     readMemory(ppc_cameraMatrixOffsetIn, &actCam);
 
@@ -287,9 +287,9 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
     uint32_t cameraIn = hCPU->gpr[3];
     uint32_t cameraOut = hCPU->gpr[12];
-    OpenXR::EyeSide side = hCPU->gpr[11] == 0 ? OpenXR::EyeSide::LEFT : OpenXR::EyeSide::RIGHT;
+    EyeSide side = hCPU->gpr[11] == 0 ? EyeSide::LEFT : EyeSide::RIGHT;
 
-    if (CemuHooks::UseBlackBarsDuringEvents()) {
+    if (UseBlackBarsDuringEvents()) {
         return;
     }
 
@@ -543,8 +543,6 @@ void CemuHooks::hook_ModifyProjectionUsingCamera(PPCInterpreter_t* hCPU) {
 
         Log::print<RENDERING>("[{}] ModifyProjectionUsingCamera at {:08X}: {}", side, cameraPtr, camera);
 
-        OpenXR::EyeSide side = hCPU->gpr[5] == 0 ? EyeSide::LEFT : EyeSide::RIGHT;
-
         // in-game camera
         glm::mat4x3 viewMatrix = camera.mtx.getLEMatrix();
         glm::mat4 worldGame = glm::inverse(glm::mat4(viewMatrix));
@@ -703,16 +701,6 @@ void CemuHooks::hook_CheckIfCameraCanSeePos(PPCInterpreter_t* hCPU) {
     BESeadLookAtCamera camera = {};
     readMemory(camPtr, &camera);
 
-    //uint32_t mainProjectionPtr = hCPU->gpr[5];
-    //BESeadPerspectiveProjection mainProjection = {};
-    //readMemory(mainProjectionPtr, &mainProjection);
-    //uint32_t altProjectionPtr = hCPU->gpr[6];
-    //BESeadPerspectiveProjection altProjection = {};
-    //readMemory(altProjectionPtr, &altProjection);
-
-    //Log::print<INFO>("Main Projection{}: {}", hCPU->gpr[0] == 0 ? " yes " : " no ", mainProjection);
-    //Log::print<INFO>("Alt Projection{}: {}", hCPU->gpr[0] == 1 ? " yes " : " no ", altProjection);
-
     BEVec3 center;
     readMemory(posPtr, &center);
 
@@ -720,7 +708,7 @@ void CemuHooks::hook_CheckIfCameraCanSeePos(PPCInterpreter_t* hCPU) {
     bool visible = false;
 
     for (int i = 0; i < 2; ++i) {
-        OpenXR::EyeSide side = (i == 0) ? OpenXR::EyeSide::LEFT : OpenXR::EyeSide::RIGHT;
+        OpenXR::EyeSide side = (i == 0) ? EyeSide::LEFT : EyeSide::RIGHT;
         if (auto fovOpt = VRManager::instance().XR->GetRenderer()->GetFOV(side)) {
             auto [pos, rot] = CalculateVRWorldPose(camera, side);
 
@@ -1120,25 +1108,3 @@ void CemuHooks::hook_VisualizeRayCastHits(PPCInterpreter_t* hCPU) {
     DebugDraw::instance().Line(rayStart, raycastHitPos, IM_COL32(255, 0, 255, 255));
     DebugDraw::instance().Line(raycastHitPos, rayEnd, IM_COL32(128, 0, 128, 128));
 }
-
-// turns out this only does the minimap ui, and not the stamina UI :/
-//void CemuHooks::hook_UpdateUIPosition(PPCInterpreter_t* hCPU) {
-//    hCPU->instructionPointer = hCPU->sprNew.LR;
-//
-//    EyeSide side = hCPU->gpr[10] == 0 ? EyeSide::LEFT : EyeSide::RIGHT;
-//    uint32_t currFrameCounter = hCPU->gpr[11];
-//    uint32_t doesUIManagerExist = hCPU->gpr[3] != 0;
-//    uint32_t uiManagerInstance = hCPU->gpr[12];
-//
-//    if (!doesUIManagerExist) {
-//        return;
-//    }
-//
-//    BEVec3 playerPosCopy = getMemory<BEVec3>(uiManagerInstance + offsetof(UIManager, innerArray.uiPos1));
-//    BEVec3 playerMtxPositionCopy = getMemory<BEVec3>(uiManagerInstance + offsetof(UIManager, innerArray.uiPos2));
-//
-//    Log::print<INFO>("[{}] Updating UI position (frame = {}, playerPos = {}, playerMtxPos = {})", side, currFrameCounter, playerPosCopy, playerMtxPositionCopy);
-//
-//    writeMemory(uiManagerInstance + offsetof(UIManager, innerArray.uiPos1), &playerPosCopy);
-//    writeMemory(uiManagerInstance + offsetof(UIManager, innerArray.uiPos2), &playerMtxPositionCopy);
-//}
