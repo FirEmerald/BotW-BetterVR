@@ -676,6 +676,8 @@ struct ModSettings {
     FloatSetting<float> worldScale = FloatSetting<float>("worldScale", 0.0f, 0.0f);
     BoolSetting leftHanded = BoolSetting("LeftHanded", false);
     BoolSetting uiFollowsGaze = BoolSetting("UiFollowsGaze", true);
+    FloatSetting<float> hudDistance = FloatSetting<float>("HudDistance", 1.85f, 0.5f, 2.5f);
+    FloatSetting<float> hudSize = FloatSetting<float>("HudSize", 0.85f, 0.4f, 1.75f);
     BoolSetting cropFlatTo16x9 = BoolSetting("CropFlatTo16x9", true);
 
     // advanced settings
@@ -705,6 +707,8 @@ struct ModSettings {
             &worldScale,
             &leftHanded,
             &uiFollowsGaze,
+            &hudDistance,
+            &hudSize,
             &cropFlatTo16x9,
             &enableDebugOverlay,
             &buggyAngularVelocity,

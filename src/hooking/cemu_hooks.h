@@ -27,6 +27,12 @@ public:
         osLib_registerHLEFunction("coreinit", "hook_UpdateActorList", &hook_UpdateActorList);
         osLib_registerHLEFunction("coreinit", "hook_CreateNewActor", &hook_CreateNewActor);
 
+        osLib_registerHLEFunction("coreinit", "hook_SetRigidBodyVelocity", &hook_SetRigidBodyVelocity);
+        osLib_registerHLEFunction("coreinit", "hook_SetRigidBodyTransform", &hook_SetRigidBodyTransform);
+        osLib_registerHLEFunction("coreinit", "hook_SetRigidBodyPosition", &hook_SetRigidBodyPosition);
+        osLib_registerHLEFunction("coreinit", "hook_SetRigidBodyPositionAndRotation", &hook_SetRigidBodyPositionAndRotation);
+        osLib_registerHLEFunction("coreinit", "hook_SetRigidBodyRotation", &hook_SetRigidBodyRotation);
+
         // Stereo Rendering/Camera Hooks
         osLib_registerHLEFunction("coreinit", "hook_BeginCameraSide", &hook_BeginCameraSide);
         osLib_registerHLEFunction("coreinit", "hook_ModifyLightPrePassProjectionMatrix", &hook_ModifyLightPrePassProjectionMatrix);
@@ -77,6 +83,8 @@ public:
         osLib_registerHLEFunction("coreinit", "hook_FixUIBlending", &hook_FixUIBlending);
         osLib_registerHLEFunction("coreinit", "hook_FixCameraSaveFilesAndInventory", &hook_FixCameraSaveFilesAndInventory);
         osLib_registerHLEFunction("coreinit", "hook_VisualizeRayCastHits", &hook_VisualizeRayCastHits);
+        osLib_registerHLEFunction("coreinit", "hook_LoadDynamicVec3", &hook_LoadDynamicVec3);
+        osLib_registerHLEFunction("coreinit", "hook_LoadDynamicBool", &hook_LoadDynamicBool);
     };
     ~CemuHooks() {
         FreeLibrary(m_cemuHandle);
@@ -248,6 +256,12 @@ private:
     static void hook_UpdateActorList(PPCInterpreter_t* hCPU);
     static void hook_CreateNewActor(PPCInterpreter_t* hCPU);
 
+    static void hook_SetRigidBodyVelocity(PPCInterpreter_t* hCPU);
+    static void hook_SetRigidBodyTransform(PPCInterpreter_t* hCPU);
+    static void hook_SetRigidBodyPosition(PPCInterpreter_t* hCPU);
+    static void hook_SetRigidBodyPositionAndRotation(PPCInterpreter_t* hCPU);
+    static void hook_SetRigidBodyRotation(PPCInterpreter_t* hCPU);
+
     // Camera Hooks
     static void hook_BeginCameraSide(PPCInterpreter_t* hCPU);
     static void hook_ModifyLightPrePassProjectionMatrix(PPCInterpreter_t* hCPU);
@@ -298,6 +312,8 @@ private:
     static void hook_CreateNewScreen(PPCInterpreter_t* hCPU);
     static void hook_FixUIBlending(PPCInterpreter_t* hCPU);
     static void hook_FixCameraSaveFilesAndInventory(PPCInterpreter_t* hCPU);
+    static void hook_LoadDynamicVec3(PPCInterpreter_t* hCPU);
+    static void hook_LoadDynamicBool(PPCInterpreter_t* hCPU);
 
 public:
     template <typename T>
